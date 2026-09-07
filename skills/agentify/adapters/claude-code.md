@@ -323,12 +323,15 @@ never-touch list. **None of them gates anything.**
 existing setup gets the same full build as an empty one, minus whatever is already covered. What
 `maturity` and `provenance` are for is one line of context in the plan and better de-duplication.
 
-**De-duplicate against the full list.** Vendored artifacts do not count toward maturity but they do
-count for de-duplication: an installed third-party guide covers its subject just as well as one the
-team wrote. Never restructure, never rewrite an existing skill, and never touch a user-scoped or
-symlinked file — those are invariants of every run, not a mode. **Home-scope entries
-(`~/.claude/skills`, `~/.claude/agents`) are de-duplication targets only**: they are not this repo's
-setup and never appear in a count shown to the user (`coverage.md` §6.1).
+**De-duplicate by `blueprint.md` §2.1 — same type, same job, this repo.** The team's own artifact
+of the candidate's type covers it, once it has been tested against this repo's commands and paths.
+A **vendored** artifact does not count toward maturity and does not cover anything: an installed
+third-party guide is generic by construction, so a generated skill links it as a reference from the
+step that needs the vendor's API detail and is still built. Never restructure, never rewrite an
+existing skill, and never touch a user-scoped or symlinked file — those are invariants of every
+run, not a mode. **Home-scope entries (`~/.claude/skills`, `~/.claude/agents`) cover nothing**: they
+are not this repo's setup, never appear in a count shown to the user, and a same-name collision
+with a generated artifact is one report line, never a skip (`coverage.md` §6.1).
 
 ---
 

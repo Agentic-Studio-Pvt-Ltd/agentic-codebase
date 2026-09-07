@@ -429,7 +429,8 @@ explicitly; that is a leftover from when the flag was gated, not evidence that i
 
 Same resolution as the Claude Code adapter: count user-scoped and project-scoped **separately**,
 never union them, and **let neither gate anything**. There is no audit-only mode (`coverage.md` §6),
-and `${CODEX_HOME}` is not this repo's setup — it is a de-duplication target and nothing else
+and `${CODEX_HOME}` is not this repo's setup — it covers no candidate and is reported only so a
+same-name collision can be named (`blueprint.md` §2.1, `coverage.md` §6.1)
 (`coverage.md` §6.1). `provenance.maturity_basis` is one line of context for the plan; `counts` is
 the de-duplication number. The counting traps below still matter, because a wrong count still
 produces wrong de-duplication and a wrong sentence in the plan.

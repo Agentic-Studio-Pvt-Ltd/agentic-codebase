@@ -14,6 +14,91 @@ Never append a second plan, and never create `plan.1.md` or a dated variant.
 
 ---
 
+## 0. The shortlist — printed before this file is written
+
+`plan.md` is long by design: evidence, mechanisms, diffs, undo. Nobody checks forty artifacts in
+that form. So before a byte of it is written, phase 6 prints the **shortlist** in chat — the whole
+candidate list as a one-screen overview the user can scan in a minute and edit in a sentence — and
+writes the plan only from the confirmed list. It is a preference-class question (`SKILL.md` rule
+9): one word takes it as shown, and `interview.md` §6's accept vocabulary applies here. The plan
+gate below stays the consent gate. This step is the *what*; that one is the *go*.
+
+Print exactly this shape. Numbers run continuously across types in build order, so `drop 12` means
+the same thing here, in the plan and at the gate.
+
+~~~markdown
+## What I'd build for REPO_NAME — ARTIFACT_TOTAL items
+
+Reply **`ok`** and I'll write the plan with all of it. Or edit in plain words — `drop 12, 19` ·
+`rename 7 to ui-reviewer` · `add a rule for trigger/` · `no hooks` · `more on 3` — then `ok`.
+
+### Rules (RULE_COUNT) — path-scoped; each loads only when you touch its zone
+| # | Rule | Scope | What it holds you to |
+|---|---|---|---|
+| 1 | database | `db/**` | schema in `db/schema.ts`, migrations via `bun run db:generate`, never hand-edit an applied one · 25 migrations |
+| 2 | api | `server/**` | every handler through `withAuth` + the org check; `Result`, never `throw` · quotes CLAUDE.md "Server discipline" |
+
+### Hooks (HOOK_COUNT) — enforced by the harness; they HOOK_STRICTNESS_WORD, per your answer
+| # | Hook | Fires on | Catches |
+|---|---|---|---|
+| 13 | env-leak blocker | any file read | `.env.local`, `.env.staging`, `.env.prod`; `.env.example` allowed · 37 env names |
+
+### Permissions (1)
+| # | Allows | Denies |
+|---|---|---|
+| 21 | your 5 real commands + read-only git | `.env*` reads; `db:reset`, `db:push:production` |
+
+### Skills (SKILL_COUNT) — invoke by name, or let the agent pick them up
+| # | Skill | Say | Does · repeat signal |
+|---|---|---|---|
+| 22 | query-db | "how many actors have…" | read-only SQL through db-inspector · 33 files in `db/`, `DATABASE_URL` |
+| 23 | add-capability | "add a generation tool" | the guide's steps, made checkable · 8 shipped, `docs/guides/adding-a-capability.md` |
+
+### Subagents (SUBAGENT_COUNT) — isolated workers with their own context
+| # | Subagent | Tools | Delegated for · paired with |
+|---|---|---|---|
+| 35 | db-inspector | Read, Grep, Bash (read-only) | schema questions, data checks · query-db |
+
+### MCP drafts (MCP_COUNT) — config only; you authenticate
+| # | Server | For | Needs |
+|---|---|---|---|
+| 40 | posthog | ask-product, build-dashboard | `POSTHOG_API_KEY` in your env — never written by me |
+
+### Index doc (1)
+| # | File | Adds |
+|---|---|---|
+| 41 | CLAUDE.md | one delimited section: tables for everything above, your branch and commit flow, removal steps |
+
+**Fired but not built (N)** — one line each; the full walk is in the plan:
+- send-notification · resend is real, but `server/email/` has 2 files and no template dir — steps not readable off the repo
+- qa · you already have `.claude/skills/qa` (yours; 1 path it names is missing here — listed in the plan)
+~~~
+
+Rules for the shortlist:
+
+1. **One row per artifact, one line per row.** Name, scope-or-trigger, and a "what it does for
+   this repo" cell that names a repo noun and ends with the count behind it (`· 13 tasks in
+   trigger/tasks/`, `· 8 shipped`). A skill or subagent row that cannot end with a count is a
+   `blueprint.md` §1.4 failure — fix the candidate, not the row. A pair appears as two rows that
+   name each other.
+2. **Numbers are the plan's numbers.** Assign them here, in build order (rules → hooks →
+   permissions → skills → subagents → MCP → index doc), and never renumber after an edit: a dropped
+   item leaves a gap, an added item takes the next number. The plan, the gate and the report use
+   these.
+3. **"Fired but not built" lists only rows that fired** — skipped or covered — never the
+   `not licensed` rows, which stay in the plan's walk table. One line each, reason first.
+4. **Handling the reply.** An accept (`interview.md` §6) writes the plan as shown. An edit is
+   applied and echoed as the changed rows plus the new total; the plan is written when the reply
+   also accepts (`drop 12, ok`) or on the next accept. `more on N` prints that row's evidence line,
+   mechanism sentence and "will not" line, nothing else. An **addition** is built only if the JSON
+   licenses it (`coverage.md` §5): search for the field, and if none exists say so in one sentence
+   and offer the nearest evidenced thing. A **rename** keeps the catalogue name in the description
+   so `setup-manager` can still find the row. `no hooks` / `no subagents` zeroes a type. Every edit
+   becomes the plan's `SHORTLIST_EDITS_LINE`, naming what was asked, so the plan reads as theirs.
+5. **The shortlist writes nothing.** It is chat. The first byte on disk is `plan.md`, after the
+   accept — and the plan gate is still the gate: confirming the shortlist is not approving the
+   build.
+
 ## 1. Rules for filling the skeleton
 
 1. **Replace every ALL_CAPS token.** A token left in the output is a bug. If you cannot fill one
@@ -34,14 +119,18 @@ Never append a second plan, and never create `plan.1.md` or a dated variant.
 7a. **One word approves, and silence never does.** `SKILL.md` rule 9 puts this in the consent class:
    the `## Your approval` block shows the recommended reply (`approved`) marked exactly as the
    interview marks a recommended option, and still requires the user to type something. Do not
-   accept `interview.md` §6's list here — that vocabulary belongs to phase 5, which writes nothing.
+   accept `interview.md` §6's list here — that vocabulary belongs to phase 5 and the §0 shortlist,
+   neither of which writes an artifact. The `ok` that confirmed the shortlist is not this approval.
 8. **Every phase-4 candidate ends in exactly one place** — built, or under one of the **three**
    skipped headings (`insufficient evidence` / `already covered` / `low confidence — opt in to
    build`). The three are different facts about a candidate and `coverage.md` §8 forbids conflating
    them: more usage brings back an insufficient-evidence one, nothing brings back one that is
    already covered, and a low-confidence one comes back on the user's word alone. There is no
    fourth heading; `### Skipped (over cap)` is retired and a plan that emits it is wrong. A
-   candidate in none of the four states is a bug in the run, not a tidy plan.
+   candidate in none of the four states is a bug in the run, not a tidy plan. **`already covered`
+   names an artifact of the same type inside this repo, or a repo command** (`blueprint.md` §2.1);
+   a vendored guide, a user-scope skill or plugin, an index-doc section or a document is not a
+   covering artifact and cannot appear in that column.
 9. **The three derived values each get a line, always.** `mode`, `services` and `team_size` were
    not asked (`interview.md` §4.2, §4.8), so the plan is the only place the user sees them. Each
    line states the derivation *and* how to overturn it. A derived value with no line is a decision
@@ -52,6 +141,12 @@ Never append a second plan, and never create `plan.1.md` or a dated variant.
 11. **Every artifact passes `blueprint.md` §1.1 before it reaches this file.** A plan entry for a
    file that would read identically in an unrelated repo is a candidate to rewrite, not to list.
    The plan is where a generic artifact is still cheap to catch.
+12. **The catalogue walk is a section of the plan, and it is the last one.** `## Catalogue walk`
+   carries phase 4's table verbatim (`blueprint.md` §10): one row per catalogue row — every §1.3
+   core artifact, every §3, §4.1, §5.1, §5.2, §6.1 and §6.2 row — with the trigger field, what was
+   found, and an outcome from §10's vocabulary. It is how the user sees what was *considered*, not
+   only what was built. A row missing, or an outcome reading "restates CLAUDE.md" / "a vendored
+   guide exists" / "installed at user scope", is a plan to send back to phase 4.
 
 ### 1.1 The no-history case — consent given, nothing found
 
@@ -153,6 +248,8 @@ DEGRADATION_LINE_OR_DELETE
 
 **Your answers shaping this plan.** INTERVIEW_ANSWER_SUMMARY
 
+**What you changed at the shortlist.** SHORTLIST_EDITS_LINE
+
 **What I worked out for myself.** Three things I did not ask about, each with how to change it:
 
 - DERIVED_MODE_LINE
@@ -233,12 +330,13 @@ More usage brings these back — rerun after a week of normal work and they may 
 
 ### Skipped (already covered)
 
-| Candidate | Type | Already covered by | Why skipped |
+| Candidate | Type | Already covered by (same type, in this repo) | Why skipped |
 |---|---|---|---|
 | CANDIDATE_NAME | CANDIDATE_TYPE | EXISTING_FILE_OR_COMMAND | ALREADY_COVERED_REASON |
 
 Building these would duplicate something you already have, which is the failure mode that gets
-generated setups deleted.
+generated setups deleted. Nothing installed at user scope, nothing vendored, and nothing in your
+index doc is counted as covering a candidate — those are references, not replacements.
 
 ### Skipped (low confidence — opt in to build)
 
@@ -276,6 +374,16 @@ anything you edited outside those markers is left alone; my own documents — th
 **Undo.** UNDO_INSTRUCTIONS_EXACT
 
 Full removal steps, with the final file list, go in `PLAN_DIR/report.md` after the build.
+
+## Catalogue walk
+
+Everything I considered, row by row, so you can see what was ruled out and why — not only what
+made the list. One row per catalogue entry; an outcome names a built item, the field that was
+empty, or the file of yours that already does the job.
+
+| Catalogue row | Trigger field | Found | Outcome |
+|---|---|---|---|
+CATALOGUE_WALK_ROWS
 ~~~
 
 ---
@@ -314,11 +422,13 @@ Full removal steps, with the final file list, go in `PLAN_DIR/report.md` after t
 | `EXISTING_FILE_PATH` | the repo-relative path of the existing artifact, from `discovery.existing_agentic_config`. Every row has one; a finding with no path is not a finding about their setup. |
 | `EXISTING_FINDING`, `EXISTING_SUGGESTED_CHANGE` | the concrete defect (broken hook path, two rules contradicting on the same key, duplicate skill name) and the one-line change you propose. **Never propose a change to a symlinked or vendored artifact** — editing a symlink changes every repo that links it, and a vendored file is overwritten by its next install; report those and stop. |
 | `EXISTING_EVIDENCE` | how you know — the frontmatter field, heading, or path you read, named literally |
-| `EXISTING_DEDUPE_NOTE` | one line naming what you read to de-duplicate and confirming the bound: `To de-duplicate I read the frontmatter, headings and paths of N existing skills, agents and rules — no bodies, no source files, no transcripts.` |
+| `EXISTING_DEDUPE_NOTE` | one line naming what you read to de-duplicate and confirming the bound: `To de-duplicate I read the frontmatter, headings and paths of N existing skills, agents and rules, and enough of M of your own to check that the commands and paths they name exist here — no bodies beyond that, no source files, no transcripts.` Add one clause naming which docs were read for quotes (`CLAUDE.md`, `DESIGN.md`, `docs/guides/*`) — `SKILL.md` phase 3's bounded exception. Never claim user-scope entries were de-duplicated against; they cover nothing (`coverage.md` §6.1) |
 | `SCORE_WITH_BREAKDOWN` | the `mapping-rules.md` §6 score and its components, e.g. `9 (F2 C2 D2 B1)` |
 | `LOW_CONFIDENCE_REASON` | why this one is `F = 1` rather than what it is — the thin count against the row threshold, or the stale `last_seen`, in the candidate's own numbers. E.g. `count 3 across 81 sessions, and the two visible examples are different phrasings`, or `last touched 2025-11-04, outside the recency gate`. A `structural` candidate (a script that exists, a convention 77% of commits follow) is **not** low-confidence and does not belong under this heading — `mapping-rules.md` §6.1 draws the line |
 | `COUNT_FOUND`, `THRESHOLD_MISSED` | the number the signal actually had, and the row threshold it missed |
-| `EXISTING_FILE_OR_COMMAND`, `ALREADY_COVERED_REASON` | the existing artifact, CI job, or package script that already does it, named by path or command, and which anti-pattern applies (A1, A2, A9) |
+| `EXISTING_FILE_OR_COMMAND`, `ALREADY_COVERED_REASON` | the existing artifact **of the same type inside this repo**, CI job, or package script that already does it, named by path or command, and which anti-pattern applies (A1, A2, A9). For an own artifact, the reason says it was tested: `own; its 4 commands and 6 paths all resolve here`. A vendored path, a `~/.claude` path, an index-doc heading or a doc path in this column is a plan to send back (`blueprint.md` §2.1) |
+| `SHORTLIST_EDITS_LINE` | one sentence per edit the user made at the §0 shortlist, in their words and with the numbers: `You dropped 12 (docs-zone rule) and 19 (typecheck-on-stop), renamed 7 to ui-reviewer, and asked for a rule for trigger/ — added as #42, licensed by trigger/README.md and 27 files.` When they took it as shown: `Nothing — you took the shortlist as shown.` Never delete the line |
+| `CATALOGUE_WALK_ROWS` | one row per `blueprint.md` catalogue row, in catalogue order: `\| §3 db-inspector \| external_services[] postgres / neon / drizzle \| 3 entries, all high \| built #13, paired with #11 \|`. Outcomes are exactly `built #N`, `not licensed — <field> is <value>`, `covered by <same-type path>`, `skipped — <one of coverage.md §1's three reasons>`, or `merged into #N`. Never fewer rows than the catalogue has |
 | `UNDO_INSTRUCTIONS_EXACT` | **Not a fixed line — derive it, in phase 6, from the three facts below.** A static undo string has now shipped wrong twice, so this token has no default. It must promise exactly what `report-template.md` §3.1 will produce after the build, no more. See §3.1 under this table. |
 
 ### 3.1 Filling `UNDO_INSTRUCTIONS_EXACT`
@@ -491,6 +601,8 @@ rules — no bodies, no transcripts, no source files.
 
 Three things to copy from it: every row names a **file path** and how the defect was seen; the
 de-duplication note states its own bound; and the context line says explicitly that the existing
-setup **did not limit** what was proposed. A finding with no path is not actionable, a
+setup **did not limit** what was proposed. And one thing to notice about what is *not* in the
+covered table: the repo's 6 vendored guides, the user's `~/.claude/skills`, and the sections of its
+index doc — none of them covers anything, so none of them appears (`blueprint.md` §2.1). A finding with no path is not actionable, a
 de-duplication claim with no stated bound reads as if the whole setup was read, and a context line
 without that last clause reads like an apology for building less.

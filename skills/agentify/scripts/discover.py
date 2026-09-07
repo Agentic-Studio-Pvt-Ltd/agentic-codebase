@@ -119,6 +119,7 @@ The `warnings` array says so on every run.
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -339,6 +340,8 @@ DEP_FRAMEWORKS = [
     ("kysely", "Kysely"), ("mongoose", "Mongoose"),
     ("electron", "Electron"), ("@tauri-apps/api", "Tauri"),
     ("zod", "Zod"), ("better-auth", "Better Auth"), ("next-auth", "NextAuth"),
+    ("@radix-ui/", "Radix UI"), ("@xyflow/react", "React Flow"), ("ai", "Vercel AI SDK"),
+    ("@react-email/", "React Email"),
     # python
     ("django", "Django"), ("flask", "Flask"), ("fastapi", "FastAPI"),
     ("starlette", "Starlette"), ("tornado", "Tornado"), ("aiohttp", "aiohttp"),
@@ -380,7 +383,7 @@ FILE_FRAMEWORKS = [
     ("app.config.*", "Expo"), ("metro.config.*", "React Native"),
     ("turbo.json", "Turborepo"), ("nx.json", "Nx"),
     ("serverless.yml", "Serverless Framework"), ("wrangler.toml", "Cloudflare Workers"),
-    ("main.tf", "Terraform"),
+    ("main.tf", "Terraform"), ("components.json", "shadcn/ui"),
 ]
 
 #: dependency name (exact, or prefix when it ends in "/") -> external service
@@ -422,6 +425,24 @@ DEP_SERVICES = [
     ("algoliasearch", "algolia"), ("@segment/", "segment"),
     ("mixpanel", "mixpanel"), ("mixpanel-browser", "mixpanel"),
     ("@amplitude/", "amplitude"),
+    # background jobs
+    ("@trigger.dev/", "trigger.dev"), ("trigger.dev", "trigger.dev"),
+    ("inngest", "inngest"), ("@temporalio/", "temporal"), ("bullmq", "bullmq"),
+    ("@upstash/qstash", "qstash"),
+    # billing beyond stripe
+    ("dodopayments", "dodo"), ("@dodopayments/", "dodo"),
+    ("@lemonsqueezy/", "lemonsqueezy"), ("@paddle/", "paddle"), ("@polar-sh/", "polar"),
+    # model providers
+    ("@openrouter/", "openrouter"), ("@fal-ai/", "fal"), ("fal-client", "fal"),
+    ("fal_client", "fal"), ("@google/generative-ai", "gemini"), ("@google/genai", "gemini"),
+    ("google-generativeai", "gemini"), ("elevenlabs", "elevenlabs"), ("@elevenlabs/", "elevenlabs"),
+    ("@deepgram/", "deepgram"), ("modal", "modal"),
+    # media, storage, realtime, notifications
+    ("uploadthing", "uploadthing"), ("@uploadthing/", "uploadthing"), ("cloudinary", "cloudinary"),
+    ("@mux/", "mux"), ("@livekit/", "livekit"), ("pusher", "pusher"), ("pusher-js", "pusher"),
+    ("ably", "ably"), ("@liveblocks/", "liveblocks"), ("@novu/", "novu"),
+    ("@pinecone-database/", "pinecone"), ("@qdrant/", "qdrant"),
+    ("@shopify/", "shopify"), ("@hubspot/", "hubspot"), ("discord.js", "discord"),
 ]
 
 #: env-var-name prefix (or exact name) -> external service.  NAMES ONLY.
@@ -448,6 +469,20 @@ ENV_SERVICES = [
     ("ALGOLIA_", "algolia"), ("SEGMENT_", "segment"), ("MIXPANEL_", "mixpanel"),
     ("AMPLITUDE_", "amplitude"), ("DATADOG_", "datadog"), ("DD_API", "datadog"),
     ("JIRA_", "jira"), ("FIGMA_", "figma"), ("ELASTIC", "elasticsearch"),
+    ("TRIGGER_", "trigger.dev"), ("INNGEST_", "inngest"), ("TEMPORAL_", "temporal"),
+    ("QSTASH_", "qstash"),
+    ("DODO_", "dodo"), ("LEMONSQUEEZY_", "lemonsqueezy"), ("LEMON_SQUEEZY_", "lemonsqueezy"),
+    ("PADDLE_", "paddle"), ("POLAR_", "polar"),
+    ("OPENROUTER_", "openrouter"), ("FAL_", "fal"), ("GEMINI_", "gemini"),
+    ("GOOGLE_GENERATIVE_", "gemini"), ("GOOGLE_CLIENT_", "google-oauth"),
+    ("ELEVENLABS_", "elevenlabs"), ("ELEVEN_", "elevenlabs"), ("DEEPGRAM_", "deepgram"),
+    ("MODAL_", "modal"),
+    ("R2_", "cloudflare"), ("CLOUDINARY_", "cloudinary"), ("UPLOADTHING_", "uploadthing"),
+    ("MUX_", "mux"), ("LIVEKIT_", "livekit"), ("PUSHER_", "pusher"), ("ABLY_", "ably"),
+    ("LIVEBLOCKS_", "liveblocks"), ("NOVU_", "novu"),
+    ("PINECONE_", "pinecone"), ("QDRANT_", "qdrant"),
+    ("SHOPIFY_", "shopify"), ("HUBSPOT_", "hubspot"), ("DISCORD_", "discord"),
+    ("NEXT_PUBLIC_GA_", "google-analytics"), ("GA_MEASUREMENT", "google-analytics"),
 ]
 
 #: repo-relative path suffix -> external service
@@ -458,6 +493,8 @@ FILE_SERVICES = [
     ("playwright.config.js", "playwright"), ("cypress.config.ts", "cypress"),
     ("drizzle.config.ts", "drizzle"), ("sentry.client.config.ts", "sentry"),
     ("sentry.server.config.ts", "sentry"), ("firebase.json", "firebase"),
+    ("trigger.config.ts", "trigger.dev"), ("trigger.config.js", "trigger.dev"),
+    ("trigger.config.mjs", "trigger.dev"),
     ("app.json", None),  # placeholder, filtered below
 ]
 FILE_SERVICES = [(p, s) for p, s in FILE_SERVICES if s]
@@ -474,7 +511,7 @@ ZONE_NAMES = {
     "alembic": "migrations", "versions": "migrations",
     "components": "components", "component": "components", "ui": "components",
     "views": "components", "widgets": "components", "screens": "components",
-    "pages": "components", "layouts": "components", "partials": "components",
+    "pages": "routes", "layouts": "components", "partials": "components",
     "test": "tests", "tests": "tests", "__tests__": "tests", "spec": "tests",
     "specs": "tests", "e2e": "tests", "cypress": "tests", "testing": "tests",
     "__mocks__": "tests", "fixtures": "tests",
@@ -486,7 +523,32 @@ ZONE_NAMES = {
     "helm": "config", "deploy": "config", "deployment": "config",
     "scripts": "scripts", "bin": "scripts", "tools": "scripts",
     "tooling": "scripts", "cli": "scripts", "tasks": "scripts",
+    # the zones a real app is made of and the old table left `null`
+    "actions": "actions",
+    "trigger": "jobs", "jobs": "jobs", "workers": "jobs", "worker": "jobs",
+    "queues": "jobs", "queue": "jobs", "crons": "jobs", "cron": "jobs", "inngest": "jobs",
+    "lib": "lib", "utils": "lib", "util": "lib", "helpers": "lib", "shared": "lib",
+    "common": "lib", "core": "lib",
+    "hooks": "hooks", "store": "state", "stores": "state", "state": "state",
+    "types": "types", "interfaces": "types",
+    "public": "assets", "static": "assets", "assets": "assets",
+    "styles": "styles", "css": "styles", "locales": "i18n", "i18n": "i18n",
+    "emails": "email", "email": "email", "middleware": "api", "middlewares": "api",
 }
+
+#: Frameworks whose `app/` or `pages/` directory is the route tree, so a folder
+#: named `app` is zone `routes` rather than a domain directory nobody classifies.
+ROUTES_FRAMEWORKS = frozenset(["Next.js", "Remix", "Nuxt", "SvelteKit", "Astro"])
+
+#: Binaries probed on PATH by name -- environment evidence, never repo
+#: evidence.  A generated `qa` skill needs to know whether `agent-browser` is
+#: here before it can name its browser driver; a `pr-reviewer` needs `gh`.
+#: `shutil.which` reads nothing and runs nothing.
+TOOLING_PROBES = (
+    "agent-browser", "playwright", "gh", "psql", "docker", "vercel", "wrangler",
+    "codex", "claude", "bun", "pnpm", "yarn", "npm", "node", "python3", "uv",
+    "poetry", "cargo", "go",
+)
 
 DOC_KINDS = [
     (re.compile(r"^readme(\.[a-z]+)?$", re.I), "readme"),
@@ -495,6 +557,17 @@ DOC_KINDS = [
     (re.compile(r"^issue_template(\.[a-z]+)?$", re.I), "issue-template"),
 ]
 ADR_DIRS = frozenset(["adr", "adrs", "decisions", "rfc", "rfcs", "architecture-decisions"])
+#: A directory whose prose is how-to material: each file there is a procedure
+#: the developer wrote down, which blueprint.md §6.2 turns into a skill.
+GUIDE_DIRS = frozenset([
+    "guides", "guide", "how-to", "howto", "howtos", "recipes", "playbooks",
+    "runbooks", "runbook", "cookbook", "tutorials",
+])
+GUIDE_STEM_RE = re.compile(
+    r"^(adding|add|creating|create|how[-_]?to|writing|building|setting[-_]up|setup|"
+    r"deploying|migrating|onboarding)([-_]|$)"
+)
+DESIGN_DOC_RE = re.compile(r"^(design|design[-_]?system|design[-_]?guidelines|ui[-_]?guidelines|brand)$")
 #: index docs are reported under existing_agentic_config, not twice under docs
 INDEX_DOC_BASENAMES = frozenset(["CLAUDE.md", "AGENTS.md", "CODEX.md"])
 DOC_EXTS = frozenset([".md", ".mdx", ".rst", ".txt", ".adoc"])
@@ -502,7 +575,7 @@ DOC_EXTS = frozenset([".md", ".mdx", ".rst", ".txt", ".adoc"])
 PROSE_EXTS = frozenset([".md", ".mdx", ".rst", ".adoc"])
 OTHER_DOC_NAMES = frozenset([
     "architecture", "changelog", "security", "code_of_conduct", "codeowners",
-    "roadmap", "support", "governance", "style_guide", "styleguide",
+    "roadmap", "support", "governance",
     "development", "testing", "deployment", "onboarding", "conventions",
 ])
 
@@ -1124,6 +1197,11 @@ class State(object):
         self.warnings = warnings
         self.file_count = 0
         self.dir_direct_files = {}
+        #: rel_dir -> direct child basenames (capped) and kept subdirectory
+        #: names, so folders[] can show the naming convention of a zone
+        #: (`0001_init.sql`, `(protected)`) without the model listing it.
+        self.dir_sample_files = {}
+        self.dir_subdirs = {}
         self.lang_files = {}
         self.lang_loc = {}
         self.manifest_paths = []     # (rel, kind, depth)
@@ -1185,6 +1263,8 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
                 continue
             kept.append(name)
         dirnames[:] = kept
+        if rel_dir and kept:
+            state.dir_subdirs[rel_dir] = sorted(kept)[:12]
 
         direct = 0
         for name in filenames:
@@ -1251,6 +1331,11 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
                 state.env_paths.append((rel_path, depth))
                 continue
 
+            if rel_dir and not scrublib.is_secret_path(rel_path):
+                sample = state.dir_sample_files.setdefault(rel_dir, [])
+                if len(sample) < 200:
+                    sample.append(name)
+
             if rel_dir.startswith(".github/workflows") and ext in (".yml", ".yaml"):
                 state.ci_paths.append(rel_path)
             elif rel_path in CI_FILES or name in CI_FILES:
@@ -1311,6 +1396,20 @@ def classify_doc(rel_dir, name, ext):
     for part in parts:
         if part in ADR_DIRS:
             return "adr"
+    # The kinds blueprint.md reads by name.  `design` licenses the designer
+    # subagent and a doc-stated-check hook; `context` the memory rule; `guide`
+    # a skill per procedure.  Root-level or under docs/, never inside code.
+    if DESIGN_DOC_RE.match(stem) and (not parts or parts[0] in ("docs", "doc", "documentation")):
+        return "design"
+    if stem == "context" and not parts:
+        return "context"
+    if stem in ("style_guide", "styleguide", "style-guide"):
+        return "style-guide"
+    for part in parts:
+        if part in GUIDE_DIRS:
+            return "guide"
+    if GUIDE_STEM_RE.match(stem) and parts and parts[0] in ("docs", "doc", "documentation"):
+        return "guide"
     if stem in OTHER_DOC_NAMES:
         return "other"
     if parts and parts[0] in ("docs", "doc", "documentation"):
@@ -2924,8 +3023,27 @@ def detect_services(manifests, env_names, state):
     return out
 
 
-def build_folders(state, limit=140):
-    """Depth-1..3 folders with RECURSIVE file counts and a zone guess."""
+def build_folders(state, frameworks=None, limit=140):
+    """
+    Depth-1..3 folders with RECURSIVE file counts, a zone guess, and a sample
+    of what each holds.
+
+    ZONES.  The deepest path segment with a known name wins (`app/api` is
+    `api`, not `routes`), with three rules on top: anything under a
+    dot-directory other than `.github` is `null` -- `.claude/hooks` is agent
+    config, not a React hooks zone, and classifying it produced a rule
+    candidate for it; `app` (or `src/app`) is `routes` only when a framework
+    in ROUTES_FRAMEWORKS says that directory is the route tree; and a
+    directory anywhere under a `jobs` zone stays `jobs`, so `trigger/tasks`
+    is not demoted to `scripts` by its own basename.
+
+    SAMPLES.  `sample_files` is up to six direct child basenames, sorted, and
+    `subdirs` up to eight kept subdirectory names -- the migration naming
+    pattern, the route groups, the component split, read off the tree instead
+    of guessed.  Names only; nothing under a secret path.
+    """
+    names = set(frameworks or [])
+    routes_fw = bool(names & ROUTES_FRAMEWORKS)
     agg = {}
     for rel_dir, count in state.dir_direct_files.items():
         if not rel_dir:
@@ -2938,18 +3056,39 @@ def build_folders(state, limit=140):
     for path, count in agg.items():
         parts = path.split("/")
         zone = None
-        for part in reversed(parts):
-            zone = ZONE_NAMES.get(part.lower())
-            if zone:
-                break
+        if not (parts[0].startswith(".") and parts[0] != ".github"):
+            for part in reversed(parts):
+                low = part.lower()
+                if low == "app" and routes_fw:
+                    zone = "routes"
+                    break
+                zone = ZONE_NAMES.get(low)
+                if zone:
+                    break
+            if zone != "jobs" and any(ZONE_NAMES.get(p.lower()) == "jobs" for p in parts):
+                zone = "jobs"
         rows.append({
             "path": path,
             "files": count,
             "depth": len(parts),
             "zone": zone,
+            "sample_files": sorted(state.dir_sample_files.get(path, []))[:6],
+            "subdirs": (state.dir_subdirs.get(path) or [])[:8],
         })
     rows.sort(key=lambda row: (-row["files"], row["path"]))
     return rows[:limit]
+
+
+def detect_tooling():
+    """Binaries on PATH, by name only.  Environment evidence for phase 4's
+    browser-driver and CLI choices; never repo evidence, never executed."""
+    found = [name for name in TOOLING_PROBES if shutil.which(name)]
+    return {
+        "on_path": found,
+        "note": "binaries found on this machine's PATH by name; environment evidence "
+                "for choosing a browser driver or CLI in a generated skill, never repo "
+                "evidence, and nothing was executed",
+    }
 
 
 def build_languages(state):
@@ -4060,10 +4199,11 @@ def scan_codex_user_scope(repo_root, reader, warnings):
             warnings,
             "Codex user scope (%s) already has %d skill(s), %d subagent(s), "
             "%d rules file(s), %d hook entr%s, %d plugin(s) and %d MCP "
-            "server(s); these load in EVERY session in this repo, so "
-            "de-duplicate against them (A9) -- they are NOT counted toward "
-            "this repo's maturity, because agentify builds repo-scoped files "
-            "and a global setup is not this repo's setup"
+            "server(s); these load in EVERY session on this machine and in no "
+            "one else's clone, so they are NOT this repo's setup: not counted "
+            "toward maturity and NOT coverage for any candidate (blueprint.md "
+            "2.1) -- a same-name collision with a generated artifact is one "
+            "report line, never a skip"
             % (block["codex_home"], block["counts"]["skills"],
                block["counts"]["agents"], block["counts"]["rules"],
                block["counts"]["hooks"],
@@ -5061,7 +5201,8 @@ def detect_agentic_config(root, state, reader, warnings):
                 "than assuming the existing file is read",
             )
 
-    # -- Codex user scope, for de-duplication only ----------------------------
+    # -- Codex user scope: reported so a same-name collision can be named; it
+    # covers no candidate and feeds no count (blueprint.md 2.1) -------------
     try:
         user_scope = scan_codex_user_scope(root, reader, warnings)
     except Exception:
@@ -5156,7 +5297,8 @@ def detect_agentic_config(root, state, reader, warnings):
         emitlib.warn(
             warnings,
             "%d of %d %s are symlinks (e.g. %s); they were followed and "
-            "counted, so de-duplicate against them and say so in the plan"
+            "counted once -- a symlink is never edited, and it covers a "
+            "candidate only as its own type does (blueprint.md 2.1)"
             % (len(entries), counts.get(bucket, 0), bucket, entries[0]),
         )
 
@@ -5225,8 +5367,10 @@ def detect_agentic_config(root, state, reader, warnings):
             warnings,
             "%d of %d existing skills/agents are third-party, installed rather "
             "than written here (e.g. %s, via %s%s); they do NOT count toward "
-            "maturity but they DO count for de-duplication -- never propose an "
-            "artifact that duplicates one"
+            "maturity and they do NOT cover any candidate -- a third-party guide "
+            "is generic by construction, so a generated skill LINKS it as a "
+            "reference from the step that needs it and is still built "
+            "(blueprint.md 2.1); a same-name path collision is resolved by naming"
             % (vendored_total, total, example.get("name", "?"),
                example.get("signal", "?"),
                ": " + example["source"] if example.get("source") else ""),
@@ -5254,9 +5398,11 @@ def detect_agentic_config(root, state, reader, warnings):
         emitlib.warn(
             warnings,
             "this repo already has an agentic setup (%d of %d skills+agents are "
-            "the team's own): de-duplicate hard against all of it, never "
-            "restructure or rewrite what is there, and build the rest of the "
-            "setup normally -- `maturity` limits nothing"
+            "the team's own): de-duplicate against the team's own artifacts of "
+            "the same type (blueprint.md 2.1), testing each against this repo's "
+            "commands and paths rather than trusting it; never restructure or "
+            "rewrite what is there; build the rest of the setup normally -- "
+            "`maturity` limits nothing"
             % (own_total, total),
         )
 
@@ -5461,6 +5607,7 @@ def empty_payload(root, warnings=None):
             "excludes": [], "tools": [], "systems": [], "task_runners": [],
         },
         "existing_agentic_config": empty_agentic_config(),
+        "tooling": {"on_path": [], "note": ""},
         "git": {
             "is_repo": False, "branch": "", "dirty": False,
             "age_days": 0, "contributors": 0, "commits_90d": 0,
@@ -5552,7 +5699,7 @@ def main(argv=None):
     frameworks = detect_frameworks(state, manifests)
     services = detect_services(manifests, env_names, state)
     languages, loc_total = build_languages(state)
-    folders = build_folders(state)
+    folders = build_folders(state, [f.get("name") for f in frameworks])
     monorepo = detect_monorepo(root, state, manifests, warnings)
 
     try:
@@ -5636,6 +5783,7 @@ def main(argv=None):
         "env_var_names": env_names,
         "monorepo": monorepo,
         "existing_agentic_config": agentic,
+        "tooling": detect_tooling(),
         "git": git_block,
         "warnings": warnings,
         "timing_ms": timer.ms,
@@ -5697,8 +5845,8 @@ def selftest():
             for k in (
                 "repo", "languages", "package_managers", "manifests", "commands",
                 "raw_scripts", "frameworks", "external_services", "folders", "docs",
-                "ci", "env_var_names", "monorepo", "existing_agentic_config", "git",
-                "warnings", "timing_ms",
+                "ci", "env_var_names", "monorepo", "existing_agentic_config", "tooling",
+                "git", "warnings", "timing_ms",
             )
         )
         and sorted(parsed.get("commands", {}).keys())
@@ -6608,6 +6756,82 @@ def selftest():
             str(nested_globs))
     finally:
         shutil.rmtree(mono, ignore_errors=True)
+
+    # -- the 2026-09-07 riffads shape: services, zones, docs and samples the
+    # old tables left invisible, so phase 4 had nothing to walk against ------
+    shape, _shape_prov = _pm_fixture("shape", {
+        "package.json": '{"name":"fx7","scripts":{"dev":"next dev"},'
+                        '"dependencies":{"next":"14.0.0","@dodopayments/better-auth":"1.0.0",'
+                        '"@trigger.dev/sdk":"4.0.0","@fal-ai/client":"1.0.0"}}',
+        "trigger.config.ts": "export default {};\n",
+        "components.json": '{"style":"new-york"}',
+        ".env.example": "TRIGGER_SECRET_KEY=\nDODO_PAYMENTS_API_KEY=\nFAL_KEY=\nR2_BUCKET_NAME=\n",
+        "app/layout.tsx": "export default function L(){return null}\n",
+        "app/(protected)/page.tsx": "export default function P(){return null}\n",
+        "app/api/health/route.ts": "export const GET = () => new Response('ok');\n",
+        "trigger/tasks/render.ts": "export const render = {};\n",
+        ".claude/hooks/guard.sh": "#!/bin/sh\nexit 0\n",
+        "components/ui/button.tsx": "export const Button = () => null;\n",
+        "components/composer/dock.tsx": "export const Dock = () => null;\n",
+        "db/migrations/0001_init.sql": "select 1;\n",
+        "db/migrations/0002_users.sql": "select 2;\n",
+        "DESIGN.md": "# Design\n\n## Anti-patterns\n- no raw hex\n",
+        "CONTEXT.md": "# Glossary\n",
+        "docs/guides/adding-a-capability.md": "# Adding a capability\n1. do\n2. verify\n",
+        "docs/roadmap.md": "# Roadmap\n",
+    })
+    svc = dict((row["name"], row) for row in shape.get("external_services") or [])
+    add(
+        "dodo, trigger.dev and fal are services in their own right (dep + env + config file)",
+        "dodo" in svc and "trigger.dev" in svc and "fal" in svc
+        and svc["trigger.dev"]["confidence"] == "high"
+        and any(e.startswith("file:trigger.config") for e in svc["trigger.dev"]["evidence"])
+        and "cloudflare" in svc,
+        str(sorted(svc.keys())),
+    )
+    fw = set(f["name"] for f in shape.get("frameworks") or [])
+    add("components.json marks shadcn/ui", "shadcn/ui" in fw and "Next.js" in fw, str(sorted(fw)))
+    zones = dict((row["path"], row) for row in shape.get("folders") or [])
+    add(
+        "app is `routes` under Next.js, app/api stays `api`, trigger/tasks is `jobs`, "
+        ".claude/hooks is null",
+        zones.get("app", {}).get("zone") == "routes"
+        and zones.get("app/api", {}).get("zone") == "api"
+        and zones.get("trigger/tasks", {}).get("zone") == "jobs"
+        and zones.get("trigger", {}).get("zone") == "jobs"
+        and zones.get(".claude/hooks", {}).get("zone") is None
+        and zones.get("components", {}).get("zone") == "components",
+        str([(p, r.get("zone")) for p, r in sorted(zones.items())][:12]),
+    )
+    add(
+        "folders carry sample_files and subdirs read off the tree",
+        zones.get("db/migrations", {}).get("sample_files") == ["0001_init.sql", "0002_users.sql"]
+        and "ui" in (zones.get("components", {}).get("subdirs") or [])
+        and "(protected)" in (zones.get("app", {}).get("subdirs") or []),
+        "%s | %s" % (zones.get("db/migrations", {}).get("sample_files"),
+                     zones.get("components", {}).get("subdirs")),
+    )
+    kinds = dict((d["path"], d["kind"]) for d in shape.get("docs") or [])
+    add(
+        "DESIGN.md, CONTEXT.md and docs/guides/* get their own doc kinds",
+        kinds.get("DESIGN.md") == "design" and kinds.get("CONTEXT.md") == "context"
+        and kinds.get("docs/guides/adding-a-capability.md") == "guide"
+        and kinds.get("docs/roadmap.md") == "other",
+        str(sorted(kinds.items())),
+    )
+    add(
+        "tooling.on_path is a list of PATH binaries, names only",
+        isinstance((shape.get("tooling") or {}).get("on_path"), list)
+        and all(isinstance(n, str) and "/" not in n for n in shape["tooling"]["on_path"]),
+        str((shape.get("tooling") or {}).get("on_path")),
+    )
+    warn_text = " ".join(shape.get("warnings") or [])
+    add(
+        "no warning tells the model to de-duplicate against vendored or user-scope entries",
+        "DO count for de-duplication" not in warn_text
+        and "de-duplicate against them (A9)" not in warn_text,
+        warn_text[:120],
+    )
 
     return emitlib.selftest_report(TOOL, checks, started_ms=started)
 

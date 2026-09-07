@@ -57,6 +57,61 @@ Two sources, and both must be used:
 A structural fact alone is enough to **build**. A transcript signal is what makes it **sharp**.
 When both are present, the artifact leads with the transcript evidence.
 
+### 1.3 The core set — built on every run its licence holds
+
+Some artifacts belong in every serious setup, and their licence is so broad that their *absence* is
+the thing that needs explaining. A run is measured against these first. Each is still
+evidence-derived — the licence column names the field — but none is ever skipped as "already
+covered" by anything except an artifact of the same type, inside this repo, doing the same job
+(§2.1), and none is ever skipped for restating the index doc.
+
+| Core artifact | Type | Licence — the field that must be non-empty | Why the usual skip reasons do not apply |
+|---|---|---|---|
+| **setup-manager** | skill | always | §6.3 |
+| **pr-reviewer**, with **review-pr** as its entry point | subagent + skill | `discovery.git.is_repo` | a solo developer reviews their own diff before it lands; `team_size` changes the wording, never the eligibility. A `diff-reviewer` is this artifact under a worse name |
+| **qa** | skill | a web framework in `frameworks[]`, or `commands.dev` non-empty | `commands.test` is the unit tests; a browser-driving pass against a running URL is a different job, and no test command covers it |
+| **db-inspector**, with **query-db** as its entry point | subagent + skill | a database service or ORM (§3), or a `DATABASE_URL`-shaped env name | a `db:studio` script is a window for a human; the agent's read-only path is this pair. A vendored ORM guide is reference material for it, not a replacement |
+| **security-auditor** | subagent | any `.env*` file, or an auth or payments service | — |
+| **designer** (`ui-reviewer`), with **new-component** as its entry point | subagent + skill | a UI framework plus a components zone, or a `docs[]` row of kind `design` | an existing `design` skill that *routes* design work does not review a diff against `DESIGN.md` or scaffold a component in this repo's conventions — different jobs |
+| **product-analyst**, with **add-product-analytics**, **ask-product** and **build-dashboard** | subagent + skills | an analytics service | a marketplace analytics plugin, at any scope, knows the vendor and not this repo's event names |
+| **env-leak blocker**, **destructive-command blocker**, **package-manager enforcer** | hooks | §4.1 | — |
+| **permissions** | settings | the target has a permissions surface | — |
+| **zone rules** — database, api, web, routes, testing, code-style, security | rules | §5.1, one per zone that exists | the index doc stating the convention is the reason to *scope* the rule to its paths, never the reason to skip it |
+| **workflow rules** — branching, commits, project management, decisions, memory, interaction | rules | §5.2 | same |
+
+**The names are the catalogue's names.** `pr-reviewer`, `db-inspector`, `security-auditor`,
+`designer`, `product-analyst`, `qa`, `setup-manager`, `create-issue`, `add-product-analytics`,
+`ask-product`, `build-dashboard`, `query-db`, `review-pr`. A run does not rename one to signal a
+nuance; the nuance goes in the description. The one reason to take the alternate name a row offers
+is a collision with a file that already exists at that path (§2.1).
+
+**Skill + subagent pairs are one proposal.** The skill is the human-facing entry point — it gathers
+inputs, reads context, formats the output — and delegates the isolated or tool-restricted part to
+the subagent. `query-db` reads the question and hands `db-inspector` a read-only job; `review-pr`
+fetches the diff and hands `pr-reviewer` the checklist. Two files, one plan entry, one evidence
+line. `mapping-rules.md` §2.1's "never both" forbids two artifacts that each do the *whole* job; it
+does not forbid a pair.
+
+### 1.4 The size test — a workflow, not a feature
+
+Personalized is not the same as narrow. A skill for something the developer did once, a subagent
+for work that fits in the main thread, a rule for one three-file corner — these are noise with a
+repo noun in them, and they are the second way a generated setup gets deleted. Before a skill or
+subagent goes in the list it passes this, and the shortlist row ends with the number that proves it:
+
+| Artifact | Must show | Read from |
+|---|---|---|
+| **Skill** | **the procedure recurs**: `>= 3` existing instances of the thing it produces (3 migrations, 15 tasks, 8 capabilities, 5 ADRs), or a `request_shapes[]` row with `count >= 3`, or a service the repo *extends over time* through a module (events, emails, plans, jobs), or a guide the developer wrote — nobody documents a one-off | `folders[].files` and `sample_files`, `request_shapes[]`, `raw_scripts`, `docs[]` |
+| **Subagent** | **it earns its context window**: a restricted tool set (read-only db, review-only), a reviewer stance, or a pass over many files — **and** it is a §3 catalogue row or a `request_shapes[]` count `>= 3` backs it. Never invented for one directory | §3, `mapping-rules.md` §2.1 |
+| **Rule** | **it governs a zone or a convention**, never one file triple. A co-change cluster inside a zone folds into that zone's rule as a sentence, unless it states something the zone rule cannot | §5.1, `mapping-rules.md` §1.2 |
+| **Hook** | **it catches something that would happen here more than once**. A check for a path with two files is a rule sentence, not a hook | §4.1 |
+
+One feature is not a workflow. "Add the resize tool" is a feature; "add a generation capability" —
+eight shipped, with a guide — is a workflow. The test is the count of the thing the artifact would
+produce or govern, and the plan states it: `13 tasks in trigger/tasks/`, never `the repo uses
+Trigger.dev`. A candidate that fails goes to `Skipped (insufficient evidence)` with the count it
+had and the count it needed, exactly like a thin transcript row.
+
 ---
 
 ## 2. Evidence, restated for structural facts
@@ -81,6 +136,31 @@ What is still forbidden: an artifact whose trigger fired on nothing you can name
 every catalogue below names the field and the test. Cite it. If the field is empty, the row does
 not fire.
 
+### 2.1 What covers a candidate — and what never does
+
+"Already covered" is the skip reason that did the most damage on real runs, because almost anything
+can be argued to cover almost anything. It has one meaning: **an artifact of the same type, inside
+this repo, that does the same job for this repo.** A rule covers a rule. A hook, a CI job or a repo
+script covers a hook. A skill covers a skill — and so does one existing repo command when the whole
+procedure *is* that command (`mapping-rules.md` A1). A subagent covers a subagent. Nothing crosses
+that line.
+
+| This | Covers | Never covers |
+|---|---|---|
+| The **index doc** (`CLAUDE.md` / `AGENTS.md`) | an index-doc line | a rule, a hook, a skill, a subagent. Prose loaded every session is the *opposite* of a path-scoped rule: the expensive, unenforced form. When the index doc already states a zone's convention, the zone rule quotes that sentence, points at the section, adds what the code shows, and loads lazily on the zone's paths |
+| A **vendored** or third-party artifact (`provenance.vendored_artifacts`) | nothing | anything. It is generic by construction — it would read the same in any repo, which is §1.1 test 4 failing. It becomes a **reference** the generated skill links to from the step that needs it (`drizzle-orm-patterns` from the migration step), and the plan names its source |
+| A **user-scope** artifact — `existing_agentic_config.user_scope`, `~/.claude/skills`, `${CODEX_HOME}/skills`, a user-scope plugin or MCP server | nothing | anything. It is not in the repo, a teammate does not get it, and it is generic by construction. A same-name collision is a report line — both load; say so — never a skip |
+| The team's **own** artifact (`provenance.own`) of the same type | the candidate, **if it passes §1.1 against this repo** | a candidate for a *different* job on a similar topic. Test it, do not trust it: every command it quotes must exist in `raw_scripts`, every path it names must exist in `folders[]`. One that mostly fails is **stale** — list it under `## Existing setup notes` naming the references that do not resolve, keep its name (never overwrite), and say that deleting it and rerunning builds the personalized one |
+| A **document** — a guide, a README section, an ADR, `DESIGN.md` | nothing | a skill, a subagent or a hook. A written procedure is the strongest licence a skill can have (§6.2, guide-to-skill), and a written rule is a hook's licence (§4.1, doc-stated check). The document is the artifact's `references/` source, not its replacement |
+| A **human GUI** — `db:studio`, a dashboard URL, a hosted console | nothing | an MCP draft or a subagent. `mapping-rules.md` A13 is about the *agent's* loop; a window the developer opens by hand is not the agent's path to the data |
+| A **symlinked** or broken artifact | as its type, once | — and it is never edited |
+
+**Name collisions are resolved by naming, never by silence.** A candidate whose catalogue name is
+taken by an artifact that does *not* cover it takes the row's alternate name (`db-inspector` →
+`db-manager`, `designer` → `ui-reviewer`, `review-pr` → `pr-review`), and the plan says why. A
+name taken by an artifact that *does* cover it is the one legitimate `covered by` — with the file
+named.
+
 ---
 
 ## 3. Subagents — the specialists
@@ -94,8 +174,8 @@ subagent; this table is what to look for, and what each one must contain to pass
 | **db-inspector** / **db-manager** | a database service in `external_services[]` (`postgres`, `neon`, `supabase`, `planetscale`, `mongodb`, `redis`) or an ORM in `frameworks[]` (`Prisma`, `Drizzle ORM`, `SQLAlchemy`, `TypeORM`) | the schema directory, the migration directory and command, the ORM's own query idiom, and a **read-only tool allowlist** when the agent supports one. Name the tables or schema files it may read |
 | **pr-reviewer** | `>= 2` non-bot rows in `signals.git.contributors[]`, or a `contributing`/`pr-template` doc in `docs[]`, or `pain_signals[]` about review. **Fires on a `solo` repo too** — reviewing your own diff before it lands is the commonest use; `team_size` changes its wording, never its eligibility | the repo's own rules as the review checklist — every rule file this run builds, by path — plus the commit convention and the test command it must confirm ran |
 | **security-auditor** | any of: `.env*` files present, an auth service in `external_services[]` (`better-auth`, `clerk`, `auth0`, `next-auth`), a payments service (`stripe`, `revenuecat`), or `env_var_names` naming secrets | the actual env var names (names only, never values), the auth entry points, and the specific classes of leak this stack allows |
-| **designer** / **ui-reviewer** | a design system in `frameworks[]` (`Tailwind CSS`, `styled-components`, `Storybook`) plus a components zone in `folders[]`, or a `DESIGN.md`-shaped doc | the component directory, the design tokens file, the existing component conventions read off the repo, and the design doc's own rules |
-| **product-analyst** | an analytics service (`posthog`, `mixpanel`, `amplitude`, `segment`) | the event names already in the codebase, the analytics client module, and read-only query access |
+| **designer** / **ui-reviewer** | a design system in `frameworks[]` (`Tailwind CSS`, `styled-components`, `Storybook`, `shadcn/ui`) plus a components zone in `folders[]`, or a `docs[]` row of kind `design` | the component directory and its `subdirs` split, the design tokens file, the existing component conventions read off the repo, and the design doc's own rules — including its banned list, which is also a §4.1 doc-stated check. An existing `design` skill that routes design work covers neither this nor `new-component` (§2.1) |
+| **product-analyst** | an analytics service (`posthog`, `mixpanel`, `amplitude`, `segment`) | the event names already in the codebase, the analytics client module, and read-only query access. A user-scope analytics plugin covers nothing (§2.1) |
 | **test-runner** / **qa** | `commands.test` non-empty **and** `test_discipline.commits_touching_tests_pct` low, or `pain_signals[]` about failing tests | the exact test command, the test directory layout, and how to read this repo's failures |
 | **codebase-explorer** | `repo.size_bucket == "large"`, or `folders[]` spanning `>= 5` zones | the zone map — which directory holds what — so it does not rediscover it every time |
 
@@ -106,7 +186,10 @@ Two disciplines:
   `sandbox_mode` and `mcp_servers` and no direct equivalent — say so in the plan
   (`adapters/capabilities.md`).
 - **A subagent that duplicates a skill is one artifact too many.** §2.1 of `mapping-rules.md`
-  decides; do not build both for the same job.
+  decides; do not build two artifacts that each do the whole job. A **pair** — an entry-point skill
+  delegating to a tool-restricted subagent — is one proposal, not a duplicate (§1.3).
+- **Use the catalogue name** (§1.3). `pr-reviewer`, not `diff-reviewer`; `db-inspector`, not
+  `database-helper`.
 
 ---
 
@@ -126,10 +209,16 @@ hooks in a repo with a `.env` file and a package manager is a finding, not a neu
 | **typecheck on write** | `commands.typecheck` non-empty and no CI job runs it (`ci[]`) | `PostToolUse` or `Stop` | the exact command; time-box it, since it is the slow one |
 | **test-on-stop** | `commands.test` non-empty **and** `test_discipline.commits_touching_tests_pct` is low or a `pain_signals[]` row names a test that broke after a change | `Stop` | the exact command and which subset to run. Time-box it; propose it at `warn` unless `hook_strictness` says otherwise |
 | **secret-scan before commit** | a payments/auth/cloud service in `external_services[]` | `PreToolUse` on the shell tool, matching `git commit` | the secret patterns this stack produces — the env prefixes in `env_var_names`, nothing invented |
-| **branch guard** | `signals.git.branch_naming[]` has a pattern with `count >= 5`, or the default branch is protected | `PreToolUse` on the shell tool | the actual branch naming pattern, and the default branch name |
+| **branch guard** | `signals.git.branch_naming[]` has a pattern with `count >= 5`, or the default branch is protected, **or the index doc names the branch to work on** | `PreToolUse` on the shell tool | the actual branch naming pattern and the default branch name — or the literal sentence from the index doc ("always work on `development`"), quoted. A `branch_naming[]` count below 5 does not override a sentence the developer wrote |
+| **doc-stated check** | the repo's own docs state a **mechanically checkable** rule — a forbidden import, class, literal or file, a required helper. Read off the index doc, a `docs[]` row of kind `design` / `style-guide` / `contributing`, or a lint config's gaps | `PostToolUse` on the write/edit tools — a grep over the file just written | the exact strings the doc forbids or requires, quoted, with the doc's path and heading as the evidence. "No raw hex, no `lucide-react`, no `h-screen`" in `DESIGN.md` §7 is three things the model can be reminded of every session, or one hook that catches them at write time — build the hook. **Zero transcript corrections about it is not a reason to skip**: the developer wrote the rule down instead of repeating it |
+| **index-doc instruction guard** | an instruction in the user's own index doc that names a **command** or **file** to avoid — "never run `db:push` against staging", "never edit an applied migration" | `PreToolUse` on the shell or edit tool | the literal command or path from the instruction, quoted; the instruction is the evidence |
 
 `hook_strictness` from phase 5 sets block-vs-warn for **all** of them at once. The env-leak and
 destructive-command hooks are the two where blocking is the sane default — say so when asking.
+
+The last three rows share one idea, and it is the one runs keep missing: **a rule the developer
+wrote into their own docs is evidence of the same tier as a correction they typed three times.**
+It licenses a hook when the check is mechanical, and a rule when it is not.
 
 ### 4.2 Permissions — the allow/deny lists
 
@@ -169,11 +258,25 @@ directory exists, holds files, and has a convention you can state from evidence.
 | **web** / **frontend** | `zone == "components"`, `zone == "web"`, a UI framework | the component directory split, the styling system, server-vs-client component rules where the framework has them, the shared UI primitives directory |
 | **testing** | `commands.test` non-empty | the runner, the file naming convention read off the repo, where tests live, what `test_discipline` says about the current bar |
 | **code style** | a linter/formatter in `frameworks[]` | the config file, the command, and only the conventions the config does **not** already enforce — never restate ESLint's own rules |
-| **security** | auth or payments service, or `.env*` present | the env var names, where secrets are read, what never goes client-side (name the framework's own public prefix, e.g. `NEXT_PUBLIC_`) |
+| **security** | auth or payments service, or `.env*` present | the env var names, where secrets are read, what never goes client-side (name the framework's own public prefix, e.g. `NEXT_PUBLIC_`), the tenancy check every query makes |
+| **routes** | `zone == "routes"` — Next.js `app/` or `pages/`, a Remix / SvelteKit / Nuxt route directory | the route-group layout read off `subdirs` (`(protected)`, `(admin)`), what a page must do before rendering (the session check, the role check), where layouts live, server-vs-client component rules |
+| **server actions / jobs** | `zone == "actions"`, or `zone == "jobs"` (`trigger/`, `jobs/`, `workers/`, `queues/`) | the file-per-action or file-per-task convention read off `sample_files`, the validation and auth every one performs, the real run command (`trigger:dev`), what never runs inside one |
+| **domain zone** | a depth-1 directory with `zone == null`, `files >= 15`, not a dot-directory, vendor or build output — the repo's own architecture (`server/generation`, `composer`, `actors`, `lib/workflow`) | a convention stateable from **one of**: a README inside it (a `docs[]` row under that path), an index-doc section naming it, a `cochange_clusters[]` row inside it, or a `commit_conventions` scope naming it. None of the four ⇒ no rule, and the walk (§10) says which four were empty |
 
 In a **monorepo** (`monorepo.is_monorepo`), zone rules are **per workspace**: a `web` rule scoped
 to `apps/web/**` and an `api` rule scoped to `apps/api/**` are two rules, not one, because their
 conventions differ. This is the case where a single merged rule is actively wrong.
+
+**The index doc is never the reason a zone rule is skipped** (§2.1). A 40 KB `CLAUDE.md` with a
+"Server discipline" section is a repo whose api rule already has its first sentence written; the
+rule quotes it, scopes it to `server/**`, and adds what the code shows that the section does not —
+the helper every handler calls, the error shape, the validator. Loaded lazily on those paths it
+costs nothing until the zone is touched, which is the opposite of the index doc's cost. The report
+may *suggest* that the section could move into the rule; agentify never moves it.
+
+**Sub-zones come from the commit scopes.** `commit_conventions.scopes` — `composer 18`, `voice
+15`, `actors 5` — is the developer's own map of the domains inside a zone. Use it to decide whether
+an api rule is one rule or one per domain, and to name the sections inside it.
 
 ### 5.2 Workflow rules — how this developer works
 
@@ -182,7 +285,7 @@ These come from git and transcripts, not from directories.
 | Rule | Fires on | States |
 |---|---|---|
 | **branching** | `signals.git.branch_naming[]` pattern `count >= 5` | the actual pattern with a real example branch name, the default branch, and how work reaches it |
-| **commits** | `commit_conventions.conventional_pct >= 0.6` or `.ticket_prefix_pct >= 0.6` | the real prefix set observed, with counts, and a real example commit subject from this repo |
+| **commits** | `commit_conventions.conventional_pct >= 0.6` or `.ticket_prefix_pct >= 0.6` — **or**, below both, any `scopes` vocabulary or an imperative-subject share `>= 0.8` | the real prefix set observed, with counts, and a real example commit subject from this repo. Below the threshold the rule states the convention that *is* observed — "imperative subject, optional `type(scope)`, scopes from {composer, voice, actors}" — never a standard the repo does not follow: the rule describes this repo, it does not prescribe |
 | **project management** | a tracker in `external_services[]` (`linear`, `jira`, `notion`, `github`), or a ticket prefix in `commit_conventions` | the tracker, the ticket-id format seen in commits, when an issue is opened, what belongs in it — the `linear-workflow.md`-shaped rule |
 | **decision recording** | `docs[]` holds an `adr` kind, or `doc_hotspots[]` names a decisions/architecture doc | the doc's real path, its existing numbering, and when a decision belongs there rather than in a commit message |
 | **memory / context recording** | `meta_queries[]` non-empty, or a `CONTEXT.md`-shaped doc | where running context is kept and what gets written back after a session |
@@ -219,6 +322,14 @@ want at the phase 6 gate, by number.
 | `sentry`, `datadog` | **triage-error** — take an error and produce a diagnosis | the release/environment tagging this repo uses, and the source-map or symbol setup |
 | `vercel`, `netlify`, `cloudflare`, `aws` | **ship** — the real deploy path | the actual deploy command, preview-vs-production, the env vars each stage needs, by name |
 | `github` | **pr-review**, **release-notes** | the repo's own rules as the checklist, the commit convention for the notes |
+| `trigger.dev`, `inngest`, `temporal`, `bullmq`, `celery` | **new-background-task** — add a job the way this repo adds one | the task directory and its file-per-task convention (`sample_files`), the real dev and deploy commands (`trigger:dev`, `trigger:deploy`), the retry and idempotency pattern the existing tasks use, the env names the runner needs |
+| `openai`, `anthropic`, `openrouter`, `fal`, `replicate`, `gemini`, `elevenlabs` | **add-capability** / **add-model-call** — add a generation or model call the way this repo does | the provider module, the prompt or policy directory, the cost or credit accounting every call passes through, the moderation step, the existing capability the new one is modelled on. When the repo has its own guide for this (§6.2, guide-to-skill), the guide is the spine |
+| `dodo`, `lemonsqueezy`, `paddle`, `polar` | same as `stripe` — **billing-change** | the same, plus the product-sync script where one exists (`dodo:sync`) and the entitlement or credit table it feeds |
+| `cloudflare` (R2), `aws` (S3), `uploadthing`, `cloudinary` | **add-upload** — only when `>= 2` upload paths exist or a `request_shapes[]` row names uploads; one presign route is a feature, not a workflow (§1.4) | the presign route, the bucket env names, the client-side PUT pattern, the size and type limits already enforced |
+
+Vendored skills in the repo for any of these (`trigger-tasks`, `neon-postgres`, `dodo-best-practices`)
+are the generated skill's **references**, linked from the step that needs the vendor's API detail.
+They are never the reason the row does not fire (§2.1).
 
 ### 6.2 Practice skills — the workflows every serious repo has
 
@@ -226,12 +337,14 @@ These fire on the code, not on a service.
 
 | Skill | Fires on | Personalized with |
 |---|---|---|
-| **qa** | a browser-testing framework (`playwright`, `cypress`) or a web framework plus a dev command | a URL parameter, an explicit **stop-and-ask** step when login is required, a goal prompt, the app's real routes, and a fixed output format for findings. Not "run the tests" — an interactive QA procedure |
+| **qa** | a web framework in `frameworks[]`, or `commands.dev` non-empty — every web app, not only one with a browser-test framework | a URL parameter, an explicit **stop-and-ask** step when login is required, a goal prompt, this app's real route groups and the role each needs, a fixed findings format with repro steps, and **the browser driver that is actually available**: `agent-browser` when `discovery.tooling.on_path` lists it (the skill's preflight checks for it and names the install command), Playwright when `frameworks[]` has it, otherwise the plan names the driver the user must install before the skill can run. Never "run the tests" — an interactive pass against the running app |
 | **design** / **new-component** | a UI framework plus a components zone | the design tokens, the component directory, the primitives already available, and the existing naming convention |
 | **new-feature** / **new-endpoint** | `cochange_clusters[]` showing the files that always change together | the actual file set, in order, with the real commands between steps |
 | **migration** | an ORM plus a migrations directory | the real create-and-apply commands and the safety checks for this database |
 | **review-pr** | `>= 2` non-bot contributors | this run's own rule files as the checklist |
 | **debug** / **triage** | `pain_signals[]` clustered on one failure mode | the actual failure, the actual logs to read, the actual fix path |
+| **guide-to-skill** | a `docs[]` row of kind `guide`, or a README / index-doc section whose heading is a procedure ("Adding a tool to the composer", "Local Postgres for dev") | the guide's own steps made checkable — the real files, the real commands, a context-gathering step that reads the examples the guide points at — and the guide itself as `references/`. The developer already wrote the procedure; the skill is what makes the agent follow it without being told. **A guide never covers the skill it licenses** (§2.1) |
+| **dev-environment** / **seed-local** | `raw_scripts` holds `>= 3` scripts sharing a prefix (`db:seed:*`, `dev:*`) **and** a doc or index-doc comment orders them | the real sequence, in order, the env file each step loads, and the check that proves each step worked |
 
 ### 6.3 `setup-manager` — build this one on every run
 
@@ -269,6 +382,11 @@ because the skill is what makes the server useful and the server is what makes t
 
 Drafts only. Env-var **names** only. Never a credential, never an authentication step performed for
 the user — that is a "needs you" item in the report.
+
+Two things never cover a draft (§2.1): a server configured at **user scope** (`~/.codex/config.toml`,
+`~/.claude.json`) — it is not in the repo — and a **human GUI** such as a `db:studio` script, which
+is the developer's window and not the agent's loop. A server already declared in the repo's own
+`.mcp.json` or `.codex/config.toml` does cover it, once, by name.
 
 ---
 
@@ -323,23 +441,46 @@ prose. If the doc is large enough that appending is risky (Codex's `project_doc_
 
 ---
 
-## 10. Coverage check — run this before writing the plan
+## 10. The catalogue walk — the table the plan must contain
 
-Walk it once. Every "no" is either a fixed omission or a line in the plan saying which field was
-empty. Never a silent gap.
+The coverage check is not a feeling about completeness. It is a table with **one row per catalogue
+row above** — every §1.3 core artifact, every §3, §4.1, §5.1, §5.2, §6.1 and §6.2 row — and the
+plan carries it as its last section (`plan-template.md`, `## Catalogue walk`). A catalogue row
+missing from the table is a bug in the run. A row present with an honest `not licensed — <field>
+is empty` is a correct run. This is the mechanism behind "never a silent gap": the run shows its
+work, row by row, and the user reads the reasons instead of trusting a count.
 
-| # | Question | If no |
-|---|---|---|
-| 1 | Is there **at least one skill**? | Re-read §6.1 and §6.2 against `external_services[]` and `commands`. Zero skills needs an explicit sentence in the plan naming what was missing |
-| 2 | Is `setup-manager` in the list? | Add it (§6.3). It is unconditional |
-| 3 | Does every zone in `folders[]` with a real `zone` value have a rule, or a stated reason it does not? | Add the rule, or state the reason |
-| 4 | If `.env*` exists, is there an env-leak guardrail? | Add it (§4.1) |
-| 5 | If a package manager is ambiguous or mismatched, is there an enforcer? | Add it (§4.1) |
-| 6 | Is there a permissions block? | Add it (§4.2), or state that the target has none |
-| 7 | Does every service in the §4.8 ranking have **either** a skill, a subagent, an MCP draft, or a stated reason? | Close the gap or state it. Working down the ranking, the reason for the tail is usually "no module in the repo calls it yet" — say that, naming the service |
-| 8 | Is the index-doc stitch last in the build order, with a table per built type? | Reorder (§9) |
-| 9 | Does every artifact pass all five personalization tests (§1.1)? | Rewrite the ones that do not — do not ship a generic file |
-| 10 | Does the plan name a number for every artifact, and no cap for any of them? | Fix the plan. The word "cap" does not appear in agentify's output |
+| Catalogue row | Trigger field | Found | Outcome |
+|---|---|---|---|
+| §3 db-inspector | `external_services[]` postgres / neon / drizzle | 3 entries, all `high` | built #13, paired with #11 query-db |
+| §3 designer | `frameworks[]` Tailwind CSS + `folders[]` components (390) + `docs[]` DESIGN.md (`design`, 15.9 KB) | fired | built #17 |
+| §3 test-runner | `test_discipline.commits_touching_tests_pct` | 0.83 — not low | not licensed — the share is high |
+| §6.1 send-notification | `external_services[]` resend | `high`; 1 module, 2 files, no template dir | skipped — steps not readable off the repo (`mapping-rules.md` §3 condition 3) |
+| §6.1 ask-product | `external_services[]` posthog | `high`; client module present | built #20 — the user-scope PostHog plugin covers nothing (§2.1) |
+| §6.2 qa | `frameworks[]` Next.js; `tooling.on_path` agent-browser | fired | covered by `.claude/skills/qa/SKILL.md` (own; 1 stale path listed in Existing setup notes) |
+
+**Outcome vocabulary, and nothing else:** `built #N`, `not licensed — <field> is <value>`,
+`covered by <same-type artifact path in this repo>`, `skipped — <one of coverage.md §1's three
+reasons>`, `merged into #N`. "Restates the index doc", "a vendored guide exists", "installed at
+user scope" and "the procedure is documented" are not outcomes; a row carrying one is re-walked.
+
+Then read the finished table against these, and fix every "no" before writing the plan:
+
+1. Is every §1.3 core artifact either `built` or `not licensed` with its field named?
+2. Is there at least one skill besides `setup-manager`? Zero is a failed walk, not a thin repo.
+3. Does every `folders[]` row with a zone, and every domain zone (§5.1), have a rule or a named
+   empty field?
+4. Does every `external_services[]` entry in the §4.8 ranking have a skill, a subagent, an MCP
+   draft or a stated reason? For the tail the reason is usually "no module in the repo calls it
+   yet" — say that, naming the service.
+5. Does every `docs[]` row of kind `guide` have a skill or a stated reason?
+6. Does every mechanically checkable rule in the index doc or a `design` doc have a hook (§4.1)?
+7. Is `setup-manager` last among skills, and the index doc last overall (§9)?
+8. Does every artifact pass §1.1, and does every evidence line carry a number?
+9. Does the plan contain a sentence arguing that fewer artifacts is the better outcome for this
+   repo? Delete the sentence and re-walk the rows it was excusing (`mapping-rules.md` A17).
+10. Does every skill and subagent pass the size test (§1.4) — its shortlist row ends with the count
+    of the thing it produces or the repeat signal behind it, not with a service name?
 
 ---
 
@@ -349,13 +490,69 @@ empty. Never a silent gap.
   are filler, and the difference is visible in §1.1's test 4.
 - **Overwriting.** Every invariant in `SKILL.md` still holds: additive, reversible, marker-delimited,
   never a destructive git command, never a secret read.
-- **Duplication.** De-duplicate against `existing_agentic_config` — including vendored and
-  symlinked artifacts, which cover their subject just as well as one the team wrote
-  (`mapping-rules.md` anti-pattern A9). A candidate that overlaps an existing artifact is skipped
-  with the existing file named.
+- **Duplication.** De-duplicate against artifacts of the **same type inside this repo** (§2.1). A
+  candidate an own artifact genuinely covers is skipped with that file named. Vendored, user-scope,
+  index-doc and document content cover nothing — and a symlinked or vendored artifact is never
+  edited.
+- **Rationalizing.** A plan that explains why a small setup is the right setup for a large repo
+  has stopped walking the catalogue (`mapping-rules.md` A17). The user cuts at the gate; the run
+  does not cut for them.
+- **Niche artifacts.** A skill for a feature that exists once, a subagent for work that fits in the
+  main thread, a rule for a three-file cluster the zone rule already covers (§1.4). The setup
+  describes how this developer works, not every corner they have touched — "complete" and "narrow"
+  are different failures, and the size test and the walk keep them apart.
 - **Guessing a command.** An empty `commands` slot stays empty until `interview.md` Q15 or Q16
   answers it. Never invent one to make a hook or a skill look complete.
 - **Asking what you can derive.** `mode`, `services` and `team_size` are derived, not asked
   (`interview.md` §4.2, §4.8), and each is stated in one line of the plan so the user can overturn
   it. A question whose answer is in the JSON, or that the phase 6 gate already settles by number, is
   a retired question being reinvented.
+
+---
+
+## 12. Worked example — what a complete walk produces
+
+The repo the caps were measured on (`coverage.md` §1): Next.js + React + Tailwind + shadcn/ui,
+Drizzle on Neon/Postgres, Better Auth, Dodo payments (10 `DODO_*` names), PostHog, Resend,
+Trigger.dev (`trigger/` with its own README), R2 uploads, fal and OpenRouter generation under
+`server/generation/` (187 files, with `docs/guides/adding-a-capability.md`), a 15.9 KB `DESIGN.md`
+with a banned list, `CONTEXT.md`, five ADRs, 61 skill directories of which 48 are vendored, and
+**0 rules, 0 hooks, 0 subagents, 0 permissions**. 268k lines, one developer, 30 sessions.
+
+The run that produced 16 artifacts read this as *"knowledge is not the gap, enforcement is"* and
+built 3 rules, 6 hooks, 2 skills and 3 subagents. The senior engineer's read is the opposite: 48
+vendored library guides are not workflows, a 40 KB index doc loaded every session is the expensive
+unscoped form of the rules that do not exist yet, and every service on the list has a workflow the
+developer runs through the agent. The complete walk produces, in build order:
+
+- **Rules (12):** database (`db/**`), migrations, api (`server/**`, quoting "Server discipline"),
+  routes (`app/**` — the `(protected)` / `(admin)` / `(workspace)` groups and the session check),
+  web (`components/**`, quoting `DESIGN.md`), server actions (`actions/**`), jobs (`trigger/**`,
+  from its README), generation (`server/generation/**`, a domain zone with a guide), testing
+  (Vitest, `*.test.ts` beside the source), security (env names, the `NEXT_PUBLIC_` boundary,
+  tenancy), decisions (`docs/adr/`, numbered), memory (`CONTEXT.md` is a glossary — what goes
+  there and what does not), commits (the observed scope vocabulary, stated as observed).
+- **Hooks (8):** env-leak blocker, destructive-command blocker (`db:reset`, `db:push:production`,
+  `git push --force`), package-manager enforcer (after Q15), lint-on-write, typecheck-on-stop, a
+  money-path test gate (`server/billing/**`), a `DESIGN.md` doc-stated check (raw hex,
+  `lucide-react`, `h-screen`), and a branch guard from the index doc's own "always work on
+  `development`".
+- **Permissions (1):** the five real commands allowed; `.env*` reads and the destructive scripts denied.
+- **Skills (13):** query-db, migration, add-capability (from the guide), new-background-task,
+  billing-change, add-product-analytics, ask-product, build-dashboard, new-component, review-pr,
+  seed-local (`db:push:local` → `db:seed` → `db:seed:catalog`, ordered by the index doc's own
+  comment), qa — **covered** here by the developer's own `qa` skill, with its one stale path
+  listed — and setup-manager last.
+- **Subagents (6):** db-inspector, pr-reviewer, security-auditor, designer, product-analyst,
+  codebase-explorer (large repo; the zone map lives in its prompt, which is not the same as the
+  map living in the index doc).
+- **MCP drafts (2):** PostHog and Neon, each paired with its skill; Trigger.dev already declared in
+  `.mcp.json`, so covered.
+- **Index doc (1)**, plus two report suggestions that are not artifacts: the three index-doc
+  sections that are zone-specific and would be cheaper as path-scoped rules, and the `AGENTS.md`
+  chain sitting 2 KB under Codex's `project_doc_max_bytes`.
+
+Around forty artifacts, every one with a field and a number behind it, not one that would be true
+in a different repo, and not one for a single feature — each skill row on the shortlist ends with
+the count of the thing it produces (`15 tasks`, `8 capabilities`, `25 migrations`, `5 ADRs`). That is what "complete" means when the evidence is this rich — a
+calibration, not a target to pad toward: a 4k-line CLI with no services gets six.

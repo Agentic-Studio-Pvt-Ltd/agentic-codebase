@@ -51,7 +51,7 @@ The skill forces the model through eight phases. Each phase has a defined input,
 | 1. Discover | Scan repo: languages, frameworks, package scripts, Makefile, test/lint config, folder structure, env var names (never values), CI config, existing docs. | `discovery.json` (internal) |
 | 2. Mine | Run the transcript miner and git miner scripts. | `signals.json` (internal) |
 | 3. Diagnose | Model reads discovery + signals and identifies: repetition, corrections, friction, missing guardrails, external systems. | Findings list with evidence |
-| 4. Propose | Map findings to artifacts (section 8), walk the setup catalogue against the repo, apply the personalization test, then the completeness check (section 9). | Candidate list |
+| 4. Propose | Map findings to artifacts (section 8), walk the setup catalogue against the repo — core set first — apply the personalization test, and fill the catalogue walk table (section 9). | Catalogue walk + candidate list |
 | 5. Interview | Ask the user numbered questions only where evidence is ambiguous. Sensible defaults, "accept all defaults" option. | Answers |
 | 6. Plan | Write `docs/agentic-setup/plan.md`. User approves, edits, or rejects items. Hard gate. | Approved plan |
 | 7. Build | Generate artifacts in dependency order on a branch. Checkpoint after each group. | Files on branch |
@@ -75,9 +75,10 @@ A script (Node or Python, no external deps beyond stdlib where possible) that em
 - Languages and frameworks (from manifests, not file extensions alone)
 - Package manager and scripts (`package.json`, `Makefile`, `justfile`, `pyproject`, etc.)
 - Test, lint, format, typecheck commands and whether they currently pass
-- Folder map to depth 3 with file counts, flagging conventional zones (api, db, migrations, components, tests)
-- External services: from dependencies and env var names (Stripe, Supabase, Neon, Linear, PostHog, Sentry, Playwright, etc.)
-- Existing docs: README, CONTRIBUTING, ADRs, PR template, issue templates
+- Folder map to depth 3 with file counts, flagging conventional zones (api, db, migrations, components, tests, routes, actions, jobs, lib, hooks, state, types), with up to six sample basenames and eight subdirectory names per folder so the naming convention of a zone (`0001_init.sql`, `(protected)`) is read off the tree rather than guessed. Anything under a dot-directory other than `.github` is never a zone.
+- External services: from dependencies, env var names and marker files (Stripe, Supabase, Neon, Linear, PostHog, Sentry, Playwright, and since 2026-09-07 the job runners, non-Stripe billing, model providers, storage, realtime and notification services — Trigger.dev, Inngest, Dodo, Lemon Squeezy, fal, OpenRouter, ElevenLabs, R2, Cloudinary, Pusher, Novu, …)
+- Existing docs: README, CONTRIBUTING, ADRs, PR template, issue templates, and three kinds the catalogue reads by name — `design` (a `DESIGN.md`-shaped doc), `context` (a root `CONTEXT.md`), `guide` (anything under `docs/guides/` or titled "adding-…" / "how-to-…")
+- Tooling on `PATH`, by name only (`agent-browser`, `gh`, `playwright`, `psql`, …): environment evidence for a generated skill's driver choice, never repo evidence, nothing executed
 - CI workflows and what they run
 - Git basics: age, contributor count, commit volume in last 90 days
 
@@ -106,7 +107,7 @@ The model produces a findings list. Each finding has: type (repetition / correct
 
 ### 7.5 Propose
 
-Apply the mapping rules (section 8), then walk the setup catalogue — subagents, guardrail hooks, permissions, zone and workflow rules, integration and practice skills, MCP drafts — against the repo, adding a candidate for every entry whose trigger field is non-empty. Run the personalization test on each one and rewrite anything that fails it. Then run the completeness check (section 9) and close or state every gap. Output a candidate list grouped by artifact type, each with a one-line rationale, a mechanism sentence and an evidence reference. **Nothing is cut for count.**
+Apply the mapping rules (section 8), then walk the setup catalogue — starting from the **core set** (`setup-manager`, `pr-reviewer` + `review-pr`, `qa`, `db-inspector` + `query-db`, `security-auditor`, `designer` + `new-component`, `product-analyst` + the analytics skills, the three guardrail hooks, permissions, the zone and workflow rules), then every other subagent, hook, rule, skill and MCP row — against the repo, adding a candidate under the catalogue's own name for every row whose trigger field is non-empty. Run the personalization test on each one and rewrite anything that fails it. Then produce the **catalogue walk**: one table row per catalogue row with its trigger field, what was found, and an outcome from a fixed vocabulary (`built #N`, `not licensed — <field> is <value>`, `covered by <same-type artifact in this repo>`, `skipped — <one of the three reasons>`, `merged into #N`). The walk is the phase's first output and the plan's last section. De-duplication has one definition: **an artifact of the same type, inside this repo, doing the same job.** The index doc, a vendored guide, a user-scope skill or plugin, a document and a human GUI cover nothing. Output the walk, then a candidate list grouped by artifact type, each with a one-line rationale, a mechanism sentence and an evidence reference. **Nothing is cut for count, and nothing is cut by argument** — a plan sentence explaining why this repo needs less is the signal to re-walk.
 
 ### 7.6 Interview
 
@@ -118,7 +119,7 @@ Apply the mapping rules (section 8), then walk the setup catalogue — subagents
 
 ### 7.7 Plan
 
-Write `docs/agentic-setup/plan.md` with:
+**First, the shortlist — in chat, before any file.** Print every candidate grouped by type in build order, numbered continuously, one row each: name, scope or trigger, and one line saying what it does for this repo ending in the count behind it (`· 15 tasks in trigger/tasks/`), plus the rows that fired and were not built, one line each. The user drops, adds, renames or modifies in plain words and confirms with one word; an addition is built only if the evidence licenses it. The numbers assigned here are the plan's numbers, and every edit becomes a line in the plan's summary. Then write `docs/agentic-setup/plan.md` from the confirmed list, with:
 
 - Summary: what will be built, count by type, estimated build time
 - Per artifact: name, type, purpose, evidence, files it will create or modify, what it will not do
@@ -126,7 +127,7 @@ Write `docs/agentic-setup/plan.md` with:
 - Capability notes for the target (e.g. Codex has no hooks; here is the substitution)
 - Explicitly skipped candidates and why
 
-User reviews. Accepts, removes items, or edits. Build does not start without approval. The plan file stays in the repo as a record.
+User reviews. Accepts, removes items, or edits. Build does not start without approval — the word that confirmed the shortlist is not the approval of the plan. The plan file stays in the repo as a record.
 
 ### 7.8 Build
 
@@ -163,10 +164,13 @@ User reviews. Accepts, removes items, or edits. Build does not start without app
 | An exposure the repo has no protection for | Hook | A `.env*` on disk and zero hooks; two lockfiles and no package-manager enforcement |
 | A service the repo actually integrates | Skill, plus a subagent where tool restriction matters | Linear → `create-issue`; PostHog → `add-product-analytics`, `ask-product`; Neon → a read-only `query-db` skill over a `db-inspector` subagent |
 | The setup this run just built | `setup-manager` skill | Creates, extends, modifies and removes any part of the setup on request |
+| A procedure the developer already wrote down | Skill (guide-to-skill / dev-environment) | `docs/guides/adding-a-capability.md` → `add-capability`; `db:push:local` → `db:seed` → `db:seed:catalog`, ordered by the index doc's own comment → `seed-local` |
+| A mechanically checkable rule in the repo's own docs | Hook (doc-stated check) | `DESIGN.md` bans raw hex, `lucide-react` and `h-screen` → a `PostToolUse` grep; `CLAUDE.md` says "always work on `development`" → a branch guard |
+| A domain directory with a stateable convention | Path-scoped rule | `server/generation/` (187 files, its own guide), `trigger/` (its own README), `app/` (route groups) |
 
 A finding can map to more than one artifact (a procedure becomes a skill and its final check becomes a hook). A finding with no evidence count maps to nothing — and a **structural** fact carries a count too: a service with its confidence, a zone with its file count, a command with its manifest citation, and an absence such as zero hooks in a repo holding `.env*` files.
 
-**Revised 2026-09-07.** The plugin-manifest row is removed: the setup is derived from one repo's evidence and personalized to it, so a portable copy would be wrong wherever it landed. Rows 12 to 16 above are new, and are what makes a run on a repo with no transcript history still produce a real setup.
+**Revised 2026-09-07.** The plugin-manifest row is removed: the setup is derived from one repo's evidence and personalized to it, so a portable copy would be wrong wherever it landed. Rows 12 to 16 above are new, and are what makes a run on a repo with no transcript history still produce a real setup. **Revised again the same day** after a run on that repo built 16 artifacts and skipped some twenty: the last three rows were added, and a **core set** was named — the artifacts every setup has when their licence holds, built under the catalogue's own names (`pr-reviewer`, never `diff-reviewer`), and never skipped as "covered" by anything but an artifact of the same type inside the repo.
 
 ## 9. Coverage — **revised 2026-09-07, replacing the sizing-cap table**
 
@@ -184,10 +188,11 @@ They were a proxy for quality and measured the wrong thing. Measured on a real 2
 
 ### What replaced them
 
-- **A completeness check** run before the plan: every zone gets a rule or a stated reason, every `.env*` gets a guardrail, every confirmed service gets a skill / subagent / MCP draft or a stated reason, and `setup-manager` is unconditional.
+- **The core set** (`blueprint.md` §1.3): `setup-manager`; `pr-reviewer` with `review-pr`; `qa` for any web app; `db-inspector` with `query-db` for any database; `security-auditor`; `designer` with `new-component`; `product-analyst` with the analytics skills; the env-leak, destructive-command and package-manager hooks; permissions; the zone and workflow rules. Each has a licence field; each is built when it holds, under the catalogue's name.
+- **The catalogue walk**, a table in the plan with one row per catalogue row — trigger field, what was found, outcome — so the user reads what was *considered*, not only what was built. "Restates the index doc", "a vendored guide exists", "installed at user scope" and "the procedure is documented" are not outcomes. `verify_artifacts.py`'s `core_set` check warns in phase 8 when a licensed core artifact is missing from the manifest.
 - **A personalization test on every generated file**: at least three concrete identifiers from this repo; this repo's convention rather than a best practice; an evidence line naming a field and a number; and the sharp one — *name a repo this file would be false in*. A file that would read identically elsewhere is rewritten, not shipped.
-- **Unconditional de-duplication.** Everything already in the repo, third-party and symlinked included, is de-duplicated against; nothing existing is ever restructured, rewritten, moved or renamed. That was the useful half of audit-only mode and is now simply how every run works. **There is no audit-only mode.**
-- **Repo scope only.** Artifacts in `~/.claude/skills` or `${CODEX_HOME}/skills` load in every repo on the machine and are not this repo's setup. They are read for de-duplication and never counted, never quoted as "your setup", and never allowed to change what a run builds.
+- **Unconditional de-duplication, with one definition of "covered".** A candidate is covered only by an artifact of the **same type, inside this repo, doing the same job** — the team's own, tested against the repo's commands and paths rather than trusted. A vendored artifact is a generic guide and becomes a reference the generated skill links to; the index doc covers only an index-doc line; a document licenses a skill rather than replacing it; a human GUI (`db:studio`) is not the agent's loop. Nothing existing is ever restructured, rewritten, moved or renamed. **There is no audit-only mode.**
+- **Repo scope only.** Artifacts in `~/.claude/skills` or `${CODEX_HOME}/skills` load in every repo on the machine and are not this repo's setup. They are never counted, never quoted as "your setup", and — since 2026-09-07 — **never coverage for anything**: a same-name collision is a report line, not a skip. Measured: a user-scope PostHog plugin and a user-scope MCP entry had silently removed three skills and a draft from a repo-scoped setup.
 
 Fewer, sharper artifacts still get used and sprawling ones still get ignored — enforced by the evidence requirement and the personalization test, which make each artifact earn its file, rather than by stopping at a number.
 
@@ -250,7 +255,7 @@ Targets for first 90 days after launch: 1,000 installs, 40% completion rate, 10 
 
 ## 15. Roadmap
 
-v1.0: Claude Code, all eight phases, three analyzers, the setup catalogue and completeness check, plan gate, verification, report.
+v1.0: Claude Code, all eight phases, three analyzers, the setup catalogue with its core set and catalogue walk, plan gate, verification, report.
 v1.1: Codex adapter.
 v1.2: `doctor` mode, rerun monthly to detect drift and new repetition; interactive plan editing.
 v1.3: Team mode, reads transcripts from multiple contributors' machines via exported summaries.
@@ -269,7 +274,7 @@ Later: Cursor and Gemini CLI adapters, boilerplate integration, community analyz
 | Risk | Mitigation |
 |---|---|
 | Overgeneration, repo feels spammed | Plan gate, evidence requirement, the personalization test that rewrites any file which would read the same in another repo, and per-type grouping so the user can drop items by number |
-| Undergeneration, setup feels generic or thin | The completeness check before the plan, the structural catalogue that fires on the codebase alone, and the removal of every output cap (§9) |
+| Undergeneration, setup feels generic or thin | The core set and the catalogue walk in the plan, the one-definition rule for "already covered", the structural catalogue that fires on the codebase alone, the `core_set` verifier warning, and the removal of every output cap (§9) |
 | Transcript reads blow the context window | Miner script pre-aggregates to ~3k tokens |
 | Agent config formats change | Versioned adapters, release checklist verifies against docs |
 | Secrets surfaced from transcripts | Scrub before surfacing, user-turns only, consent every run |

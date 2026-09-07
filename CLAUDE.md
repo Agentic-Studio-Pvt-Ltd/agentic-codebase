@@ -66,8 +66,12 @@ and `setup-manager` — all derived from its own code.
 
 Two things are structural, not incidental:
 
-- **Phase 6 is a hard gate.** `docs/agentic-setup/plan.md` must be written and approved before any
-  file is generated. Never build straight from findings.
+- **Phase 6 is a hard gate, with a shortlist in front of it.** Before `plan.md` is written, the
+  whole candidate list is printed in chat — grouped by type, numbered in build order, one line per
+  item ending in its count — and the user edits it in words and confirms with one word
+  (`plan-template.md` §0). Then `docs/agentic-setup/plan.md` is written from the confirmed list and
+  must be approved before any file is generated. Never build straight from findings, and never
+  treat the shortlist's `ok` as the plan's approval.
 - **Phases 1–2 are deterministic scripts; 3–8 are model reasoning.** The scripts emit JSON
   (`discovery.json`, `signals.json`); the model never scrapes the repo or transcripts directly. That
   is what keeps transcript volume out of the context window — the miner pre-aggregates to ~3k tokens
@@ -86,7 +90,7 @@ is ~1200 lines.
 1. **Analyzers** (`scripts/`, stdlib only, no network): repo analyzer, transcript miner, git miner,
    artifact verifier. The contributor extension point.
 2. **Core workflow** (target-agnostic): diagnose → map findings to artifacts (PRD §8) → walk the
-   `blueprint.md` catalogue → completeness check → plan → build → verify.
+   `blueprint.md` catalogue, core set first → the catalogue walk table → plan → build → verify.
 3. **Target adapters** (`adapters/claude-code.md`, `adapters/codex.md`): the only place agent-specific
    paths and formats live. `adapters/capabilities.md` is the short verdict table phase 6 reads so it
    never has to open an adapter. Never let a hardcoded `~/.claude/projects/...` path or a
@@ -118,11 +122,38 @@ From PRD §3, §8, §9, §13 — the parts most easily broken by a plausible-loo
 - **No caps, and the word never reaches the user.** *cap*, *limit* and *quota* appear in no question,
   plan, report or summary. A candidate is skipped only for: no evidence, already covered, or
   low-confidence-not-opted-in.
-- **No audit-only mode.** De-duplication against everything already in the repo is unconditional, and
-  so is never restructuring, rewriting, moving or renaming what is there. A symlinked or vendored
-  artifact is never edited at all.
-- **Repo scope only.** `~/.claude/skills` and `${CODEX_HOME}/skills` are read for de-duplication and
-  nothing else. They are never counted, never called "your setup", and never change what is built.
+- **No audit-only mode.** De-duplication is unconditional, and so is never restructuring, rewriting,
+  moving or renaming what is there. A symlinked or vendored artifact is never edited at all.
+- **"Covered" has one definition** (`blueprint.md` §2.1): an artifact of the **same type, inside this
+  repo, doing the same job** — the team's own, tested against the repo's commands and paths rather
+  than trusted. The index doc covers only an index-doc line. A vendored artifact is a generic guide
+  and becomes a *reference* the generated skill links to. A document (a guide, `DESIGN.md`) licenses
+  an artifact rather than replacing it. A human GUI (`db:studio`) is not the agent's loop. The
+  2026-09-07 riffads run lost some twenty artifacts to the opposite readings of each of these.
+- **Repo scope only, and user scope covers nothing.** `~/.claude/skills` and `${CODEX_HOME}/skills`
+  are never counted, never called "your setup", and never coverage for a candidate — a same-name
+  collision is a report line, not a skip.
+- **The core set is built when its licence holds, under the catalogue's names** (`blueprint.md`
+  §1.3): `setup-manager`; `pr-reviewer` + `review-pr`; `qa`; `db-inspector` + `query-db`;
+  `security-auditor`; `designer` + `new-component`; `product-analyst` + the analytics skills; the
+  three guardrail hooks; permissions; the zone and workflow rules. A skill + subagent pair is one
+  proposal. `pr-reviewer` is never renamed `diff-reviewer` to signal a nuance.
+- **The catalogue walk is a section of the plan** (`blueprint.md` §10): one row per catalogue row
+  with its trigger field, what was found and an outcome from a fixed vocabulary. "Restates
+  `CLAUDE.md`", "a vendored guide exists", "installed at user scope" and "the procedure is
+  documented" are not outcomes; a plan sentence arguing this repo needs less is anti-pattern A17.
+  `verify_artifacts.py`'s `core_set` check warns when a licensed core artifact is missing.
+- **A rule the developer wrote into their own docs is evidence.** A mechanically checkable line in
+  the index doc or `DESIGN.md` licenses a hook (doc-stated check); a how-to guide licenses a skill
+  (guide-to-skill); a depth-1 directory with 15+ files and a README, an index-doc section, a
+  co-change cluster or a commit scope is a domain zone that gets a rule.
+- **Not too niche.** A skill needs a repeat signal — `>= 3` instances of what it produces, a
+  request shape at `>= 3`, a service the repo extends over time, or a guide — and a subagent must
+  earn its context window (`blueprint.md` §1.4, `mapping-rules.md` A18). One feature is not a
+  workflow. The shortlist row ends with the count that proves it.
+- **Phase 7 may read the repo, bounded.** Per artifact: the files its evidence names, a zone listing
+  plus up to three existing examples, and the doc it quotes. Never `.env*`, never a transcript,
+  never a bulk read. Phases 3–6 stay on the JSON, plus the frontmatter/headings exception.
 - **Personalization is testable, not aspirational.** `blueprint.md` §1.1: three repo identifiers,
   this repo's convention, an evidence line with a number, and — the sharp one — *name a repo this
   file would be false in*. A file that fails is rewritten, not shipped.

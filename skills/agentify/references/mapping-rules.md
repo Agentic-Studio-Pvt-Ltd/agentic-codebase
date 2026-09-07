@@ -132,11 +132,12 @@ unless stated.
 | 9 | Long-form knowledge re-derived each session | `request_shapes[]` where the skeleton is a question ("how does…", "where is…", "why do we…") | `count >= 3` **and** `sessions >= 2` **and** no procedure to run | **Reference doc** |
 | 10 | Guardrail gap | `pain_signals[]` + `discovery.ci[]` + `test_discipline` | a failure the user complained about `count >= 2` that CI does **not** already catch | **Hook** (preferred) or **rule** if not mechanisable |
 | 11 | Missing/thin index doc | `discovery.existing_agentic_config.index_docs[]` | absent, or `< 400 bytes`, and `discovery.commands` has **>= 2** populated commands | **Index doc** (always exactly one; always built, never ranked) |
-| 12 | **Zone with a stateable convention** | `discovery.folders[].zone`, corroborated by `signals.git.directory_hotspots[]` / `cochange_clusters[]` | the zone directory exists and holds files, **and** the convention is readable off the repo (an ORM, a validator, a test runner, a styling system) rather than invented | **Path-scoped rule** — one per zone, per workspace in a monorepo (`blueprint.md` §5.1) |
-| 13 | **Guardrail the repo has no protection for** | an absence: `existing_agentic_config.counts.hooks`, `.rules`, plus `discovery.env_var_names`, `.package_managers`, `.commands`, `external_services[]` | the exposure is present in the repo (a `.env*` file, an ambiguous package manager, a destructive command this stack has) **and** nothing in `ci[]` or `existing_agentic_config` already catches it | **Hook** — the `blueprint.md` §4.1 catalogue |
+| 12 | **Zone with a stateable convention** | `discovery.folders[].zone` (incl. `routes`, `actions`, `jobs`), **or a domain zone** — a depth-1 `folders[]` row with `zone == null`, `files >= 15`, not a dot-directory — corroborated by `signals.git.directory_hotspots[]` / `cochange_clusters[]`, a README under it, an index-doc section naming it, or a `commit_conventions` scope | the zone directory exists and holds files, **and** the convention is readable off the repo (an ORM, a validator, a test runner, a styling system, the `sample_files` naming pattern, the doc that describes it) rather than invented. **The index doc stating the convention licenses the rule; it never covers it** (`blueprint.md` §2.1) | **Path-scoped rule** — one per zone, per workspace in a monorepo (`blueprint.md` §5.1) |
+| 13 | **Guardrail the repo has no protection for** | an absence: `existing_agentic_config.counts.hooks`, `.rules`, plus `discovery.env_var_names`, `.package_managers`, `.commands`, `external_services[]`; **or a doc-stated check** — a mechanically checkable rule in the index doc or a `docs[]` row of kind `design` / `style-guide` / `contributing` (a forbidden import, class, literal, command or branch) | the exposure is present in the repo (a `.env*` file, an ambiguous package manager, a destructive command this stack has, a written rule with no enforcement) **and** nothing in `ci[]` or `existing_agentic_config` already catches it. A written rule needs no transcript correction behind it | **Hook** — the `blueprint.md` §4.1 catalogue |
 | 14 | **Repeated command surface the user keeps approving by hand** | `discovery.commands` (`>= 2` populated slots) + `signals.transcripts.commands_requested[]` | the target supports a permissions block | **Permissions** — one allow/deny block, `blueprint.md` §4.2 |
 | 15 | **A service the user works with, in the codebase** | `discovery.external_services[]` + `frameworks[]` + the modules that use it in `folders[]` / `file_hotspots[]` | the service is `confidence >= "medium"`, **a module in the repo actually calls it**, and a `blueprint.md` §6.1 row names a workflow for it. Services are **ranked, never filtered by a question** (`interview.md` §4.8); the user drops what they do not want at the phase 6 gate | **Skill** — the integration workflow, plus its **subagent** where §3 of `blueprint.md` calls for tool restriction |
 | 16 | **The setup this run just built** | the built-artifact list itself | `>= 1` artifact was built | **Skill** — `setup-manager`, unconditional (`blueprint.md` §6.3) |
+| 17 | **A procedure the developer already wrote down** | a `discovery.docs[]` row of kind `guide`, or a README / index-doc section whose heading is a procedure ("Adding a tool to …", "Local Postgres for dev"), or `>= 3` `raw_scripts` sharing a prefix that a doc orders | the doc names real files and real commands that exist in `folders[]` / `raw_scripts`, and there are `>= 2` steps. **The doc never covers the skill** (`blueprint.md` §2.1, A13) — it is the skill's `references/` source | **Skill** — guide-to-skill / dev-environment (`blueprint.md` §6.2) |
 
 Notes that apply to the whole table:
 
@@ -226,7 +227,7 @@ at any size — it is tier 3.
 supply this gate on a no-history run by asking the user which services they touch. It is retired:
 `interview.md` §4.1, §4.8.)* Gate 2 is also met when **this run built a skill or a subagent for that
 service** (`blueprint.md` §7). That is a real substitute rather than a softening: a skill only
-exists because §6.1 named a workflow and the three conditions in §3 passed, so the draft is licensed
+exists because §6.1 named a workflow and the four conditions in §3 passed, so the draft is licensed
 by an artifact that itself had to clear the personalization test — not by a dependency, and not by
 an answer. A service with no skill, no subagent and no tier-1 record gets **no draft**, on any
 history, and the plan says which of the three was missing.
@@ -436,6 +437,14 @@ Default when both fit: **skill**. Subagents cost more to build and are harder to
 subagent has to earn the isolation, the persona, or the tool restriction it exists for
 (`blueprint.md` §3). Never build a subagent when a skill would do.
 
+**"Never both" forbids two artifacts that each do the whole job. It does not forbid a pair.** A
+skill that is the human-facing entry point — gathers the inputs, reads the context, formats the
+output — and delegates the isolated or tool-restricted part to a subagent is **one proposal with
+two files**: `query-db` → `db-inspector`, `review-pr` → `pr-reviewer`, `new-component` →
+`designer` (`blueprint.md` §1.3). The plan lists the pair as one numbered entry with one evidence
+line. What this rule still forbids is a `query-db` skill that runs the queries itself *and* a
+`db-inspector` that also runs them.
+
 ### 2.2 Rule vs hook
 
 | Signal | Pick |
@@ -485,6 +494,14 @@ A correction (row 5) whose examples all mention paths under one directory is a *
 A correction with no path context ("use bun, not npm") is an **index-doc line** if it is one
 sentence, a global rule file if it needs qualification.
 
+**The index doc never covers a rule.** This table decides where a *new* convention goes; it is not
+a licence to skip a zone rule because the index doc already has a section on that zone. Those are
+two different mechanisms with opposite costs — the index doc is loaded in every session whether or
+not the zone is touched, a `paths:`-scoped rule is loaded only when it is — and a rule is what
+`pr-reviewer` enumerates as its checklist. When the index doc already states the convention, the
+rule quotes that sentence, points at the section, and adds what the code shows (`blueprint.md`
+§2.1, §5.1). "It would only restate `CLAUDE.md`" is A17, not a skip reason.
+
 ### 2.4 Skill vs reference doc
 
 | Signal | Pick |
@@ -494,6 +511,12 @@ sentence, a global rule file if it needs qualification.
 | Steps exist, but they change every time and only the context is stable | **Reference doc** |
 
 A reference doc is cheap and never blocks anything, so a borderline case goes to the reference doc.
+
+**A guide the repo already has is the opposite case.** A `docs[]` row of kind `guide` — "Adding a
+capability", "Local Postgres for dev" — is a procedure the developer wrote down. It is row 17's
+evidence and the skill's `references/` source; it is never the reason the skill is not built
+(`blueprint.md` §2.1). The knowledge half of a repo lives in its docs; the skill is what makes the
+agent follow the procedure without being told to read them.
 
 ### 2.5 Skill vs "just an index-doc line"
 
@@ -535,8 +558,8 @@ This closes the gap between "counts come from transcripts" and "a fresh repo has
 
 | Artifact | Min. tier (§0.2) | Behavioural evidence (counts) required? | Discovery-only evidence allowed? |
 |---|---|---|---|
-| Skill | **1**, or **2** from a `blueprint.md` catalogue row | Yes for rows 1 and 3. **No** for rows 15 and 16 — a catalogue skill is licensed by the structural fact | **Yes**, for rows 15 and 16 only, under the three conditions below |
-| Subagent | **1**, or **2** from `blueprint.md` §3 | Yes for row 3. **No** for a §3 catalogue subagent | **Yes**, for a `blueprint.md` §3 row only, under the same three conditions |
+| Skill | **1**, or **2** from a `blueprint.md` catalogue row | Yes for rows 1 and 3. **No** for rows 15, 16 and 17 — a catalogue skill is licensed by the structural fact | **Yes**, for rows 15, 16 and 17 only, under the four conditions below |
+| Subagent | **1**, or **2** from `blueprint.md` §3 | Yes for row 3. **No** for a §3 catalogue subagent | **Yes**, for a `blueprint.md` §3 row only, under the same four conditions |
 | Rule from a correction (any scope) | **1** | **Yes** — row 5 threshold | No |
 | Rule — command policy ("never run X here") | **1**, and only from a tier-1 record that **names the command**: `correction`, `pain_signal`, `commands_requested` | **Yes** — row 5's `count >= 2`, **and** the record must quote the command token the policy will match | **No, at any strength** — see below |
 | Path-scoped rule from a co-change cluster | **2** | row 6 git thresholds (`support`, `confidence`, `still_exists`) **and** the §1.2 scope test. A `directory_hotspot` corroborates such a rule and can never carry one — §1.3 | **Yes**, git-derived form — this is the row that carries a no-history run |
@@ -546,19 +569,25 @@ This closes the gap between "counts come from transcripts" and "a fresh repo has
 | Permissions | **2** | No | **Yes** (row 14) |
 | Index doc | **2** | No | **Yes** |
 
-**The three conditions on a discovery-only skill or subagent.** This is the row that changed, and it
+**The four conditions on a discovery-only skill or subagent.** This is the row that changed, and it
 changed because the old `No` was measured producing **zero skills** on a 268k-line repo with eight
-external services and 384 recorded prompts. A structural skill is allowed when all three hold, and is
+external services and 384 recorded prompts. A structural skill is allowed when all four hold, and is
 deleted when any one fails:
 
-1. **It matches a named row** in `blueprint.md` §3, §6.1 or §6.2, and the field that row reads is
-   non-empty in `discovery.json`. Not "the repo uses X so a skill about X would be nice" — the row.
+1. **It matches a named row** in `blueprint.md` §1.3, §3, §6.1 or §6.2, and the field that row reads
+   is non-empty in `discovery.json`. Not "the repo uses X so a skill about X would be nice" — the row.
 2. **It passes all five personalization tests** (`blueprint.md` §1.1). In particular test 4: name the
    repo you would have to paste it into for it to become false. A skill you cannot answer that for is
    a template, which is the one thing this tool does not produce.
 3. **Its steps are readable off this repo** — real directories, the real command from a `commands`
    slot, the real module that talks to the service. A step you had to invent from the vendor's
-   documentation is a step that does not go in.
+   documentation is a step that does not go in. A vendored skill already in the repo may be
+   *linked* from a step as the vendor's API reference; it may not supply the step.
+4. **It recurs** (`blueprint.md` §1.4). The plan can name `>= 3` existing instances of what the
+   skill produces, a `request_shapes[]` count `>= 3`, a service the repo extends over time through
+   a module, or a guide the developer wrote. One instance is a feature, and a feature gets no
+   skill. For a subagent: it is a §3 catalogue row, or a `request_shapes[]` count `>= 3` backs it,
+   and it earns its context window with a tool restriction, a reviewer stance or a many-file pass.
 
 `setup-manager` (row 16) is licensed by the setup itself and is exempt from condition 1 only.
 
@@ -734,18 +763,24 @@ after every approved policy is known. Checkpoint after each type, as on the othe
   `existing_agentic_config` or in `slash_commands[]`.
 - **A8. Restating framework or language documentation** in a rule or reference doc. Repo-specific
   facts only. "Next.js route handlers live in app/api" is documentation; "our route handlers must
-  call `withAuth` from `src/lib/auth.ts`" is a rule.
-- **A9. Duplicating an existing artifact** listed in `discovery.existing_agentic_config.skills` /
-  `.agents` / `.rules` / `.hooks`. On a repo that already has a setup this is the main failure
-  mode — add and fix, never write a parallel copy of something already there. It is unconditional:
-  there is no mode that turns de-duplication on (`coverage.md` §6).
-  **Check `.user_scope` too.** Codex loads `${CODEX_HOME}/skills`, `rules`, `hooks.json` and its
-  plugin skills into *every* session in this repo, so a skill the user installed globally months ago
-  is already there. Those entries are reported separately and deliberately excluded from `counts`
-  and `maturity` — a global setup is not this repo's setup — but they are full de-duplication
-  targets. Likewise `.artifacts_by_target` says which agent loads each existing artifact, and
-  `.user_scope.skills_shared_with_claude_code` names the ones that are a single file in both trees:
-  never write a second copy of one of those into the other tree.
+  call `withAuth` from `src/lib/auth.ts`" is a rule. **A8 is about the vendor's docs, not the
+  repo's own.** Quoting the repo's `CLAUDE.md`, `DESIGN.md` or a guide into a rule scoped to the
+  paths it governs is `blueprint.md` §1.1 passing, and "it restates the index doc" is A17.
+- **A9. Duplicating an existing artifact of the same type, inside this repo, that does the same
+  job** — one listed in `discovery.existing_agentic_config.skills` / `.agents` / `.rules` / `.hooks`
+  under `provenance.own`, and tested against this repo rather than trusted (`blueprint.md` §2.1).
+  On a repo that already has a setup this is the main failure mode — add and fix, never write a
+  parallel copy. It is unconditional: there is no mode that turns de-duplication on
+  (`coverage.md` §6). **What A9 does not reach:** a **vendored** artifact (a generic guide — it
+  becomes the generated skill's reference), a **user-scope** entry (`~/.claude/skills`,
+  `${CODEX_HOME}/skills`, a user-scope plugin or MCP server — not in the repo, so a teammate never
+  gets it; a same-name collision is a report line, never a skip), the **index doc** (prose covers
+  only an index-doc line), and a **document** (a guide licenses a skill, §2.4). The 2026-09-07
+  measurement: the old wording dropped three analytics skills, a db skill, a QA skill, an MCP draft
+  and a guide-shaped skill on one repo, every one against something outside §2.1's definition.
+  `.artifacts_by_target` still says which agent loads each existing artifact, and
+  `.user_scope.skills_shared_with_claude_code` still names the ones that are a single file in both
+  trees: never write a second copy of one of those into the other tree.
 - **A10. Splitting one finding into three artifacts to look productive.** Merge overlapping
   candidates *before* they are ranked (`coverage.md` §2 step 1), not after.
 - **A11. An artifact justified by a mention count.** `tool_mentions` and `file_hotspots` are tier 3
@@ -757,9 +792,13 @@ after every approved policy is known. Checkpoint after each type, as on the othe
   path-scoped rule does. Re-read the mechanism sentence (§0.3) and check that it acts on the
   recorded failure rather than on the same *topic*.
 - **A13. Building over a working local loop.** A script, dev command, or CLI already in the repo
-  that does the job means the candidate is `### Skipped (already covered)`, naming it. This is A1
-  generalised past `package.json` scripts, and it is the one that catches MCP drafts (§1.1 gate 3).
-  Only a correction or pain signal *about that loop* reopens the question.
+  that does **the agent's** job means the candidate is `### Skipped (already covered)`, naming it.
+  This is A1 generalised past `package.json` scripts, and it is the one that catches MCP drafts
+  (§1.1 gate 3). Only a correction or pain signal *about that loop* reopens the question. **Two
+  things are not a loop:** a **human GUI** (`db:studio`, a hosted dashboard — the developer's
+  window, not the agent's path to the data) and a **document** (a written procedure is row 17's
+  evidence, §2.4). Measured 2026-09-07: both were taken as loops, and a `query-db` skill, a Neon
+  MCP draft and a guide-shaped skill went unbuilt.
 - **A14. Two counts drawn from one set of turns.** Six turns presented as twelve units of evidence,
   because one pasted instruction template fed both a `request_shapes[]` row and a `corrections[]`
   row. Both counts are real; their sum is not. §6.2.
@@ -774,6 +813,18 @@ after every approved policy is known. Checkpoint after each type, as on the othe
 - **A16. Flattening every structural candidate to one score.** On a run with no transcripts every
   candidate is structural, and writing `F = 1` on all of them hands the plan an unordered pool, so
   the user reads twenty artifacts in no meaningful order. Read the band off §6.3 and cite the row.
+- **A18. A skill for a feature.** "Add the resize tool" happened once; a skill for it is a
+  template with a repo noun in it, and a subagent for one directory is a skill with a persona.
+  The size test (`blueprint.md` §1.4) is the gate: the shortlist row ends with the count of the
+  thing the artifact produces, and a row that cannot is dropped to `Skipped (insufficient
+  evidence)` with the count it had. Personalized means *this developer's workflows*, not every
+  corner of their tree.
+- **A17. The rationalized cut.** A plan sentence arguing that fewer artifacts is the right outcome
+  for this repo — "knowledge is not the gap, enforcement is", "I skipped every rule that would only
+  restate `CLAUDE.md`", "you already have 61 skills" — is not a finding; it is the run explaining
+  why it stopped walking the catalogue. The tell is that the sentence is about the *setup*, not
+  about a field and a number. Delete it and re-walk the rows it excused (`blueprint.md` §10, check
+  9). The user cuts at the phase 6 gate, by number; the run never pre-cuts for them.
 
 ---
 
@@ -1387,8 +1438,9 @@ script CI does not run are now different numbers, where the flat rule made them 
 ## 8. Handoff to coverage
 
 Once the candidate list is ranked, read `coverage.md` in the same phase: §2 for merge-and-order, §6
-for de-duplication against what already exists, §10 of `blueprint.md` for the completeness check,
-and §8 for how skipped candidates are presented. **Nothing is cut for count** — the only reasons a
+for de-duplication against what already exists (by `blueprint.md` §2.1's definition — same type,
+same job, this repo), §10 of `blueprint.md` for the catalogue walk table the plan must carry, and
+§8 for how skipped candidates are presented. **Nothing is cut for count** — the only reasons a
 candidate is not built are no evidence, already covered, or low-confidence-not-opted-in.
 
 Two things must survive into the plan:

@@ -994,7 +994,10 @@ written. The contract has been reconciled to match; these entries record why.
   wrong twice over.
 - **To change it.** `references/coverage.md` §6.1, `adapters/claude-code.md` §3,
   `adapters/codex.md` §3.1.
-- **Status: `decided`.**
+- **Amended 2026-09-07 by §2.33.** The clause "read for de-duplication only" was still enough to
+  drop three analytics skills and an MCP draft against a user-scope plugin. User scope now covers
+  nothing at all; a same-name collision is a report line.
+- **Status: `decided`, amended.**
 
 ### 2.24 A structural fact is evidence, and it carries a count
 
@@ -1082,7 +1085,7 @@ written. The contract has been reconciled to match; these entries record why.
   `gh repo view --json viewerPermission`. agentify now makes no network call at all in a default run,
   which is a simpler promise to make and a simpler one to keep.
 - **What went with it.** The whole ladder, including the zsh word-splitting fix that made it work at
-  all. The reasoning pattern it demonstrated survives in `interview.md` §1.9: a trigger reads JSON or
+  all. The reasoning pattern it demonstrated survives in `interview.md` §1.11: a trigger reads JSON or
   another question's **default**, never another question's answer.
 - **To change it.** `SKILL.md` phase 8 step 6 and rule 7, `references/interview.md` §4.1.
 - **Status: `decided`.**
@@ -1207,6 +1210,231 @@ written. The contract has been reconciled to match; these entries record why.
 - **To change it.** `SKILL.md` rule 9 and phases 6–8; `references/interview.md` §1, §4.4, §4.6,
   §4.7, §5, §6; `references/privacy.md` §2 and §3; `references/plan-template.md`;
   `references/verification.md` §5.1.
+- **Status: `decided`.**
+
+### 2.32 "Already covered" has one definition: same type, same job, this repo
+
+- **Question.** The riffads run (2026-09-07, after the cap removal) proposed 16 artifacts and put
+  some twenty under `Skipped (already covered)`. Every one of those skips cited something that is
+  not an artifact of the candidate's type: three api/components/scripts zone rules "restate
+  `CLAUDE.md`"; `query-db` is covered by a vendored `neon-postgres` guide; `add-capability` is
+  covered by the guide that licenses it (A13); a Neon MCP draft is covered by `db:studio`, a GUI;
+  `codebase-explorer` by a table in the index doc. What is a covering artifact?
+- **Default implemented.** **An artifact of the same type, inside this repo, that does the same job
+  for this repo** (`blueprint.md` §2.1). A rule covers a rule; a hook, CI job or repo script covers
+  a hook; a skill — or one existing repo command that *is* the whole procedure — covers a skill; a
+  subagent covers a subagent. Nothing crosses that line. The table in §2.1 states, for each thing
+  that used to be taken as coverage, what it covers instead: the index doc covers an index-doc
+  line; a vendored artifact becomes a **reference** the generated skill links to from the step that
+  needs the vendor's API; a document licenses the skill it describes; a human GUI is not the
+  agent's loop. The team's **own** artifact of the same type is tested, not trusted — every
+  command it quotes must exist in `raw_scripts`, every path in `folders[]` — and a stale one is an
+  `Existing setup notes` item with the unresolved references named, never overwritten.
+- **Why the narrow definition.** Each of the wide readings has the same shape: it takes the
+  *topic* of an existing thing as the *job* of the candidate. A guide on Neon knows Neon; it does
+  not know this repo's schema, and the personalization test (§1.1 test 4) says so. A section in a
+  40 KB index doc loaded every session is the expensive, unenforced form of the lazily-loaded
+  path-scoped rule that would replace it — the opposite of coverage. Every one of these produced
+  a plan that was true sentence by sentence and wrong as a whole.
+- **What changed.** `blueprint.md` §2.1 (new), §11; `coverage.md` §1, §2 step 6, §6, §6.1, §6.2,
+  §8; `mapping-rules.md` §2.1 (pairs), §2.3, §2.4, A8, A9, A13, A17 (new); `plan-template.md`
+  rule 8 and the covered table's header; `SKILL.md` rule 4 and phases 1, 3, 4; `discover.py`'s
+  four provenance warnings, which used to instruct the model to de-duplicate against vendored and
+  user-scope entries.
+- **Status: `decided`.**
+
+### 2.33 User-scope artifacts cover nothing
+
+- **Question.** §2.23 kept user-scope entries out of the counts but left them as de-duplication
+  targets, on the argument that Codex loads `${CODEX_HOME}/skills` into every session. The riffads
+  run then skipped `add-product-analytics`, `ask-product`, `build-dashboard` and a PostHog MCP
+  draft because a PostHog plugin was installed at user scope and a PostHog server sat in
+  `~/.codex/config.toml`. Was that the right skip?
+- **Default implemented.** No. **User scope covers nothing**, not even by de-duplication. The
+  setup agentify builds is repo-scoped by definition — a teammate gets it by cloning — and a
+  user-scope artifact is on one machine and generic by construction. What user scope earns is one
+  report line per same-name collision (`~/.claude/skills/qa` beside a generated `.claude/skills/qa`
+  — both load; the user may want to rename one), under the new `## Suggestions I did not build`.
+- **Why.** `GOAL.md`'s instruction was "this should not consider the user's global level skills",
+  and the earlier fix honoured it for the maturity count only. The de-duplication clause was the
+  same mistake in a second place, and it removed the exact artifacts the user had listed as the
+  reason for the product — the personalized PostHog skills.
+- **What changed.** `coverage.md` §6.1, §6.2; `mapping-rules.md` A9; `blueprint.md` §2.1, §7;
+  `discover.py`'s Codex user-scope warning; `plan-template.md` `EXISTING_DEDUPE_NOTE`;
+  `report-template.md` rule 10.
+- **Status: `decided`.**
+
+### 2.34 The core set, under the catalogue's names
+
+- **Question.** The user's own client work always produced the same spine — `qa`, `db-inspector`,
+  `pr-reviewer`, `setup-manager`, the designer and analyst, the three guardrail hooks, a rule per
+  zone — and asked that "few of them must be created for all". The riffads plan had `setup-manager`
+  and a `diff-reviewer`, and no `qa`, `designer`, `product-analyst` or `query-db`. Should some
+  artifacts be unconditional?
+- **Default implemented.** **A core set with a licence per row** (`blueprint.md` §1.3), not an
+  unconditional list: `setup-manager` (always); `pr-reviewer` + `review-pr` (any git repo — a solo
+  developer reviews their own diff); `qa` (a web framework or a dev command); `db-inspector` +
+  `query-db` (a database service, an ORM, or a `DATABASE_URL`-shaped name); `security-auditor`
+  (`.env*`, auth or payments); `designer` + `new-component` (a UI framework and a components zone,
+  or a `design` doc); `product-analyst` + the three analytics skills (an analytics service); the
+  env-leak, destructive-command and package-manager hooks; permissions; the zone and workflow rules.
+  Each row names why the usual skip reasons do not apply to it. **The names are the catalogue's**:
+  a solo repo gets `pr-reviewer`, not `diff-reviewer`; the nuance goes in the description. **A
+  skill + subagent pair is one proposal** — the entry-point skill delegates to the tool-restricted
+  subagent — and `mapping-rules.md` §2.1's "never both" forbids only two artifacts that each do the
+  whole job.
+- **Why a licence per row rather than "always".** Evidence-derived is still the product's first
+  claim; a `qa` skill in a CLI repo would be a template. The licences are broad enough that on any
+  real app the whole set fires, and narrow enough that the walk (§2.35) can say which field was
+  empty when one does not.
+- **Mechanically.** `verify_artifacts.py`'s new `core_set` check (WARN) reads the manifest and,
+  with `--discovery`, the services and frameworks, and names each licensed core artifact that is
+  missing. A core skill the repo already carries under its own `.claude/skills/<name>` is not
+  flagged, because the repo's own artifact of the same type is the one legitimate coverage.
+- **What changed.** `blueprint.md` §1.3 (new), §3, §12; `templates/subagent.md.tmpl` rule 7;
+  `templates/skill.md.tmpl` rules 11–12; `verify_artifacts.py` + `verification.md` §2; `PRD.md`
+  §7.5, §9; `README.md`.
+- **Status: `decided`.**
+
+### 2.35 The catalogue walk is a section of the plan
+
+- **Question.** The riffads plan never listed `designer`, `product-analyst`, the testing,
+  code-style, security, memory or decisions rules, or `new-background-task` — not as built, not as
+  skipped. They were never walked. `blueprint.md` §10 was a ten-question checklist the model could
+  answer "yes" to without touching a row. How is a silent gap made impossible?
+- **Default implemented.** **The walk is a table, and the plan carries it** (`blueprint.md` §10,
+  `plan-template.md` rule 12 and `## Catalogue walk`): one row per catalogue row — every §1.3, §3,
+  §4.1, §5.1, §5.2, §6.1, §6.2 row — with the trigger field, what was found, and an outcome from a
+  fixed vocabulary: `built #N`, `not licensed — <field> is <value>`, `covered by <same-type path>`,
+  `skipped — <one of the three reasons>`, `merged into #N`. "Restates the index doc", "a vendored
+  guide exists", "installed at user scope" and "the procedure is documented" are not outcomes, and a
+  row carrying one is re-walked. It is phase 4's first output and the plan's last section, so the
+  user reads what was *considered*.
+- **Why a table and not a checklist.** A checklist is answered from memory; a table with a row per
+  catalogue entry has to be filled from the JSON, and a missing row is visible. It also makes the
+  two-class rule in §2.31 hold for the plan itself: the user can overturn any outcome by number
+  because every outcome is on the page. The cost is ~45 rows in a plan that was already 39 KB;
+  measured against twenty silently missing artifacts, it is cheap.
+- **The companion rule.** `mapping-rules.md` A17, the rationalized cut: a plan sentence arguing that
+  fewer artifacts is the right outcome for this repo — the riffads plan's "knowledge is not the gap,
+  enforcement is" — is the run explaining why it stopped walking. Delete it and re-walk.
+- **What changed.** `blueprint.md` §10 rewritten, §11, §12 (a worked walk on the riffads shape,
+  ~40 artifacts, as the calibration for "complete"); `plan-template.md` rule 12, the skeleton, the
+  token table; `SKILL.md` phase 4 and phase 6; `coverage.md` §2 step 6; `PRD.md` §7.5, §9.
+- **Status: `decided`.**
+
+### 2.36 A rule the developer wrote into their own docs is evidence
+
+- **Question.** The riffads plan skipped a `ui-token-guard` hook because "nothing in 30 sessions
+  corrects any of [DESIGN.md's banned list]", a branch rule because `branch_naming[]` counted 3
+  while `CLAUDE.md` itself says "always work on `development`", the `add-capability` skill because
+  `docs/guides/adding-a-capability.md` already exists, and every `zone == null` directory —
+  `app/`, `actions/`, `trigger/`, `server/generation/` — got nothing. Is a written rule weaker
+  evidence than a typed correction?
+- **Default implemented.** No — **it is evidence of the same tier**, and it licenses a hook when the
+  check is mechanical and a rule when it is not. Three catalogue rows carry it: the **doc-stated
+  check** hook (`blueprint.md` §4.1) for a forbidden import, class, literal, command or branch
+  stated in the index doc or a `design` / `style-guide` / `contributing` doc; **guide-to-skill**
+  (§6.2, `mapping-rules.md` row 17) for a `docs[]` row of kind `guide` or a procedure-shaped
+  section; and the **domain zone** rule (§5.1) for a depth-1 directory with 15+ files and a README,
+  an index-doc section, a co-change cluster or a commit scope. `discover.py` now emits the inputs:
+  doc kinds `design`, `context`, `style-guide`, `guide`; zones `routes`, `actions`, `jobs`, `lib`,
+  `hooks`, `state`, `types`; `sample_files` and `subdirs` per folder; the services that were
+  invisible (Dodo was folded into Better Auth; Trigger.dev, fal, OpenRouter and R2 were absent);
+  and `tooling.on_path` for the `qa` skill's browser driver.
+- **Why.** The developer who writes "no raw hex" into `DESIGN.md` instead of correcting the agent
+  three times has done more work, not less, and demanding the correction on top penalises exactly
+  the repos with the best documentation. The zone classifier's `null` for `app/` and `trigger/`
+  meant the rows that would have caught them read an empty field and correctly did not fire; the
+  fix is upstream, in what discovery reports, not in a looser rule.
+- **What changed.** `blueprint.md` §4.1, §5.1, §5.2, §6.1, §6.2; `mapping-rules.md` rows 12, 13,
+  17, A8; `discover.py` (tables, `build_folders`, `classify_doc`, `detect_tooling`, six new
+  selftests); `SKILL.md` phase 3's bounded exception, widened to quote those docs; `PRD.md` §7.2,
+  §8.
+- **Status: `decided`.**
+
+### 2.37 Phase 7 reads the files the evidence names
+
+- **Question.** "You never scrape the repo yourself" was written to keep transcript volume out of
+  the context window and to keep phases 1–2 deterministic. But `skill.md.tmpl` asks for
+  `CONTEXT_PATHS`, a conventions file and a filled output example, `rule.md.tmpl` for a correct and
+  an incorrect code example, and `blueprint.md` §3 for "the ORM's own query idiom" — none of which
+  is in the JSON. Where were those supposed to come from?
+- **Default implemented.** **A bounded read licence in phase 7, and only there** (`SKILL.md` phase
+  7): per artifact, the files its evidence names, a listing of its zone plus up to three existing
+  examples there, and the doc it quotes. Never `.env*` or a secret path, never a transcript, never
+  a bulk read; the files read are named in that type's checkpoint line; a token still unfillable is
+  evidence the candidate lacked, and its line is dropped rather than invented. Phases 3–6 stay on
+  the JSON, plus the frontmatter-and-headings exception (now also the `design` / `guide` /
+  `context` / `contributing` / `readme` / `adr` docs, for quoting).
+- **Why here and not earlier.** Phase 4 proposes from counts, and counts come from the scripts;
+  reading source there would let the model rediscover the repo and propose from impression.
+  Phase 7 fills an approved plan, artifact by artifact, so the reads are scoped by the plan and
+  audited by the checkpoint. `discover.py`'s new `sample_files` / `subdirs` carry the naming
+  conventions phase 4 needs without opening a file.
+- **What changed.** `SKILL.md` phases 3 and 7; `templates/skill.md.tmpl` rule 12.
+- **Status: `decided`.**
+
+### 2.38 The shortlist: the list is confirmed in chat before the plan is written
+
+- **Question.** `plan.md` is the right artifact to approve — evidence, mechanism, diff preview and
+  undo per item — and the wrong artifact to *scan*: on riffads it was 39 KB for 16 items, and a
+  complete walk produces forty. The user asked that the list of rules, hooks, agents and skills be
+  confirmed with them, in a form they can check quickly, and that the plan be written only from
+  that confirmed list. Where does that step go, and what does it look like?
+- **Default implemented.** **Phase 6 starts with the shortlist, in chat, before a byte of `plan.md`
+  exists** (`plan-template.md` §0, `SKILL.md` phase 6 step 1). One screen: every candidate grouped
+  by type in build order, numbered continuously, one row each — name, scope or trigger, one line of
+  what it does for *this* repo ending in the count behind it — then the rows that fired and were not
+  built, one line each. Closing line: `Reply "ok" and I'll write the plan with all N. Or edit in
+  words — drop 12, rename 7, add a rule for trigger/ — then ok.` An accept writes the plan as shown;
+  an edit is applied and echoed as the changed rows plus the new total, and the plan is written on
+  the accept that follows (`drop 12, ok` does both). `more on N` prints one row's evidence and
+  mechanism. An addition is built only if the JSON licenses it (`coverage.md` §5). Numbers assigned
+  at the shortlist are the plan's numbers and are never reassigned; every edit becomes the plan's
+  `SHORTLIST_EDITS_LINE`.
+- **The class of the question, and why it matters.** The shortlist is a **preference** under
+  `SKILL.md` rule 9 — it writes nothing, so `interview.md` §6's accept vocabulary applies and one
+  word takes it. The plan gate stays **consent**: the `ok` that confirmed the shortlist is not the
+  approval of the plan, and `SKILL.md` phase 6, `plan-template.md` rule 7a and `interview.md` §6
+  each say so in place. Two gates, two jobs: the shortlist is the *what*, the plan gate is the *go*,
+  and collapsing them would either make the user approve forty items from a 40 KB file or make
+  `ok` on a chat list authorise writes to their repo.
+- **Why not fold it into the interview.** The list depends on the answers — the package-manager
+  enforcer on Q15, several skills on Q16's empty slots, the low-confidence rows on Q13 — and a
+  forty-row table above four questions buries the questions. One extra round, with the whole setup
+  visible on one screen, is what the user asked for and is cheaper than reading the plan twice.
+- **What changed.** `plan-template.md` §0 (new), rule 7a, the summary skeleton, the token table;
+  `SKILL.md` phase 6 and the phase table; `coverage.md` §5; `interview.md` §6; `PRD.md` §7.7;
+  `CLAUDE.md`; `README.md`.
+- **Status: `decided`.**
+
+### 2.39 The size test: a workflow, not a feature
+
+- **Question.** "Do not go way too niche — a skill or subagent for so small a feature or workflow
+  that's not that much repeatable." The first riffads run had built a rule from a three-file
+  co-change cluster and proposed a reference doc for one design question; the catalogue's service
+  rows, read literally, would license an `add-upload` skill for a repo with one presign route.
+  Personalized and narrow are different things; what separates them?
+- **Default implemented.** **The size test** (`blueprint.md` §1.4; `mapping-rules.md` §3
+  condition 4 and A18). A **skill** must recur: `>= 3` existing instances of the thing it produces
+  (migrations, tasks, capabilities, ADRs), or a `request_shapes[]` count `>= 3`, or a service the
+  repo extends over time through a module, or a guide the developer wrote — nobody documents a
+  one-off. A **subagent** must earn its context window — a tool restriction, a reviewer stance or a
+  many-file pass — and be a §3 catalogue row or backed by a request shape at `>= 3`. A **rule**
+  governs a zone or a convention; a cluster inside a zone folds into that zone's rule. A **hook**
+  catches something that would happen more than once. The proof is a number, and the shortlist row
+  ends with it: `· 15 tasks in trigger/tasks/`, never `· uses Trigger.dev`. A row that cannot end
+  with a count drops to `Skipped (insufficient evidence)` with the count it had.
+- **Why a count and not judgment.** "Too niche" is a judgment the model has already shown it makes
+  in both directions — sixteen artifacts one day, a rule per file triple the next. Tying the test to
+  the count of the thing produced makes it the same kind of fact as every other threshold in
+  `mapping-rules.md`, visible on the shortlist where the user is checking exactly this, and immune
+  to the caps argument: it never limits how many artifacts a repo gets, only that each one is a
+  workflow.
+- **What changed.** `blueprint.md` §1.4 (new), §6.1 `add-upload`, §10 check 10, §11, §12;
+  `mapping-rules.md` §3 condition 4, A18; `plan-template.md` §0 rule 1; `interview.md` §4.8 table;
+  `CLAUDE.md`.
 - **Status: `decided`.**
 
 ## Part 3 — Judgment calls flagged for sign-off

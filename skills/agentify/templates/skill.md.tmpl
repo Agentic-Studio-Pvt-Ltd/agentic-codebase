@@ -47,6 +47,19 @@
 #>     something the developer actually hit? A skill that fails any of them is rewritten, not
 #>     shipped. Test 4 is the sharp one: if the file would be equally true in an unrelated project,
 #>     it is a template, and templates are the one thing this tool does not produce.
+#> 11. EXISTING VENDORED SKILLS ARE REFERENCES, NOT COVERAGE. A third-party skill already in the
+#>     repo (`provenance.vendored_artifacts`: a `drizzle-orm-patterns`, a `trigger-tasks`, a
+#>     `neon-postgres`) is the vendor's API guide. Link it from the one step that needs that API
+#>     detail — "for the query builder's syntax read .agents/skills/drizzle-orm-patterns/SKILL.md" —
+#>     never copy it, never let it supply a step, and never treat its presence as a reason this
+#>     skill is not built (blueprint.md §2.1). A user-scope skill is not linked at all: a teammate
+#>     does not have it.
+#> 12. WHERE THE NOUNS COME FROM. Phase 7 may read, per skill, the files its evidence names, a
+#>     listing of its zone plus up to three existing examples there, and the doc it quotes
+#>     (SKILL.md phase 7). That is where CONTEXT_PATHS, the conventions file and the output example
+#>     come from. The name of the catalogue row is the skill's name (blueprint.md §1.3); a skill
+#>     that is the entry point of a pair names its subagent in the step that delegates, and says
+#>     what the subagent may not do (write, in a read-only pair).
 name: {{SKILL_NAME}}
 #> description — the only line the agent reads when deciding whether to load this skill, so it
 #> decides whether the skill ever fires. Write it in third person, one paragraph, under 1024

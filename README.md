@@ -37,7 +37,7 @@ Eight phases. Each has a defined input, output, and stop condition, so a run can
 | 3 | **Diagnose** | The model reads the two JSON reports and writes findings: repetition, corrections, friction, guardrail gaps, external systems. Each carries an evidence count. |
 | 4 | **Propose** | Findings are mapped to artifact types, then a catalogue walks your stack — zones, services, frameworks, commands, missing guardrails — for everything the evidence supports. **Nothing is capped.** A finding with no evidence count maps to nothing. |
 | 5 | **Interview** | 3 to 8 numbered questions, ceiling of 12, each with a marked default. Reply `defaults` to accept all. Never asks what discovery already answered. |
-| 6 | **Plan** | `docs/agentic-setup/plan.md` is written. **Hard gate.** You accept, cut items, or edit. No file is generated before written approval. |
+| 6 | **Shortlist, then plan** | First a one-screen shortlist in chat — every item, numbered, one line each with the count behind it — that you edit in plain words and confirm with `ok`. Then `docs/agentic-setup/plan.md` is written from it. **Hard gate.** You accept, cut items, or edit. No file is generated before written approval. |
 | 7 | **Build** | The tree has to be clean or you override it explicitly. Artifacts are generated on a branch, in dependency order, with a checkpoint after each type, and committed to that branch — an empty branch deletes without undoing anything. |
 | 8 | **Verify and hand off** | Every artifact goes through deterministic checks — it exists, it parses, its frontmatter is right, its evidence matches the plan, its ID is unique, no secret is in an MCP draft, no rule contradicts what the repo actually does. The report is written, and you get a branch or a staged diff. Generated hooks are scanned statically; agentify **asks** before it runs one. |
 
@@ -73,11 +73,11 @@ Earlier versions capped output by repo size and switched to an "audit-only" mode
 
 What replaced them:
 
-- **A completeness check.** Every zone in your tree gets a rule or a stated reason it does not; every `.env*` file gets a guardrail; every confirmed service gets a skill, a subagent, an MCP draft or a stated reason.
+- **A core set, and a catalogue walk you can read.** Every setup gets `setup-manager`, a `pr-reviewer` subagent with a `review-pr` skill, a `qa` skill for any web app, a read-only `db-inspector` with `query-db` for any database, a `security-auditor`, a `designer` with `new-component`, a `product-analyst` with the analytics skills, the env-leak / destructive-command / package-manager hooks, a permissions block, and a rule per zone — each when its licence holds. The plan ends with a table showing every catalogue row that was considered, what was found, and why it was or was not built.
 - **A personalization test on every file.** Five checks, and the sharp one is: *name a repo this file would be false in.* A file that would read identically in an unrelated project is a template, and it gets rewritten rather than shipped.
-- **De-duplication, unconditionally.** Everything already in the repo — including the third-party and symlinked artifacts — is de-duplicated against, and nothing existing is ever restructured, rewritten or moved. That was the useful half of audit-only mode, and it is now just how every run works.
+- **De-duplication, unconditionally — against the right thing.** A candidate is skipped as "already covered" only by an artifact of the same type, inside your repo, that does the same job — your own, and checked against your actual commands and paths rather than trusted. A third-party library guide you installed is generic by construction, so it becomes a reference the generated skill links to, not a reason to skip it. Your `CLAUDE.md` stating a convention is the reason to scope a rule to that zone, not the reason to skip the rule. Nothing existing is ever restructured, rewritten or moved.
 
-**Only what is in the repo counts as the repo's setup.** Skills in `~/.claude/skills` or `~/.codex/skills` load everywhere on your machine and say nothing about this project; agentify reads them so it does not build a duplicate, and for nothing else.
+**Only what is in the repo counts as the repo's setup.** Skills in `~/.claude/skills` or `~/.codex/skills` load everywhere on your machine and in nobody else's clone; they say nothing about this project and never stand in for an artifact here. If a generated skill shares a name with one of them, the report says so and both load.
 
 ## Safety and privacy
 

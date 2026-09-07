@@ -22,6 +22,11 @@
 #>  4. Keep the five agentify-* lines verbatim; a rerun matches on agentify-id and rewrites in place.
 #>  5. Target length after filling: 40-120 lines.
 #>  6. No attribution in the body. The one comment line below is the only placement.
+#>  7. The name is the catalogue's name (blueprint.md §1.3): pr-reviewer, db-inspector,
+#>     security-auditor, designer, product-analyst, codebase-explorer. Never rename to signal a
+#>     nuance (a solo repo still gets `pr-reviewer`, not `diff-reviewer`); the nuance goes in the
+#>     description. When this subagent is the worker half of a pair, its description names the
+#>     skill that delegates to it, and its `tools` line is the restriction that pair exists for.
 name: {{SUBAGENT_NAME}}
 #> description — the routing line. The main agent reads only this when deciding whether to delegate,
 #> so it must state the trigger, not the personality. Third person, under 1024 characters:

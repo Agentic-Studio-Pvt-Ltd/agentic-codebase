@@ -337,6 +337,12 @@ WHAT IS CHECKED  (one `checks[]` entry each)
                         `## Never-cached routes` keeps its section) and
                         AGENTIFY'S OWN METADATA (`## Evidence`, the frontmatter
                         block, any `agentify-*:` line) are never directives
+    core_set            blueprint.md 1.3's core set is present -- at least one
+                        skill, `setup-manager`, a reviewer subagent, and (with
+                        `--discovery`) the db, qa, analytics and env-leak
+                        artifacts the repo licenses.  WARN only: a core
+                        artifact the user dropped at the gate is a correct
+                        outcome; one the walk never proposed is the defect
     undo_partition      `committed_paths` and `uncommitted_paths` cover every
                         artifact exactly once, and a gitignored or
                         `restore: span` artifact is in the second list
@@ -3355,10 +3361,12 @@ def load_manifest(source: str) -> Tuple[Dict[str, Any], str]:
     return (parsed, label)
 
 
-def load_discovery(source: Optional[str]) -> Tuple[Dict[str, Dict[str, Any]], str, str]:
+def load_discovery(source: Optional[str]) -> Tuple[Dict[str, Dict[str, Any]], str, str, Dict[str, Any]]:
     """
     Optional companion input: phase 1's `discovery.json`, reduced to the
-    conventions a rule can contradict.  Returns `(conventions, label, warning)`.
+    conventions a rule can contradict.  Returns `(conventions, label, warning,
+    parsed)` -- the last is the raw document, for `core_set`, and `{}` when
+    nothing usable was read.
 
     Unlike the manifest this is never fatal.  `--discovery` is an *addition* to
     the run, so a missing or malformed file degrades to "rules checked against
@@ -3366,11 +3374,11 @@ def load_discovery(source: Optional[str]) -> Tuple[Dict[str, Dict[str, Any]], st
     contract in `lib/emit.py`.
     """
     if not source:
-        return ({}, "", "")
+        return ({}, "", "", {})
     path = os.path.abspath(os.path.expanduser(source))
     if not os.path.isfile(path):
         return ({}, "", "--discovery: file not found (%s); rules were compared with each other "
-                        "only, not against discovered conventions" % _short(path, 100))
+                        "only, not against discovered conventions" % _short(path, 100), {})
     try:
         handle = open(path, "r", encoding="utf-8", errors="replace")
         try:
@@ -3380,13 +3388,14 @@ def load_discovery(source: Optional[str]) -> Tuple[Dict[str, Dict[str, Any]], st
         parsed = json.loads(raw)
     except (OSError, ValueError) as exc:
         return ({}, "", "--discovery: could not read %s (%s); rules were compared with each "
-                        "other only" % (_short(path, 80), _short(exc, 80)))
+                        "other only" % (_short(path, 80), _short(exc, 80)), {})
+    raw_doc = parsed if isinstance(parsed, dict) else {}
     conventions = conventions_from_discovery(parsed)
     if not conventions:
         return ({}, path, "--discovery: %s named no package manager, command, framework or "
                           "language this checker recognises; rules were compared with each "
-                          "other only" % _short(path, 80))
-    return (conventions, path, "")
+                          "other only" % _short(path, 80), raw_doc)
+    return (conventions, path, "", raw_doc)
 
 
 # ---------------------------------------------------------------------------
@@ -3419,6 +3428,7 @@ class Verifier(object):
         manifest_label: str = "",
         conventions: Optional[Dict[str, Dict[str, Any]]] = None,
         conventions_label: str = "",
+        discovery: Optional[Dict[str, Any]] = None,
     ):
         self.repo = repo
         self.repo_real = os.path.realpath(repo)
@@ -3437,6 +3447,9 @@ class Verifier(object):
         #: Empty when `--discovery` was not given -- and the PASS row says so.
         self.conventions = conventions or {}
         self.conventions_label = conventions_label
+        #: The raw `discovery.json`, for `core_set` only -- which artifacts the
+        #: repo's services and frameworks license.  `{}` without `--discovery`.
+        self.discovery = discovery if isinstance(discovery, dict) else {}
         self.checks = []  # type: List[Dict[str, str]]
         self.warnings = []  # type: List[str]
         #: Counted for every check, emitted or not, so `summary` stays true
@@ -3615,6 +3628,7 @@ class Verifier(object):
             self._check_artifact(artifact)
 
         self._check_names_unique()
+        self._check_core_set()
         self._check_settings_json()
         self._check_plugin_paths()
         self._check_mcp_json()
@@ -4899,6 +4913,132 @@ class Verifier(object):
         if os.path.isfile(candidate):
             return candidate
         return None
+
+    # -- the core set -----------------------------------------------------
+
+    _CORE_DB_SERVICES = frozenset([
+        "postgres", "neon", "supabase", "planetscale", "mongodb", "redis", "drizzle",
+        "prisma", "mysql", "sqlite",
+    ])
+    _CORE_DB_FRAMEWORKS = frozenset(["Drizzle ORM", "Prisma", "SQLAlchemy", "TypeORM", "Sequelize", "Kysely", "Mongoose"])
+    _CORE_WEB_FRAMEWORKS = frozenset([
+        "Next.js", "Nuxt", "Remix", "Astro", "Svelte", "SvelteKit", "Angular", "Vite",
+        "Django", "Laravel", "Ruby on Rails", "Expo", "React Native", "Vue", "React",
+    ])
+    _CORE_ANALYTICS = frozenset(["posthog", "mixpanel", "amplitude", "segment"])
+
+    def _existing_skill_dir(self, name: str) -> bool:
+        """True when the repo already carries a skill of this name under either
+        skills root -- the user's own, which blueprint.md 2.1 lets cover the
+        candidate, so its absence from the manifest is not a gap."""
+        for root in (".claude/skills", ".agents/skills"):
+            if os.path.isfile(os.path.join(self.repo, root, name, "SKILL.md")):
+                return True
+        return False
+
+    def _check_core_set(self) -> None:
+        """
+        blueprint.md 1.3: the artifacts every setup has when their licence
+        holds.  Measured 2026-09-07 on a 268k-line repo with eight services:
+        the run built two skills and no reviewer, designer or analyst, and
+        nothing in phase 8 noticed, because every row was about a file that
+        existed and none was about a file that should have.  WARN only -- the
+        user may have dropped an item at the gate, and that is their call --
+        but a warn the report has to carry is what makes the gap visible.
+        """
+        def labels(kind: str) -> List[str]:
+            out = []
+            for artifact in self.artifacts:
+                if artifact.get("type") != kind:
+                    continue
+                out.append(" ".join(
+                    str(artifact.get(key) or "") for key in ("id", "name", "path")
+                ).lower())
+            return out
+
+        skills = labels("skill")
+        agents = labels("subagent")
+        hooks = labels("hook")
+        gaps = []  # type: List[str]
+        found = []  # type: List[str]
+
+        if not skills:
+            gaps.append("zero skills -- a run that builds none has almost certainly failed the "
+                        "catalogue walk (blueprint.md 6)")  # kept long: it is the whole finding
+        else:
+            found.append("%d skill(s)" % len(skills))
+        if any("setup-manager" in label for label in skills):
+            found.append("setup-manager")
+        else:
+            gaps.append("no `setup-manager` skill -- it is unconditional (blueprint.md 6.3)")
+        if any("review" in label for label in agents):
+            found.append("a reviewer subagent")
+        elif any(
+            os.path.isfile(os.path.join(self.repo, ".claude", "agents", candidate))
+            for candidate in ("pr-reviewer.md", "code-reviewer.md", "diff-reviewer.md")
+        ):
+            found.append("a reviewer subagent the repo already had")
+        else:
+            gaps.append("no reviewer subagent (`pr-reviewer`) -- licensed by any git repo "
+                        "(blueprint.md 1.3)")
+
+        discovery = self.discovery
+        if discovery:
+            services = set(
+                str(row.get("name") or "").lower()
+                for row in (discovery.get("external_services") or [])
+                if isinstance(row, dict)
+            )
+            frameworks = set(
+                str(row.get("name") or "")
+                for row in (discovery.get("frameworks") or [])
+                if isinstance(row, dict)
+            )
+            env_names = [str(n) for n in (discovery.get("env_var_names") or []) if n]
+            if (services & self._CORE_DB_SERVICES) or (frameworks & self._CORE_DB_FRAMEWORKS):
+                if any("db-" in label or "database" in label for label in agents):
+                    found.append("a db subagent")
+                else:
+                    gaps.append(
+                        "no `db-inspector` subagent, though discovery has %s"
+                        % ", ".join(sorted((services & self._CORE_DB_SERVICES)
+                                           | (frameworks & self._CORE_DB_FRAMEWORKS))[:3])
+                    )
+            if frameworks & self._CORE_WEB_FRAMEWORKS:
+                if any(re.search(r"(^|[^a-z])qa([^a-z]|$)", label) for label in skills):
+                    found.append("a qa skill")
+                elif self._existing_skill_dir("qa"):
+                    found.append("a qa skill the repo already had")
+                else:
+                    gaps.append("no `qa` skill, though discovery has %s"
+                                % ", ".join(sorted(frameworks & self._CORE_WEB_FRAMEWORKS)[:2]))
+            if services & self._CORE_ANALYTICS:
+                if any("analytics" in label or "product" in label for label in skills + agents):
+                    found.append("an analytics artifact")
+                else:
+                    gaps.append("no `product-analyst` / `add-product-analytics` / `ask-product`, "
+                                "though discovery has %s"
+                                % ", ".join(sorted(services & self._CORE_ANALYTICS)))
+            if env_names:
+                if any("env" in label or "secret" in label for label in hooks):
+                    found.append("an env-leak hook")
+                else:
+                    gaps.append("no env-leak hook, though env_var_names holds %d name(s)"
+                                % len(env_names))
+
+        if gaps:
+            self.add(
+                "core_set", "manifest", WARN,
+                "; ".join(gaps[:5]) + " -- blueprint.md 1.3: dropped at the gate is fine, never "
+                "proposed is not",
+            )
+            return
+        self.add(
+            "core_set", "manifest", PASS,
+            "the core set is present: %s%s"
+            % (", ".join(found), "" if discovery else
+               " (no --discovery, so the licence-gated items were not checked)"),
+        )
 
     def _check_settings_json(self) -> None:
         """
@@ -7706,7 +7846,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         return 1  # pragma: no cover - fail() exits
 
-    conventions, conventions_label, conventions_note = load_discovery(getattr(args, "discovery", None))
+    conventions, conventions_label, conventions_note, discovery_raw = load_discovery(
+        getattr(args, "discovery", None))
 
     timer = emit_lib.Timer()
     with timer:
@@ -7717,6 +7858,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             manifest_label=label,
             conventions=conventions,
             conventions_label=conventions_label,
+            discovery=discovery_raw,
         )
         if conventions_note:
             verifier.warn(conventions_note)
@@ -8363,6 +8505,82 @@ def selftest() -> int:
         )
         status, detail = worst(result, "manifest_entry")
         add("an artifact with empty evidence FAILS, not warns", status == FAIL, "%s: %s" % (status, detail[:90]))
+
+        # -- core_set: the 2026-09-07 gap -- a build with no skills, no
+        # setup-manager and no reviewer passed every row, because every row
+        # was about a file that existed and none about one that should have.
+        code, result, _raw = verify(
+            "core-missing-manifest.json",
+            [{"id": "only-rule", "type": "rule", "path": ".claude/rules/only-rule.md",
+              "action": "created", "evidence": "cochange x3"}],
+        )
+        status, detail = worst(result, "core_set")
+        add(
+            "a manifest with no skills, no setup-manager and no reviewer WARNS on core_set",
+            status == WARN and "zero skills" in detail and "setup-manager" in detail
+            and "pr-reviewer" in detail,
+            "%s: %s" % (status, detail[:140]),
+        )
+        core_dir = os.path.join(fixture, ".claude", "skills", "setup-manager")
+        if not os.path.isdir(core_dir):
+            os.makedirs(core_dir)
+        with open(os.path.join(core_dir, "SKILL.md"), "w") as handle:
+            handle.write("---\nname: setup-manager\ndescription: Maintains the setup.\n"
+                         "agentify-id: setup-manager\nagentify-version: 1\n"
+                         "agentify-generated: 2026-09-07\nagentify-evidence: 3 artifacts built\n"
+                         "---\n\nSafe to delete or edit.\n")
+        core_agents = os.path.join(fixture, ".claude", "agents")
+        if not os.path.isdir(core_agents):
+            os.makedirs(core_agents)
+        with open(os.path.join(core_agents, "pr-reviewer.md"), "w") as handle:
+            handle.write("---\nname: pr-reviewer\ndescription: Reviews a diff.\n"
+                         "agentify-id: pr-reviewer\nagentify-version: 1\n"
+                         "agentify-generated: 2026-09-07\nagentify-evidence: git.is_repo true\n"
+                         "---\n\nSafe to delete or edit.\n")
+        core_ok = [
+            {"id": "setup-manager", "type": "skill",
+             "path": ".claude/skills/setup-manager/SKILL.md", "action": "created",
+             "evidence": "3 artifacts built"},
+            {"id": "pr-reviewer", "type": "subagent", "path": ".claude/agents/pr-reviewer.md",
+             "action": "created", "evidence": "git.is_repo true"},
+        ]
+        code, result, _raw = verify("core-present-manifest.json", core_ok)
+        status, detail = worst(result, "core_set")
+        add(
+            "setup-manager plus a reviewer subagent PASSES core_set without --discovery",
+            status == PASS and "setup-manager" in detail and "no --discovery" in detail,
+            "%s: %s" % (status, detail[:140]),
+        )
+        core_discovery = os.path.join(fixture, "core-discovery.json")
+        with open(core_discovery, "w") as handle:
+            json.dump({
+                "package_managers": ["bun"],
+                "commands": {"test": "bun test"},
+                "frameworks": [{"name": "Next.js"}, {"name": "Drizzle ORM"}],
+                "external_services": [{"name": "posthog", "confidence": "high"},
+                                      {"name": "neon", "confidence": "medium"}],
+                "env_var_names": ["DATABASE_URL", "NEXT_PUBLIC_POSTHOG_KEY"],
+            }, handle)
+        code, result, _raw = verify(
+            "core-licensed-manifest.json", core_ok, extra=["--discovery", core_discovery]
+        )
+        status, detail = worst(result, "core_set")
+        add(
+            "with --discovery, a db service, a web framework, an analytics service and env names "
+            "each name the core artifact that was not built",
+            status == WARN and "db-inspector" in detail and "`qa`" in detail
+            and "product-analyst" in detail and "env-leak" in detail,
+            "%s: %s" % (status, detail[:200]),
+        )
+        # The two files above must not outlive this probe: `undo_created_dirs`
+        # later derives "directories holding nothing but this run's files" from
+        # the fixture, and a stray pr-reviewer.md in .claude/agents would make
+        # that derivation come back empty.
+        os.remove(os.path.join(core_agents, "pr-reviewer.md"))
+        os.remove(os.path.join(core_dir, "SKILL.md"))
+        os.rmdir(core_dir)
+        if not os.listdir(core_agents):
+            os.rmdir(core_agents)
 
         # The contradiction the docs use as their own example.
         with open(os.path.join(rules_dir, "use-bun.md"), "w") as handle:

@@ -14,7 +14,10 @@ summary. If a candidate is not built, the reason is always one of exactly three 
 three are facts about the evidence rather than about a number agentify chose:
 
 1. **No evidence** — the field the row needs is empty or below its threshold (`mapping-rules.md` §0).
-2. **Already covered** — an existing artifact, CI job, or repo script already does it (A1, A2, A9).
+2. **Already covered** — an artifact of the **same type inside this repo** already does the same
+   job (`blueprint.md` §2.1); for a hook, a CI job or repo script; for a skill, one existing repo
+   command that *is* the whole procedure (A1, A2, A9). Nothing else covers anything: not the index
+   doc, not a vendored guide, not a user-scope skill or plugin, not a document, not a human GUI.
 3. **Low confidence** — it cleared its threshold but on thin or stale demand, so the user opts in
    (`mapping-rules.md` §6.1).
 
@@ -47,6 +50,10 @@ on first.
    hooks → settings → skills → subagents → MCP drafts → index doc).
 5. **No trading across types.** Do not re-map a weak skill into a rule to get it built. If it is a
    rule, it was always a rule.
+6. **No cutting by argument.** A sentence in the plan explaining why this repo is better served by
+   fewer artifacts — "knowledge is not the gap", "these would only restate the index doc" — is
+   `mapping-rules.md` A17, the rationalized cut. Delete the sentence and re-walk the rows it
+   excused. The user cuts at the gate; the run does not cut for them.
 
 ### 2.1 When the total is large, say so — and still propose it
 
@@ -100,12 +107,14 @@ to drop; anything you drop stays in the report so you can add it later.
 
 ## 5. The user's controls
 
-The gate is the control surface, and it is why the interview does not ask what the gate settles.
-Three values reach the plan **derived rather than asked** — `mode`, `services` and `team_size`
-(`interview.md` §4.2, §4.8) — and each carries a line saying how to overturn it. Overturning one is
-a plain sentence at the gate, not a question round.
+The shortlist (`plan-template.md` §0) and the gate are the control surface, and they are why the
+interview does not ask what they settle. Three values reach the plan **derived rather than asked**
+— `mode`, `services` and `team_size` (`interview.md` §4.2, §4.8) — and each carries a line saying
+how to overturn it. Overturning one is a plain sentence at the shortlist or the gate, not a
+question round. The shortlist is where most edits happen — it is the whole list on one screen,
+numbered, before the plan exists — and every edit made there is a line in the plan's summary.
 
-- **They can drop anything**, at the phase 6 gate, by number. Honour it exactly.
+- **They can drop anything**, at the shortlist or the phase 6 gate, by number. Honour it exactly.
 - **They can overturn a derived value** in words: "stage only" sets `mode`, "we're a team" sets
   `team_size`, naming services reorders them. Never re-ask to confirm — a derived value put back as
   a question is a retired question reinvented (`interview.md` §4.1).
@@ -133,9 +142,10 @@ every run:
   skill, agent, rule, hook or index doc. This is the additive invariant, not a mode.
 - **Never rewrite the user's prose.** Existing files are read for de-duplication only. The index
   doc is appended to inside markers, always.
-- **De-duplicate against everything found in the repo**, vendored and symlinked included. A
-  third-party guide covers its subject as well as one the team wrote, and a second copy is
-  anti-pattern A9. `provenance.vendored_artifacts` names the source for the skipped row.
+- **De-duplicate against artifacts of the same type inside the repo** (`blueprint.md` §2.1) — the
+  team's own, tested against this repo rather than trusted; a symlinked one counts once. A
+  **vendored** artifact covers nothing: it is a generic guide, and it becomes a reference the
+  generated skill links to, with `provenance.vendored_artifacts` naming its source in the plan.
 - **Never touch a symlinked or vendored artifact.** A symlink lives in another store and editing it
   changes every repo that links it; a vendored artifact is overwritten by its next install. If one
   is broken, that is a report line, not an edit.
@@ -149,11 +159,14 @@ every run:
 **Only artifacts inside `$REPO_ROOT` are this repo's setup.** A skill in `~/.claude/skills` or
 `${CODEX_HOME}/skills` loads in every repo on the machine and says nothing about this one. Discovery
 already keeps them apart: `counts` and `provenance` are repo-scoped; `user_scope` is the home store
-and is reported for **de-duplication only**. Never sum `user_scope` into anything, never quote it as
-"your setup", and never let it change what this run builds.
+and is reported so that **name collisions can be named**. Never sum `user_scope` into anything,
+never quote it as "your setup", and never let it change what this run builds.
 
-The one thing home-scope entries do earn: if a candidate duplicates one, skip it and name the file,
-exactly as for a repo-level duplicate.
+**Home-scope entries cover nothing — not even by de-duplication.** Measured 2026-09-07: a
+user-scope PostHog plugin and a user-scope Codex MCP entry were taken as covering three analytics
+skills and an MCP draft, on a run whose whole purpose was a repo-scoped setup a teammate would get
+by cloning. A same-name collision (`~/.claude/skills/qa` beside a generated `.claude/skills/qa`) is
+one line in the report saying both load and which the user may want to rename. It is never a skip.
 
 ### 6.2 Reading the provenance fields
 
@@ -161,9 +174,9 @@ exactly as for a repo-level duplicate.
 |---|---|---|
 | `counts.skills`, `counts.agents`, `counts.rules`, `counts.hooks` | every repo-level artifact found, the team's own and vendored alike | de-duplication, and telling the user what is installed |
 | `provenance.own` + `provenance.ambiguous` | the artifacts this team wrote | one sentence of context in the plan — never a gate |
-| `provenance.vendored` | installed from elsewhere (a `skills-lock.json` entry, a vendor or plugin-cache path, frontmatter naming a source) | de-duplication, and naming the source in a skipped row |
+| `provenance.vendored` | installed from elsewhere (a `skills-lock.json` entry, a vendor or plugin-cache path, frontmatter naming a source) | naming the source when a generated skill links it as a reference; **never coverage** (`blueprint.md` §2.1) |
 | `symlinked.skills`, `symlinked.agents` | entries resolving outside their directory | the never-touch list |
-| `user_scope.*` | the machine-wide store (Codex home, Claude home) | de-duplication only, §6.1 |
+| `user_scope.*` | the machine-wide store (Codex home, Claude home) | name collisions in the report, §6.1; **never coverage** |
 
 `maturity` is still emitted by `discover.py`. **It no longer gates anything.** Quote
 `provenance.maturity_basis` in the plan when `provenance.vendored` is non-zero, as one line of
@@ -191,8 +204,10 @@ exactly three headings, with its score and reason, so the user can pull it back 
 
 - **`### Skipped (insufficient evidence)`** — the count was below the row threshold. Show the count
   found and the threshold missed. More usage brings these back.
-- **`### Skipped (already covered)`** — an existing artifact, CI job or repo script already does the
-  job (A1, A2, A9). Name the existing file or command, and its source when vendored.
+- **`### Skipped (already covered)`** — an artifact of the **same type inside this repo** already
+  does the job, or a CI job / repo script does for a hook, or one repo command is the whole
+  procedure for a skill (A1, A2, A9; `blueprint.md` §2.1). Name the file or command. Nothing
+  vendored, user-scope, index-doc or documentary ever appears in this column.
 - **`### Skipped (low confidence — opt in to build)`** — cleared its threshold but sits at `F = 1`
   on thin or stale demand (`mapping-rules.md` §6.1). Show the score with its breakdown and the
   number that made it thin. Only the user's yes brings these back. A `structural` `F = 1` — a script

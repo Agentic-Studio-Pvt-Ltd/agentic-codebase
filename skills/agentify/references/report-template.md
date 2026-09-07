@@ -58,6 +58,14 @@ that disagrees with the filesystem is worse than no report.
    report, never create `report.1.md`. Same rule, same wording, as `plan-template.md`'s header and
    `SKILL.md` phase 7. The idempotency invariant holds either way: a rerun updates in place and
    never duplicates.
+10. **Suggestions are not artifacts, and they get their own section.** Two things the catalogue
+   walk surfaces are never built and always reported, one line each, under `## Suggestions I did
+   not build`: an index-doc section that is zone-specific and would be cheaper as a path-scoped
+   rule (name the heading and the rule that would take it — `setup-manager` can move it on request;
+   agentify never moves the user's prose), and a same-name collision between a generated artifact
+   and one at user scope (`~/.claude/skills/qa` beside `.claude/skills/qa` — both load; say which
+   the user may want to rename). Delete the section when there is nothing to say; never fill it
+   with generic advice, and never let a suggestion here stand in for an artifact the walk licensed.
 9. **Add this file's `artifacts[]` entry to the manifest after writing it, then re-run the static
    pass** (`verification.md` §9 step 6). That entry cannot exist earlier — `file_exists` would fail
    on a file that is written *from* the results of that pass. **Its `path` is a separate thing and
@@ -129,6 +137,10 @@ Why this is yours: NEEDS_YOU_REASON
 2. NEEDS_YOU_STEP
 
 NEEDS_YOU_NONE_LINE_OR_DELETE
+
+## Suggestions I did not build
+
+SUGGESTIONS_OR_DELETE
 
 ## Verification
 
@@ -232,6 +244,7 @@ Bigger codebase or a team? Agentic Studio builds the full engineering system in 
 | `VERIFY_FAILURE_ACTION_NOTE_OR_DELETE` | for each fail: what you did — fixed it, or removed the artifact and moved it to Skipped |
 | `BASE_BRANCH`, `BASE_COMMIT`, `BRANCH_NAME`, `PLAN_DIR` | `manifest.base_branch` (empty means detached HEAD — use `base_commit`), `manifest.base_commit`, `manifest.branch`, `manifest.plan_dir`. Never a remembered value: the manifest is the only place they survive |
 | `CREATED_PATHS`, `CREATED_DIRS_DEEPEST_FIRST` | every `action: created` path, **plus `PLAN_DIR/report.md` itself**, and every `manifest.created_dirs` entry deepest-first, space-separated on one line each. Both are the **whole** created set, ignored or not: `rm` and `rmdir` do not consult `.gitignore`, so these two never take the `committed_paths` / `uncommitted_paths` split — only `git restore --staged` does. In the skeleton's "Files this run created, in full" listing the same set is written one path per line as `CREATED_PATH`. **The `rm -f` operand list drops `UNMERGE_PATHS`** — a config agentify merged into is removed by the un-merge script, not by `rm` — while the listing keeps them. The report's *artifact entry* is appended to the manifest only after the report is written (`verification.md` §9 step 6), so it is not among the `action: created` entries you are reading and you add it by hand; its *path* is already in the partition lists, reserved before this section was rendered (`verification.md` §9 step 4a), which is what makes the counts below final. Omitting it is how an undo strands the one file that explains the run |
+| `SUGGESTIONS_OR_DELETE` | rule 10: one bullet per suggestion — an index-doc section named by heading with the path-scoped rule it could become, or a user-scope name collision with the two paths that both load. Delete the whole section when there is none |
 | `MODIFIED_PATH`, `MODIFIED_ID`, `PRE_EXISTING_SHA256` | one set per `action: modified` artifact — its `path`, its `id`, and its `pre_existing_sha256` |
 | `REMOVAL_MODE_SENTENCE` | **One mechanism per sentence, each with the count of files it removes.** Choose on `manifest.mode` **and** on whether `manifest.uncommitted_paths` is empty — never on `mode` alone. **branch, `uncommitted_paths` empty**: `All N of this run's files are committed on BRANCH_NAME, and nothing was committed to BASE_BRANCH. Deleting the branch removes all N.` **branch, `uncommitted_paths` non-empty**: `N of this run's files are committed on BRANCH_NAME, and nothing was committed to BASE_BRANCH. Deleting the branch removes those N. The other M were never committed — IGNORED_BY_PATTERN — so the branch delete does not touch them and step 2 removes them by name.` `N` is `len(manifest.committed_paths)`, `M` is `len(manifest.uncommitted_paths)`, and `N + M` is every artifact in the manifest — if it is not, `verification.md` §10.2 has already failed the run. Never print the first sentence when the second applies: it is the exact false claim measured on `vercel/turborepo`, where 4 of 9 artifacts were on the branch and 5 were not, and the branch delete removed 4 of them while reporting success. **stage-only**: `Nothing was committed and no branch was created, so there is no branch to delete. The numbered steps below remove N files and D directories and take K appended-to files back to their pre-run bytes.` Say `the numbered steps below`, never a fixed number of them — §3.1 emits its steps across two, three or four blocks, blocks B and C appear only when a `restore: span` file's format calls for them, and any step whose token resolves to an empty list is omitted and the rest renumbered. Add one sentence after it: `Run them top to bottom, in the order printed — step 1 saves a copy of this file, because the last block deletes it.` **no git repo**: `This repo is not under git, so nothing was staged or committed. The steps below delete N files and D directories and remove the marked block from K files that were appended to.` |
 | `REMOVAL_COMMANDS` | §3.1's **block A** for `manifest.mode`, and only block A: the save-a-copy step, then the mode's git steps — `git show`/`cp` + `git checkout` + `git branch -D` in branch mode, `cp` + the two `git restore` steps in stage-only, the `cp` alone with no git repo. **Nothing in block A deletes anything**; every `rm`, `rmdir` and script is a later block. Never another mode's block |
