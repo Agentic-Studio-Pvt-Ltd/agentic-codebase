@@ -31,6 +31,10 @@ Never append a second plan, and never create `plan.1.md` or a dated variant.
    saying a limit stopped anything (`coverage.md` §1). If a type produced nothing, the note on its
    row names the field that was empty.
 7. **No file is created by this phase.** Not a stub, not a placeholder, not a directory.
+7a. **One word approves, and silence never does.** `SKILL.md` rule 9 puts this in the consent class:
+   the `## Your approval` block shows the recommended reply (`approved`) marked exactly as the
+   interview marks a recommended option, and still requires the user to type something. Do not
+   accept `interview.md` §6's list here — that vocabulary belongs to phase 5, which writes nothing.
 8. **Every phase-4 candidate ends in exactly one place** — built, or under one of the **three**
    skipped headings (`insufficient evidence` / `already covered` / `low confidence — opt in to
    build`). The three are different facts about a candidate and `coverage.md` §8 forbids conflating
@@ -250,12 +254,15 @@ word and any of them is included.
 
 Nothing has been created yet. This file is the only thing I have written.
 
-Reply with one of:
+→ **`approved`** — build all ARTIFACT_TOTAL items above.   ← what I'd do
 
-- **`approved`** — build everything above.
+Or, if you want something different:
+
 - **`approved except N, M`** — build everything except those numbered items.
 - **`approved, but ...`** — tell me what to change and I'll rewrite this plan first.
 - **`no`** — I stop, and you can delete this file.
+
+Anything you drop stays listed under **Skipped**, so you can add it back later by name.
 
 I will not create, modify, or stage any other file until you reply.
 

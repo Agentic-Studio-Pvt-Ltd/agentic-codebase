@@ -22,7 +22,9 @@ it yet** — do not read a default as an answer.
 
 Last reconciled against the tree: **2026-09-07, direction round (two passes).** §2.30 records the
 second pass: three more questions retired after a real run, each replaced by a derivation the plan
-states out loud. §2.22 through §2.29 are from the first pass and
+states out loud. §2.31 is the third: every remaining question now carries the answer agentify
+recommends, and one word accepts the lot — with consent and approval held back from that shortcut
+on purpose. §2.22 through §2.29 are from the first pass and
 record the product-direction change in `GOAL.md`: no output caps, no audit-only mode, repo scope
 only, structural facts as evidence, the index doc built last, permissions in and the plugin manifest
 out, no pull requests, and three new interview questions. §2.12's provenance classification stands;
@@ -1162,6 +1164,49 @@ written. The contract has been reconciled to match; these entries record why.
 - **To change it.** `references/interview.md` §2, §4.1, §4.2, §4.8 and §8; `SKILL.md` phase 5 and
   phase 7 step 4; `references/plan-template.md`; `references/mapping-rules.md` §1.1 and row 15;
   `references/blueprint.md` §3, §6.1 and §11.
+- **Status: `decided`.**
+
+### 2.31 Every question carries its own answer, and one word accepts it
+
+- **Question.** A question with a marked default still costs the user a decision per question. What
+  is the minimum input a correct run can require?
+- **Default implemented.** **One word, for the whole interview.** Three changes, one new rule:
+  - **`SKILL.md` rule 9** applies to every question in every phase, not just the interview: name the
+    option you recommend, justify it in one clause from a real signal, make it answerable in one
+    word, and never re-ask to confirm.
+  - **The marker changed from `[default]` to `→ … ← recommended`**, with the recommended option on
+    its own visually distinct line and every other option indented under it. The word matters:
+    *default* describes what happens if the user ignores you; *recommended* says you have an opinion
+    and will be overruled. `[default]` is retired and must not be emitted.
+  - **The accept-everything vocabulary widened** from twelve strings to four families —
+    plain assent (`ok`, `yes`, `sure`, `fine`, `looks good`…), the literal word (`defaults`,
+    `recommended`…), proceed (`go`, `do it`, `👍`…), all-yes — and is explicitly *not* a parser:
+    any whole reply meaning *use what you suggested* takes that path.
+- **The line that keeps this safe, and it is the whole of the decision.** Questions split into two
+  classes by **what a non-answer means**:
+
+| Class | Where | Non-answer means |
+|---|---|---|
+| **Preference** | the interview, build checkpoints | take the recommendation |
+| **Consent / approval** | transcript consent, the phase 6 plan gate, a dirty-tree override, executing a hook | **nothing** — the recommendation is printed, an explicit reply is still required, and silence is never a yes |
+
+  Without that split, "minimal input" quietly erodes the two gates the product rests on. Concretely:
+  `interview.md` §6's list is scoped to phase 5 and **must not** be carried into phase 6, and the
+  four consent sites each say so in place. `continue` is a safe accept in phase 5, which writes
+  nothing, and is explicitly not approval of a plan.
+- **What each consent site now shows.** The transcript question marks option 1 recommended, says why
+  in one sentence, and closes `Reply "1" or "ok" to go ahead, "no" to skip, or name a window`. The
+  plan's `## Your approval` block marks `approved` the same way the interview marks an option. The
+  hook smoke-test says `I recommend yes` and why. The dirty-tree gate names the files and offers
+  `reply "go ahead" and I'll build anyway`.
+- **The rule that stops this becoming a rubber stamp.** `interview.md` §1 rule 10: a recommendation
+  you cannot justify in one clause is not a recommendation. If the honest `Why:` line would be *"I
+  have no idea, you pick"*, the evidence has not been read hard enough — read it again, or derive
+  the value and state it in the plan instead of asking (§4.8). A question is not a way to offload a
+  judgment agentify was supposed to make.
+- **To change it.** `SKILL.md` rule 9 and phases 6–8; `references/interview.md` §1, §4.4, §4.6,
+  §4.7, §5, §6; `references/privacy.md` §2 and §3; `references/plan-template.md`;
+  `references/verification.md` §5.1.
 - **Status: `decided`.**
 
 ## Part 3 — Judgment calls flagged for sign-off

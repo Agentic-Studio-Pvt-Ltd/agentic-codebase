@@ -11,13 +11,15 @@ genuinely cannot settle. It is not a discovery interview and it is not a prefere
 1. **Ask 3 to 8 questions. Absolute ceiling 12.** If your selection produces fewer than 3, ask
    fewer — do not invent filler. If it produces more than 8, cut by priority (§3) until you are
    at 8. Only go past 8 when a question is `must-ask` and its trigger fired, and never past 12.
-2. **Every question has a marked default.** No open-ended questions without one. The default
-   must be the answer you would proceed with if the user walked away.
+2. **Every question carries a recommendation, and one word accepts it.** No open-ended question
+   without one. The recommended option is the answer you would proceed with if the user walked
+   away — so it must be one you would actually defend, not the most cautious cell in the table.
+   §5 has the shape it renders in.
 3. **Every question has a fired trigger.** If the trigger condition in §4 is false for this run,
    the question does not get asked. No exceptions, no "might as well".
 4. **Ask once, in one block.** One message containing all the questions. Do not drip them.
    No follow-up round unless an answer is genuinely unparseable (§7).
-5. **`defaults` accepts everything** (§6).
+5. **One word accepts everything** — `ok`, `yes`, `defaults`, and the rest of §6's list.
 6. **Never ask what discovery already answered** (§2).
 7. **Never ask a question whose answer changes nothing.** Every entry in §4 names what it
    changes downstream. If, for this run, the answer would change nothing — for example the plugin
@@ -25,7 +27,17 @@ genuinely cannot settle. It is not a discovery interview and it is not a prefere
 8. **There are no caps, and the interview never mentions one.** agentify builds the whole setup
    the evidence supports (`coverage.md` §1). No question offers to raise, lower or explain a limit,
    and the words *cap*, *limit* and *quota* do not appear in a question, an option or a `Why:` line.
-9. **No trigger may read another question's answer.** Rule 4 asks every question in one message,
+9. **Minimal input is a design constraint, not a courtesy.** The user must be able to clear the
+   whole interview with the word `ok`, and must never have to re-type something already on their
+   screen. Every question is answerable by its letter alone; a whole reply of `ok` accepts every
+   recommendation; nothing is re-asked to confirm; and a derived value is never put back as a
+   question (§4.8). A question the user has to think hard about to answer *at all* is a question
+   that needed a better recommendation.
+10. **A recommendation you cannot justify in one clause is not a recommendation.** The `Why:` line
+   carries the justification and cites a field and a number (§5). If the honest `Why:` would be
+   "I have no idea, you pick", the evidence has not been read hard enough — read it again, or
+   derive the value and state it in the plan instead of asking (§4.8).
+11. **No trigger may read another question's answer.** Rule 4 asks every question in one message,
    so at the moment you compose a question *no* question has been answered yet. A trigger of the
    form "ask this if Q7 answered `b`" can never fire, and it fails silently — the question simply
    never appears, in any run, and nothing reports it. Every trigger in §4 must resolve against
@@ -33,7 +45,7 @@ genuinely cannot settle. It is not a discovery interview and it is not a prefere
    target detection, or another question's **default** (which *is* known at compose time).
    Where one answer genuinely has to override another, do it **after** the reply, in §7's
    reconciliation step — never in a trigger. §4.3 audits the whole bank against this rule.
-10. **Every noun comes from the target, never from a literal.** A question that hardcodes
+12. **Every noun comes from the target, never from a literal.** A question that hardcodes
    `CLAUDE.md`, `.claude/`, "Claude Code plugin", or one target's hook exit contract is wrong on
    every run against the other target — and it fails the way a bad trigger fails, silently, because
    the user cannot tell that the question they were asked was the wrong one. **§3.1 is the
@@ -119,7 +131,7 @@ it is chosen per repo, not fixed at 180 (§4.2).
 
 `TARGET` is settled before this phase: `SKILL.md` phase 0 step 2 sets it from the agent you are
 running inside. Every question below that names a file, a directory, an artifact type or a mechanism
-takes its noun from this table (§1.10). The bank writes the **token**; you render the cell.
+takes its noun from this table (§1.12). The bank writes the **token**; you render the cell.
 
 | Token | `claude-code` | `codex` |
 |---|---|---|
@@ -160,7 +172,7 @@ file the hook is registered in; `PERMISSIONS_FILE` → Q3's `Why:` line and Q15'
 
 **The ambiguous-target run (Q7 in the set).** Q7 exists only when both targets are configured *and*
 phase-0 detection was ambiguous, so on that run `TARGET` is not settled when you compose. Resolve
-every token against **Q7's own default** — the phase-0 provisional target — exactly as §1.9 requires
+every token against **Q7's own default** — the phase-0 provisional target — exactly as §1.11 requires
 a trigger to read a default rather than an answer, and add the other target's form in a trailing clause
 where one word covers it (`…in .claude/settings.json (.codex/rules/ if you pick Codex above)`).
 **Q9 is now one of the questions that trailing clause saves, and it must be asked.** Its two
@@ -207,7 +219,7 @@ Notes on the bank:
 - Never add a question that is not in this bank without a concrete, run-specific reason, and
   never add more than one. It still counts against the ceiling and still needs a default and a
   named downstream effect.
-- **No row above spells a target-specific literal, and a new one must not either** (§1.10). Six of
+- **No row above spells a target-specific literal, and a new one must not either** (§1.12). Six of
   the nine questions name something that differs between Claude Code and Codex — Q3, Q9, Q10, Q12,
   Q14 — and every one of them reads a §3.1 token or a `discovery.existing_agentic_config.codex`
   field. If a run makes you want to write `CLAUDE.md`, `.claude/` or "a Claude Code plugin" into a
@@ -256,7 +268,7 @@ you cannot do the second, the gate already covers it.
 
 **The one thing worth keeping from Q2's ladder** is the reasoning pattern, which §3.1 still cites: a
 trigger reads JSON or another question's **default**, never another question's *answer*, because
-§1.4 asks everything in one message. That is §1.9, and it is why dependent wording composes against
+§1.4 asks everything in one message. That is §1.11, and it is why dependent wording composes against
 another question's **default**, never its answer.
 
 **Never re-derive a PR offer from anything.** Not from a `contributing` doc, not from `pr_patterns`,
@@ -433,7 +445,7 @@ lack:
   sentence, and `pr_patterns.available` is still `false` under the `--no-gh` phase 2 runs — no
   trigger reads it, and Q2, the question that once did, is retired (§4.1).
 
-**Answer-dependency audit (§1.9) — every row above re-checked, 2026-09-04.** A trigger that reads
+**Answer-dependency audit (§1.11) — every row above re-checked, 2026-09-04.** A trigger that reads
 another question's *answer* can never fire, because §1.4 asks everything in one message. Two rows
 did, and both are repaired above:
 
@@ -480,18 +492,18 @@ these are the two decision contracts phase 7 emits and phase 8 tests.
 **`claude-code` — verbatim:**
 
 ```
-a) warn only — the hook exits 0 and prints what it found  [default]
-b) blocking — the hook exits 2, the tool call does not run, and its stderr
-   goes back to me as the instruction to fix it
+→ a) warn only — the hook exits 0 and prints what it found   ← recommended
+  b) blocking — the hook exits 2, the tool call does not run, and its stderr
+     goes back to me as the instruction to fix it
 ```
 
 **`codex` — verbatim:**
 
 ```
-a) warn only — the hook exits 0 and prints what it found  [default]
-b) blocking — the hook still exits 0 and answers with a "deny" decision, so
-   the tool call does not run and the reason comes back to me as the
-   instruction to fix it
+→ a) warn only — the hook exits 0 and prints what it found   ← recommended
+  b) blocking — the hook still exits 0 and answers with a "deny" decision, so
+     the tool call does not run and the reason comes back to me as the
+     instruction to fix it
 ```
 
 Why the Codex option is not "exit 2": the documented exit-2 path exists on Codex as well, but
@@ -575,9 +587,9 @@ the `AGENTS.md` pointer lines cite, so resolve `PLAN_DIR` before phase 6 writes 
 Verbatim, on both targets. `TARGET_NAME` is the only token in it.
 
 ```
-a) no, none — just build the setup for this repo  [default]
-b) yes, one I already have installed — which?
-c) I want one — which? (I'll put the install command in the report; I won't run it for you)
+→ a) no, none — just build the setup for this repo   ← recommended
+  b) yes, one I already have installed — which?
+  c) I want one — which? (I'll put the install command in the report; I won't run it for you)
 ```
 
 **Naming the two by name is deliberate.** Compound engineering and superpowers are the two the user
@@ -609,9 +621,9 @@ correct the premise rather than just the answer:
 ```
 3. Two lockfiles sit at your repo root — bun.lock and package-lock.json — and package.json
    declares no packageManager. Which one does this repo really use?
-   a) bun  [default]
-   b) npm
-   c) something else — name it
+   → a) bun   ← recommended
+     b) npm
+     c) something else — name it
    Why: discovery left commands.install empty on purpose; the enforcement hook below needs
         to know which one to allow and which to block.
 ```
@@ -624,8 +636,8 @@ say that is why.
 
 ```
 4. I could not find a format command, and the auto-format hook below needs one. What do you run?
-   a) skip it — build everything else  [default]
-   b) type the command
+   → a) skip it — build everything else   ← recommended
+     b) type the command
    Why: package.json defines no format script; prettier is a devDependency but nothing
         configures it, so I will not assume `prettier --write .`.
 ```
@@ -712,20 +724,20 @@ One message. This header, then the questions, then the footer. Nothing else — 
 how important the interview is, no summary of the candidate list (that is the plan's job).
 
 ```
-## A few things the evidence can't tell me (N questions)
+## A few things I can't work out from the evidence (N questions)
 
-Reply `defaults` to accept every default below, or answer by number — e.g. `1a, 3 blocking,
-4 Linear and Sentry`. Anything you skip takes its default.
+**Reply `ok` and I'll use every recommendation below.** To change one, just name it —
+`2b`, `3 blocking`, or plain English. Anything you don't mention keeps its recommendation.
 
 1. QUESTION TEXT
-   a) OPTION TEXT  [default]
-   b) OPTION TEXT
+   → a) OPTION TEXT   ← recommended
+     b) OPTION TEXT
    Why: ONE LINE OF EVIDENCE, WITH A COUNT WHERE THERE IS ONE
 
 2. QUESTION TEXT
-   a) OPTION TEXT  [default]
-   b) OPTION TEXT
-   c) OPTION TEXT
+   → a) OPTION TEXT   ← recommended
+     b) OPTION TEXT
+     c) OPTION TEXT
    Why: ONE LINE OF EVIDENCE, WITH A COUNT WHERE THERE IS ONE
 
 ...
@@ -737,8 +749,16 @@ creating a single file.
 Formatting rules:
 
 - Numbers are sequential from 1 with no gaps. Options are lettered `a)`, `b)`, `c)`.
-- The default option is marked with a trailing `  [default]`. Exactly one per question.
-- Put the default first when it reads naturally; otherwise mark it wherever it belongs.
+- **Exactly one option per question is marked recommended**, with a leading `→ ` on its line and a
+  trailing `   ← recommended`. Every other option is indented two spaces so the marked one is the
+  line the eye lands on. There is no unmarked question: a question agentify cannot recommend an
+  answer to is one it has not finished thinking about (§1.11).
+- **Put the recommended option first** unless the option order is itself meaningful
+  (`a) warn` before `b) blocking` is an escalation and stays in that order).
+- The word is **recommended**, not *default*. `default` describes what happens if the user ignores
+  you; `recommended` says you have an opinion and are willing to be overruled — which is the whole
+  point of asking in a way that costs one word to answer. `[default]` is the retired marker; do not
+  emit it.
 - `Why:` is one line, and it cites a real signal — `7 sessions asked for a new endpoint`,
   `stripe + @sentry/node in package.json`, `4 non-bot authors on the default branch over the
   365-day window` (§4.2 — never the raw `--all` count, and name the window `mine_git.py` actually
@@ -763,20 +783,35 @@ Formatting rules:
 
 ---
 
-## 6. Handling a `defaults` reply
+## 6. Handling an accept-everything reply
 
-Recognize, case-insensitively, with surrounding punctuation stripped: `defaults`, `default`,
-`all defaults`, `accept defaults`, `use defaults`, `d`, `yes to all`, `all yes`, `sounds good`,
-`lgtm`, `go`, `ship it`.
+**The one-word path is the point of the whole render (§1.9), so recognise it generously.**
+Case-insensitively, with surrounding punctuation and emoji stripped:
+
+| Family | Forms |
+|---|---|
+| Plain assent | `ok`, `okay`, `k`, `yes`, `y`, `yep`, `yeah`, `sure`, `fine`, `right`, `correct`, `agreed`, `sounds good`, `looks good`, `all good`, `perfect`, `great` |
+| The literal word | `defaults`, `default`, `all defaults`, `accept defaults`, `use defaults`, `d`, `recommended`, `your recommendations`, `all recommended`, `take the recommendations` |
+| Proceed | `go`, `go ahead`, `proceed`, `continue`, `carry on`, `do it`, `ship it`, `lgtm`, `+1`, `👍` |
+| All-yes | `yes to all`, `all yes`, `yes please`, `all of them` |
+
+That list is **not** exhaustive and is not a parser. Any whole reply whose plain meaning is *use
+what you suggested* takes this path; when the meaning is genuinely unclear, §7's unparseable rule
+applies and you ask that one question again, not all of them.
+
+**`continue` is safe here and nowhere else.** This phase writes nothing, so a loose reading costs
+at most a preference the user corrects at the gate. **Phase 6 is the opposite** — `SKILL.md`
+requires an explicit approval of *that plan*, and a stray `continue` from an earlier message is
+never it. Do not carry this list into phase 6.
 
 When one of those is the **whole** reply:
 
-1. Resolve every question to its default. No follow-up questions. Not even one.
+1. Resolve every question to its recommended option. No follow-up questions. Not even one.
 2. Echo the resolved set back in a compact list so the record is explicit, then proceed
    immediately to phase 6:
 
 ```
-Defaults accepted:
+Using my recommendations:
 1. QUESTION SHORT LABEL — RESOLVED ANSWER
 2. QUESTION SHORT LABEL — RESOLVED ANSWER
 ...
@@ -784,27 +819,29 @@ Defaults accepted:
 Writing the plan now.
 ```
 
-3. Low-confidence findings are **not** included. Q13's default is no.
-4. Hooks are **not** blocking, on either target. Q3's default is warn-only, and Q3 is asked on
+3. Low-confidence findings are **not** included. Q13 recommends no.
+4. Hooks are **not** blocking, on either target. Q3 recommends warn-only, and Q3 is asked on
    both targets (§4.4) — while it was skipped on Codex, every Codex hook shipped at this default
    without the question ever being put.
-5. **No engineering system is installed.** Q14's default is `none`, so `defaults` never produces a
-   marketplace install or a dependency on one.
+5. **No engineering system is installed.** Q14 recommends `none`, so a one-word accept never
+   produces a marketplace install or a dependency on one.
 6. **Every command slot the user did not fill stays empty**, and the candidates that needed one are
    dropped, named, under Skipped (insufficient evidence). Q16's default is `skip these`, and that
-   is the whole point: `defaults` must never resolve to a guessed command. Q15 is the exception —
-   its default is a real manager read off a real lockfile, named in the question.
-7. A dirty tree is **not** resolved by `defaults` and is not this phase's business: phase 7 step 3
-   refuses to build without an explicit override.
-8. **Nothing about `defaults` shrinks the build.** There is no cap to keep and no audit-only mode to
-   confirm; a bare `defaults` builds the full proposed set minus the low-confidence opt-ins.
-9. **`defaults` does not touch the three derived values.** `mode`, `services` and `team_size` were
-   never questions, so there is nothing for `defaults` to accept — they stay as §4.2 and §4.8
+   is the whole point: a one-word accept must never resolve to a guessed command. Q15 is the
+   exception — it recommends a real manager read off a real lockfile, named in the question.
+7. A dirty tree is **not** resolved by a one-word accept and is not this phase's business: phase 7
+   step 3 refuses to build without an explicit override.
+8. **Nothing about accepting the recommendations shrinks the build.** There is no cap to keep and
+   no audit-only mode to confirm; a bare `ok` builds the full proposed set minus the low-confidence
+   opt-ins.
+9. **A one-word accept does not touch the three derived values.** `mode`, `services` and
+   `team_size` were never questions, so there is nothing to accept — they stay as §4.2 and §4.8
    derived them, and their plan lines still say how to overturn them.
 
-**Partial replies.** `defaults except 3` or `defaults, but blocking hooks`: apply defaults to
-everything, then apply the named overrides, then echo the resolved set exactly as above with the
-overridden lines marked ` (yours)`. Do not re-ask the rest.
+**Partial replies.** `ok except 3`, `defaults but blocking hooks`, `looks good, use bun`: apply the
+recommendations to everything, then the named overrides, then echo the resolved set exactly as
+above with the overridden lines marked ` (yours)`. Do not re-ask the rest — an override is an
+answer, not an invitation to reopen the round.
 
 **Mixed replies.** `1a, 3 blocking, defaults for the rest`: same handling.
 
@@ -832,7 +869,7 @@ overridden lines marked ` (yours)`. Do not re-ask the rest.
   reintroducing a retired one (§4.1).
 
 **Then reconcile the answers that depend on other answers.** Triggers cannot read an answer
-(§1.9), so the places where one answer overrides another — or settles a noun another question was
+(§1.11), so the places where one answer overrides another — or settles a noun another question was
 composed against — are settled *here*, after the reply and before §8's record is written:
 
 - **Q15's answer fills `discovery.commands.install`** for the rest of the run, and every later

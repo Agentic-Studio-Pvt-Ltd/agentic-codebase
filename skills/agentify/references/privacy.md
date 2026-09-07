@@ -97,15 +97,18 @@ Where it goes:    nowhere. No network calls, no telemetry, no files outside this
                   Only the scrubbed ~3k-token summary enters this conversation.
 
 Your options:
-  1. yes                 read all available sessions for this repo   [default]
+→ 1. yes                 read all available sessions for this repo   ← recommended
   2. no                  skip transcripts entirely; I will work from
                          the code and git history only
   3. last N days         e.g. "last 30 days" — read only sessions in that window
 
+I recommend 1: without it I am working from the code alone, which finds your
+guardrail gaps but not the work you repeat. Say "no" and the run still works.
+
 I never read .env values, credential files, private keys, or anything matching a
 secret filename pattern — not in this phase and not in any other.
 
-Which do you want? (1 / 2 / "last 30 days")
+Reply "1" or "ok" to go ahead, "no" to skip, or name a window.
 ```
 
 **Substitutions**
@@ -145,8 +148,11 @@ resolve to a number, ask for the number of days.
 Record the outcome as `consent = full | none | days:N`. Carry it through the whole run. It
 appears again in the plan (phase 6) and the report (phase 8).
 
-Silence is not consent. If the user replies to something else entirely without answering,
-re-ask once, then default to **no**.
+**Silence is not consent**, and this is the boundary `SKILL.md` rule 9 draws: the recommendation is
+printed, and a reply is still required. A one-word `ok` **is** a reply and reads as `full`; saying
+nothing, or answering something else entirely, is not — re-ask once, then take **no**. Never carry
+`interview.md` §6's accept-everything list into this question: that list resolves preferences in a
+phase that writes nothing, and this one decides whether agentify reads the user's prompts at all.
 
 ---
 

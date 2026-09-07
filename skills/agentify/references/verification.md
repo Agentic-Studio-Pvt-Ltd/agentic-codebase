@@ -313,13 +313,19 @@ only. To smoke-test hooks you must add `--exec-hooks`, and you may only add it a
 
 > I built N hook script(s). I can smoke-test them by actually running each one with empty input,
 > in a throwaway directory outside your repo, with your environment variables stripped and a
-> 5-second timeout. Nothing else on your machine is touched. Want me to? (yes / no — no is fine,
-> I will report them as statically checked only.)
+> 5-second timeout. Nothing else on your machine is touched.
+>
+> **I recommend yes** — it is the only check that proves the script runs at all, and the sandbox
+> is the tightest one in the tool. Reply `yes` to run them, or `no` and I will report them as
+> statically checked only, which is a perfectly good outcome.
 
 Rules around that question:
 
+- **`SKILL.md` rule 9 puts this in the consent class**, so the recommendation is printed and an
+  explicit answer is still required. A one-word `yes` is an answer; silence is not.
 - Ask it in phase 8, in your own turn, and wait for an answer. Never infer consent from the
-  phase-0 transcript consent, from `hook_strictness`, or from a general "go ahead".
+  phase-0 transcript consent, from `hook_strictness`, from `interview.md` §6's accept-everything
+  list, or from a general "go ahead".
 - A no, a silent skip, or any ambiguity means you do **not** pass `--exec-hooks`. There is no
   retry and no rephrasing to get a better answer.
 - Never pass `--exec-hooks` on a rerun without asking again.

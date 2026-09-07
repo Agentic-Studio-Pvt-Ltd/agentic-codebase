@@ -56,6 +56,15 @@ adapter's `## 1. DETECT` section **alone**, the only adapter text phases 0–6 m
    (`interview.md` Q14), the install command is a line in the report for them to run.
 8. **Attribution in exactly three places** (see the last section). Never in the runtime behavior of a
    generated skill or agent. Never gating anything.
+9. **Every question you ask carries its own answer.** Any question in any phase — consent, the
+   interview, a build checkpoint, the plan gate — names the option you recommend, justifies it in
+   one clause from a real signal, and is answerable in one word. Never ask an open question with no
+   recommendation, never make the user re-type what is already on their screen, and never re-ask to
+   confirm something they already said. **Two classes, and the difference is what a non-answer
+   means:** for a **preference** (the interview, a checkpoint) silence takes the recommendation;
+   for **consent or approval** — reading transcripts, the phase 6 plan gate, a dirty-tree override,
+   executing a hook — the recommendation is shown but an explicit answer is still required, and
+   silence is never a yes.
 
 ## Before phase 0 — variables, script contract, JSON envelope
 
@@ -70,10 +79,9 @@ PLAN_DIR="docs/agentic-setup"      # provisional; phase 5 confirms it
 
 **Target repo not your cwd?** Replace line 1 with
 `REPO_ROOT="$(cd /abs/path/to/repo && git rev-parse --show-toplevel)"` and change nothing else:
-every script takes `--repo "$REPO_ROOT"`, every git call uses `git -C`. Never assume cwd is the
-repo — `$WORK` and phase 8's `--manifest` resolve against **cwd**, not `--repo`. `$PLAN_DIR` is
-repo-relative and becomes final in phase 5 (`docs/agentic-setup`, or `interview.md` §3.1's
-`ALT_PLAN_DIR`); phases 6–8 write under `$REPO_ROOT/$PLAN_DIR`.
+every script takes `--repo "$REPO_ROOT"`, every git call uses `git -C`. `$WORK` and phase 8's
+`--manifest` resolve against **cwd**, not `--repo`. `$PLAN_DIR` is repo-relative, final in phase 5
+(`docs/agentic-setup` or `interview.md` §3.1's `ALT_PLAN_DIR`); phases 6–8 write under it.
 
 `$SKILL_DIR` is the directory holding this file: the first candidate that actually contains the
 scripts. **Substitute `SELF_DIR` before running this** — the absolute directory of the `SKILL.md`
@@ -136,10 +144,7 @@ Both leave `history_bucket` at `none`.
    consented-but-empty (§8.1). Say the resolver's `match_mode` out loud *before* the options — a
    weak one may be another checkout. Record consent as `full`, `days:N` or `none`.
 
-**Output:** a preflight record — `target`, `repo_root`, `skill_dir`, `transcript_root`, `consent`,
-`tree_dirty`, `maturity` (filled in phase 1). **Stop condition:** an explicit consent answer exists.
-Assumed consent is not consent. A dirty tree does **not** stop phase 0; it is carried in the record
-and settled before phase 7.
+**Output:** a preflight record — `target`, `repo_root`, `skill_dir`, `transcript_root`, `consent`, `tree_dirty`, `maturity` (filled in phase 1). **Stop condition:** an explicit consent answer exists. Assumed consent is not consent. A dirty tree does **not** stop phase 0; it is carried in the record and settled before phase 7.
 
 ## Phase 1 — Discover
 
@@ -151,8 +156,7 @@ python3 "$SKILL_DIR/scripts/discover.py" --repo "$REPO_ROOT" > "$WORK/discovery.
 
 Read it. Top-level keys, and there are no others: `repo`, `languages`, `package_managers`,
 `manifests`, `commands`, `raw_scripts`, `frameworks`, `external_services`, `folders`, `docs`, `ci`,
-`env_var_names`, `monorepo`, `existing_agentic_config`, `git`, `warnings`, `timing_ms`,
-`schema_version`, `tool`.
+`env_var_names`, `monorepo`, `existing_agentic_config`, `git`, `warnings`, `timing_ms`, `schema_version`, `tool`.
 
 - `commands` is exactly seven string slots — `install`, `dev`, `build`, `test`, `lint`, `typecheck`,
   `format` — and `""` when unknown, never absent. There is **no** `commands.verified`: a `warnings`
@@ -167,12 +171,9 @@ Read it. Top-level keys, and there are no others: `repo`, `languages`, `package_
   full build, the existing ones simply not built twice. `.counts` is what is installed,
   `.provenance` who wrote it, `.symlinked` what must never be edited. **Only artifacts inside
   `$REPO_ROOT` count**: `.user_scope` is the machine-wide store, for de-duplication only (§6.1).
-- Surface anything in `warnings` that changes what the user should expect (a walk truncated by
-  timeout, an unparseable `.gitignore`, a vendored-vs-own maturity split).
+- Surface anything in `warnings` that changes what the user should expect — a walk truncated by timeout, an unparseable `.gitignore`, a vendored-vs-own split.
 
-**If it exits 1:** you have no repo evidence. Note it, continue on git and transcript evidence only, and say so in the plan. Do not walk the tree by hand to compensate.
-
-**Output:** `discovery.json` in `$WORK`. **Stop:** you have read it.
+**If it exits 1:** you have no repo evidence. Note it, continue on git and transcript evidence only, and say so in the plan. Do not walk the tree by hand. **Output:** `discovery.json` in `$WORK`.
 
 ## Phase 2 — Mine
 
@@ -195,12 +196,11 @@ from `discovery.git.is_repo`.
 python3 "$SKILL_DIR/scripts/mine_transcripts.py" --repo "$REPO_ROOT" --target "$TARGET" > "$WORK/transcripts.json"
 ```
 
-`--target` is not a label — it selects the whole locate strategy, so pass phase 0's `TARGET`
-verbatim. Append `--days N` when the consent was scoped, `--redact-report` if the user consented to
-counts but not to seeing quoted prompts. **When consent is `none`, skip this script entirely** — not
-`--days 0`, not any other token gesture (`privacy.md` §8). A consented run that finds nothing is a
-different state: it runs, returns an empty report, and is worded from `privacy.md` §8.1. Compose
-`$WORK/signals.json` from the two outputs using the envelope above.
+`--target` selects the whole locate strategy, so pass phase 0's `TARGET` verbatim. Append `--days N`
+when consent was scoped, `--redact-report` if the user consented to counts but not to quoted
+prompts. **When consent is `none`, skip this script entirely** — not `--days 0`, not any other token
+gesture (`privacy.md` §8). A consented run that finds nothing is a different state: it runs, returns
+an empty report, worded from §8.1. Compose `$WORK/signals.json` using the envelope above.
 
 **Then surface the transcript-match warning to the user, out loud.** The mining report carries no
 `match_mode` — only phase 0's `--resolve-only` does — so its confidence shows only in `warnings` and
@@ -210,9 +210,7 @@ merged** (worktrees, subdirectory sessions, scratchpads), print it verbatim and 
 trusts a count: merging another checkout's sessions inflates every number in the plan, and only the
 user knows whether it is the same work.
 
-**If either exits 1:** treat that source as absent, note it, continue. **Output:** `signals.json`.
-
-**Stop condition:** any weak-match or sibling warning has been shown to the user and answered.
+**If either exits 1:** treat that source as absent, note it, continue. **Output:** `signals.json`. **Stop condition:** any weak-match or sibling warning has been shown to the user and answered.
 
 ## Phase 3 — Diagnose
 
@@ -254,8 +252,8 @@ Four disciplines, all easy to lose:
 1. **Every row already carries a count of 2 or more.** The miner drops singletons, so a row you can
    see is real evidence and a short list means thin history, not filtering left to you.
 2. **`request_shapes[]` is work; status pings are not in it.** The miner routes "what's remaining?"
-   to `meta_queries[]` and "ok"/"thanks"/"continue" to `sessions.social_turns`. Both are real
-   evidence for a *different* artifact — read them, never fold them into a repetition finding.
+   to `meta_queries[]` and "ok"/"thanks" to `sessions.social_turns` — both real evidence for a
+   *different* artifact. Read them; never fold them into a repetition finding.
 3. **Diagnose, do not restate.** "The top request shape is X, 7 times" is the miner read aloud; a
    finding joins sources the miner cannot join alone. Produce at least one: a `request_shape` joined
    to a `discovery.commands` slot or an `external_services` entry; a `corrections` cluster joined to
@@ -270,9 +268,9 @@ Four disciplines, all easy to lose:
 **Input:** the findings list. **Do:**
 
 1. Read `references/mapping-rules.md`. Map findings to candidates with its thresholds, its
-   disambiguation rules (§2), its allowed evidence sources per type (§3) and its evidence-string
-   format (§5). §0 outranks everything: no count, no candidate — and its last paragraph is what
-   makes a **structural** fact a count.
+   disambiguation rules (§2), its evidence sources per type (§3) and its evidence-string format
+   (§5). §0 outranks everything: no count, no candidate — and its last paragraph makes a
+   **structural** fact a count.
 2. Read `references/blueprint.md`. This is the phase's centre of gravity, not an appendix. Walk its
    catalogues — §3 subagents, §4 hooks and permissions, §5 rules, §6 skills including the
    unconditional `setup-manager`, §7 MCP — against `discovery.json`, adding a candidate for every
@@ -303,7 +301,7 @@ built list and a skipped heading.
 the render shape, §6 for a `defaults` reply, §7 for everything else and the post-reply reconciliation
 (Q15/Q16 write back into `discovery.commands`). Ask **3 to 8 questions, ceiling 12**, in **one
 message**, numbered, each with its default marked; no trigger may read another question's *answer*
-(§1.9).
+(§1.11).
 
 Every question must be gated on a real ambiguity in `discovery.json` or `signals.json`. **Never ask
 what discovery already answered** — package manager, framework, test/lint/build command, languages,
@@ -333,22 +331,23 @@ verbatim. `open_pr`, `plugin`, `caps` and `audit_only` are **not** fields.
 
 **Do:** read `references/plan-template.md` and `adapters/capabilities.md` — those two, nothing else.
 Write `$REPO_ROOT/$PLAN_DIR/plan.md`, reproducing the skeleton literally, filling every token from
-its §3 table. Its §1 and §1.1 own what the plan must carry: the evidence-shape line naming the repo
-and history buckets; the consent line verbatim from `privacy.md` §8; the capability notes, statuses
-and substitution prose from `capabilities.md` (**never open a full adapter here** — ~20k tokens for
-one table); the skipped candidates under their **three separate** headings — `insufficient
-evidence`, `already covered`, `low confidence — opt in to build` (`coverage.md` §8; there is no
-fourth); the `## Existing setup notes` section whenever `existing_agentic_config` listed anything,
-with the de-duplication note stating what you read; and the exact undo instructions, **two**
-mechanisms in `branch` mode whenever a planned path is gitignored — run `git check-ignore -v` now,
-so the user learns it before approving, not at build time. List artifacts in **build order**, numbered, so `approved except 4` is
-unambiguous. **No cap line, no clamp line, and the word "cap" nowhere in the file.** A rerun
-**regenerates `plan.md` wholesale, keeping its `agentify-id`** — one plan file, never a second
-appended. Then present it and wait.
+its §3 table. Its §1 and §1.1 own what the plan carries: the evidence-shape line; the three derived
+lines (§4.2, §4.8); the consent line verbatim from `privacy.md` §8; the capability notes from
+`capabilities.md` (**never open a full adapter here** — ~20k tokens for one table); the skipped
+candidates under their **three** headings (`coverage.md` §8; there is no fourth); `## Existing setup
+notes` whenever `existing_agentic_config` listed anything, with the de-duplication note; and the
+exact undo instructions, **two** mechanisms in `branch` mode whenever a planned path is gitignored —
+run `git check-ignore -v` now, so the user learns it before approving, not at build time. List
+artifacts in **build order**, numbered, so `approved except 4` is unambiguous. **No cap line, and
+the word "cap" nowhere in the file.** A rerun **regenerates `plan.md` wholesale, keeping its
+`agentify-id`**. Then present it and wait.
 
 > **No file other than `plan.md` is created, modified, or staged until the user approves in
-> writing.** This is the gate. Not "they seem happy", not a `continue` from three messages ago. An
-> explicit approval of *this plan*: `approved`, `approved except 3 and 5`, `go`, or an edited list.
+> writing.** This is the gate, and rule 9's consent half governs it: end with
+> `Reply "approved" to build all N, or name the numbers to drop.` — one word to accept, one number
+> to cut — but **silence is never a yes here.** Not "they seem happy", not a `continue` from three
+> messages ago, and not `interview.md` §6's accept-everything list, which belongs to phase 5 alone.
+> An explicit approval of *this plan*: `approved`, `approved except 3 and 5`, or an edited list.
 > Anything else — silence, a question, a tangent — means you are still waiting. If they reject it,
 > revise and ask again; never build a reduced version and announce it.
 
@@ -360,25 +359,24 @@ is a deliverable on its own.
 
 **Input:** the approved plan and the answer record. No recorded approval ⇒ you are still in phase 6.
 
-**Do:** read `references/build-and-verify.md` first — it holds the detail this phase and phase 8
-point at, and every `§` below is a section of it.
+**Do:** read `references/build-and-verify.md` first — it holds the detail this phase and phase 8 point at, and every `§` below is a section of it.
 
 1. **Read the one adapter that matches `TARGET`** — `adapters/claude-code.md` *or*
    `adapters/codex.md`, never both. Its §4 gives the exact path, format and frontmatter per artifact
-   type on this target, and names which types are unsupported or substituted.
-2. Read from `templates/` **only the templates for artifact types the approved plan contains** (the
-   type → template map is §2).
+   type, and names which types are unsupported or substituted.
+2. Read from `templates/` **only the templates the approved plan's types need** (map is §2).
 3. **Settle the dirty tree, record where the user was standing, and ask git which approved paths it
-   will refuse to commit** — the boundary phase 0 deferred to. All three run **before one byte is
-   written** (§3.1). Exclude `$PLAN_DIR/`: all of it is your own output, not the user's dirt.
+   will refuse to commit** — the boundary phase 0 deferred to, all three **before one byte is
+   written** (§3.1). Exclude `$PLAN_DIR/`: your own output, not the user's dirt.
    ```bash
    git -C "$REPO_ROOT" status --porcelain -uall -- . ":(exclude)$PLAN_DIR"
    BASE_BRANCH="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD || echo '')"  # '' = detached
    BASE_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo '')"  # '' = no commits yet
    git -C "$REPO_ROOT" check-ignore -v -- <every approved artifact path>
    ```
-   Non-empty status means dirty: say what is uncommitted and **refuse to write until the user
-   commits or stashes it themselves, or says in words to proceed anyway** — never `git stash` for
+   Non-empty status means dirty: name what is uncommitted, say **`I'd commit or stash these first —
+   reply "go ahead" and I'll build anyway`**, and **refuse to write until they do one or say it**
+   (rule 9, consent class: recommendation shown, explicit answer required). Never `git stash` for
    them. `check-ignore` prints one line per **ignored** path; **exit 1 means none are ignored — the
    ordinary answer, not an error** (§3.2). Record it per path (step 6) and **say it out loud before
    the first byte**: which paths, the pattern excluding them, and that a second explicit step
@@ -408,9 +406,11 @@ point at, and every `§` below is a section of it.
 5. **Build in dependency order, not preference:** rules → hooks → permissions → skills (each with
    its reference docs) → subagents → MCP config drafts → **index doc last**, because that section's
    tables enumerate what was actually written (`blueprint.md` §9). `setup-manager` is the **last
-   skill**, so its inventory is complete. **Checkpoint after each type**: show what was written,
-   then continue or stop on the user's word. **If a checkpoint fails**, stop that type, keep what is
-   written, record it, continue with the next (§6 has the other build-time failure shapes).
+   skill**, so its inventory is complete. **Checkpoint after each type**: list what was written, one
+   path per line, and say `Continuing to <next type> — say stop if you want to look first.` That is
+   a preference under rule 9: silence continues, and the user needs no word to keep going. **If a
+   checkpoint fails**, stop that type, keep what is written, record it, continue with the next
+   (§6 has the other build-time failure shapes).
 6. **Write `$REPO_ROOT/$PLAN_DIR/build-manifest.json`** — phase 8 cannot run without it, and it is
    the only place the undo facts outlive the run. **Fill it from §5, field by field**: top-level keys
    (§5.1), the undo record (§5.2), the per-artifact fields including `ignored`, `ignored_by`,
@@ -440,21 +440,20 @@ path is in exactly one of the two lists, with none missing from both.
 
 ## Phase 8 — Verify and hand off
 
-**Input:** the build manifest and the built artifacts, plus `references/build-and-verify.md`, still open from phase 7 — every bare `§` below is a section of it. **Do:**
+**Input:** the build manifest, the built artifacts, and `references/build-and-verify.md` still open from phase 7 — every bare `§` below is a section of it. **Do:**
 
 1. Read `references/verification.md`. Run the static pass, exactly:
    ```bash
    python3 "$SKILL_DIR/scripts/verify_artifacts.py" --repo "$REPO_ROOT" \
      --manifest "$REPO_ROOT/$PLAN_DIR/build-manifest.json" --discovery "$WORK/discovery.json"
    ```
-   Both paths are **absolute on purpose**; `--discovery` is optional to the script and mandatory here
-   (§7: what each flag buys, what a relative `--manifest` costs). **It executes nothing** until you
-   add `--exec-hooks`, which needs the explicit `verification.md` §5.1 yes. Read each `checks[]` row
-   by its literal `name` against `verification.md` §2 — that table owns severity. **If it exits 1**,
-   the manifest is missing or unparseable: fix it and rerun; never hand off an unverified build,
-   never fake results (§10 has the other phase 8 failure shapes).
+   Both paths are **absolute on purpose**; `--discovery` is optional to the script and mandatory
+   here (§7). **It executes nothing** until you add `--exec-hooks`, which needs the explicit
+   `verification.md` §5.1 yes. Read each `checks[]` row by its literal `name` against
+   `verification.md` §2 — that table owns severity. **If it exits 1**, the manifest is missing or
+   unparseable: fix it and rerun; never hand off an unverified build, never fake results (§10).
 2. Run the live tests in `verification.md` §§4–8, one per artifact type, time-boxed to ~60s each; a
-   hang is a `warn`. **Never** point one at a real database, API, or credential; an MCP draft is
+   hang is a `warn`. **Never** point one at a real database, API or credential — an MCP draft is
    verified as *config* only.
 3. **Every `fail` ends one of two ways:** fixed and re-tested, or removed and moved to the report's
    Skipped table with the reason `failed verification and was removed`.
@@ -476,7 +475,7 @@ path is in exactly one of the two lists, with none missing from both.
 7. **Say the undo out loud in the final summary, worded for the mode, naming which files each
    mechanism removes** — the three exact wordings are §9. **Never print a branch-delete line in
    stage-only mode**, and **never print the bare two-line branch undo when `uncommitted_paths` is
-   non-empty**: both succeed, both print a reassuring `Deleted branch`, and both leave files behind.
+   non-empty**: both succeed, both print a reassuring `Deleted branch`, both leave files behind.
 
 **Output:** `report.md`, the branch or staged diff, and the final run summary.
 
@@ -492,8 +491,7 @@ carries the mode's undo line and the attribution.
 2. The footer of `report.md` and of the generated index-doc section.
 3. One frontmatter comment line in each generated file.
 
-Text: `This work was brought to you by Agentic Studio.` followed by one upsell line:
-`Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: <link>.`
+Text: `This work was brought to you by Agentic Studio.` then one upsell line: `Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: <link>.`
 
 Nowhere else. Never inside the runtime behavior of a generated skill, agent, hook or rule — a
 generated artifact must work identically with the comment deleted — and never gating anything. The
