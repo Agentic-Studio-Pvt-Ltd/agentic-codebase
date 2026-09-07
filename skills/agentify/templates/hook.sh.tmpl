@@ -1,0 +1,180 @@
+#!/bin/sh
+# agentify-id: {{AGENTIFY_ID}}
+# agentify-version: 1
+# agentify-generated: {{GENERATED_DATE}}
+# agentify-evidence: {{EVIDENCE_LINE}}
+# Safe to delete or edit. This work was brought to you by Agentic Studio.
+#
+# {{HOOK_TITLE}}
+#
+# Target:  Claude Code. The Codex hook script is a different file, codex-hook.sh.tmpl.
+# Event:   {{HOOK_EVENT}}     (PreToolUse | PostToolUse | UserPromptSubmit | Stop | SessionStart)
+# Matcher: {{HOOK_MATCHER}}   regex over CLAUDE CODE tool names (Bash, Edit, Write, MultiEdit)
+# Wired by: .claude/settings.json — see settings-hooks.json.tmpl for the fragment and the
+#           merge procedure. This file does nothing until that fragment is merged.
+#
+# Contract
+#   stdin  one JSON object describing the tool call (or prompt) that triggered the hook
+#   exit 0 allow. Anything on stderr is diagnostic only.
+#   exit 2 block. stderr is shown to the agent as the reason, so stderr must say what to do next.
+#   other  the harness treats it as a non-blocking error; this script never returns one on purpose.
+#
+# Budget: under 2 seconds, enforced by CHECK_TIMEOUT_S below. This runs on every matching tool
+# call, so a slow check taxes every single edit.
+#
+# Fail open: any internal problem — malformed stdin, no python3, missing tool, timeout — exits 0
+# and lets the work through. A guard that breaks the session is worse than a guard that misses a
+# violation. Only a check that ran to completion and found a real violation blocks.
+#
+# This script does not modify, move, or delete any file.
+#> Formatting hooks are the single exception to that last line: if this hook's whole purpose is
+#> formatting, it may run the formatter on the one path in FILE_PATH, and must still exit 0. Say so
+#> in the header when you do. Any other hook that writes to the repo is a bug.
+#
+#> ─── agentify template: hook.sh.tmpl ──────────────────────────────────────────
+#> Emits: .claude/hooks/{{HOOK_FILE_NAME}}   (Claude Code; chmod 0755 after writing — an
+#>        unexecutable hook is reported as a failed check by verify_artifacts.py)
+#>        **Codex is not this template's target and needs no substitution: it has a full,
+#>        first-class hook system.** Use `codex-hook.sh.tmpl` + `codex-hooks.json.tmpl` for that
+#>        target — 12 events, regex matchers over a different tool vocabulary, and a JSON
+#>        `permissionDecision` protocol instead of exit 2. adapters/codex.md §4.3 owns the bytes;
+#>        adapters/capabilities.md records the row as Native on both targets. (An earlier version
+#>        of this header said Codex has no hooks and that the adapter installs a native git hook
+#>        plus an AGENTS.md instruction. That was false. Git hooks remain a separate, opt-in
+#>        artifact on both targets, for commit-time evidence only.)
+#> Filling rules
+#>  1. Replace every placeholder — an ALL_CAPS name in double braces. Delete every line starting
+#>     with "#>". Ordinary "#" comments stay: they are the emitted file's documentation.
+#>  2. Keep the five agentify-* header lines verbatim; a rerun matches on agentify-id.
+#>  3. POSIX sh only. No bashisms: no [[ ]], no arrays, no ${var,,}, no `function` keyword,
+#>     no `local`. It must run under dash and under macOS /bin/sh.
+#>  4. Delete whichever of the two filter blocks below does not apply: the tool-name filter always
+#>     stays, the file-path filter goes when the hook matches Bash commands rather than edits.
+#>  5. Build a hook only for a deterministic check that must not depend on the model remembering.
+#>     Anything needing judgement is a rule or a skill, not a hook.
+
+set -eu
+
+CHECK_TIMEOUT_S=2
+
+# The block message and its fix, verbatim. The heredoc delimiter is quoted, so NOTHING inside is
+# expanded by the shell — a backtick, a $VAR or a $(command) in the text stays text. One rule when
+# filling it: no line of the message may be the delimiter word on its own.
+BLOCK_REASON=$(cat <<'AGENTIFY_BLOCK_REASON'
+{{BLOCK_MESSAGE}}
+Fix: {{REMEDIATION_HINT}}
+AGENTIFY_BLOCK_REASON
+)
+
+# Hooks are invoked from the session's cwd. Prefer the harness's project root; fall back to the
+# git root, which is the same idiom the Codex wiring uses, so this line stays correct if the
+# script is ever copied to a target that exports no project-directory variable. Bare `cd .` is
+# not a fallback: it silently runs the check against whatever directory the session happened to
+# be in.
+REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")}"
+cd "$REPO_ROOT" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Read the trigger payload. Empty or unreadable stdin means nothing to judge.
+# ---------------------------------------------------------------------------
+INPUT=$(cat 2>/dev/null || true)
+[ -n "$INPUT" ] || exit 0
+
+# python3 is already required by agentify, so it is safe to parse with. jq is not assumed.
+command -v python3 >/dev/null 2>&1 || exit 0
+
+# json_get <dotted.path> — prints the value, or nothing if absent. Never fails.
+json_get() {
+  printf '%s' "$INPUT" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+node = data
+for key in sys.argv[1].split("."):
+    if isinstance(node, dict) and key in node:
+        node = node[key]
+    else:
+        sys.exit(0)
+if node is None:
+    sys.exit(0)
+sys.stdout.write(node if isinstance(node, str) else json.dumps(node))
+' "$1" 2>/dev/null || printf ''
+}
+
+TOOL_NAME=$(json_get tool_name)
+FILE_PATH=$(json_get tool_input.file_path)
+COMMAND=$(json_get tool_input.command)
+
+# ---------------------------------------------------------------------------
+# Filters. Every early exit here is a tool call this hook costs nothing on.
+# ---------------------------------------------------------------------------
+case "$TOOL_NAME" in
+  {{TOOL_NAME_GLOB}}) ;;
+  *) exit 0 ;;
+esac
+
+if [ -n "$FILE_PATH" ]; then
+  case "$FILE_PATH" in
+    {{PATH_GLOB}}) ;;
+    *) exit 0 ;;
+  esac
+fi
+
+# ---------------------------------------------------------------------------
+# The check.
+# ---------------------------------------------------------------------------
+TMP_OUT=$(mktemp 2>/dev/null || printf '/tmp/agentify-hook-%s.out' "$$")
+trap 'rm -f "$TMP_OUT"' EXIT INT TERM
+
+# run_check must exit 0 when clean and 1 when it found a real violation. Any other exit status is
+# treated as "the check could not run" and lets the work through.
+#> Fill {{CHECK_COMMAND}} with the repo's own command, taken from discovery.json commands/raw_scripts
+#> — never a command this repo does not already have. It must read, not write, and it must be scoped
+#> to the triggering change ($FILE_PATH / $COMMAND) rather than sweeping the whole repo, or it will
+#> blow the 2 second budget.
+run_check() {
+  {{CHECK_COMMAND}}
+}
+
+# run_guarded <command...> — runs with a hard time budget, no dependency on timeout(1),
+# which is absent on stock macOS.
+run_guarded() {
+  "$@" >"$TMP_OUT" 2>&1 &
+  cmd_pid=$!
+  ( sleep "$CHECK_TIMEOUT_S"; kill -TERM "$cmd_pid" ) >/dev/null 2>&1 &
+  watchdog_pid=$!
+  rc=0
+  wait "$cmd_pid" || rc=$?
+  kill -TERM "$watchdog_pid" >/dev/null 2>&1 || true
+  return "$rc"
+}
+
+status=0
+run_guarded run_check || status=$?
+
+case "$status" in
+  0)
+    exit 0
+    ;;
+  1)
+    {
+      # $BLOCK_REASON is read from a quoted heredoc above, so a backtick or a $(...) in the
+      # generated message is literal text. Never inline {{BLOCK_MESSAGE}} into a double-quoted
+      # shell string here: the shell would execute what it found on every violation.
+      printf '%s\n' "$BLOCK_REASON"
+      if [ -s "$TMP_OUT" ]; then
+        printf '\n--- check output (first 40 lines) ---\n'
+        head -n 40 "$TMP_OUT"
+      fi
+      printf '\nThis check comes from .claude/hooks/{{HOOK_FILE_NAME}} (agentify-id: {{AGENTIFY_ID}}).\n'
+      printf 'Delete that file and its entry in .claude/settings.json to remove it.\n'
+    } >&2
+    exit 2
+    ;;
+  *)
+    printf 'agentify hook {{AGENTIFY_ID}}: check did not complete (exit %s), allowing.\n' "$status" >&2
+    exit 0
+    ;;
+esac

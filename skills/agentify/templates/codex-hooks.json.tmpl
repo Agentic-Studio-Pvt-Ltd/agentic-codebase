@@ -1,0 +1,173 @@
+agentify template: codex-hooks.json.tmpl
+========================================
+
+The Codex counterpart of `settings-hooks.json.tmpl`. Codex has a first-class hook system — twelve
+events, regex matchers, a JSON decision protocol — so a hook on this target is a real hook, not a
+substitution. Authority on the bytes: `adapters/codex.md` §4.3. Verdict on support:
+`adapters/capabilities.md`, row "Hooks".
+
+This file is NOT written to the repo. It is a fragment to MERGE into `<repo>/.codex/hooks.json`,
+which may already contain hooks the user wrote. The JSON body between the BEGIN and END markers is
+the only part that is data; everything above the BEGIN marker is instructions for the merge and must
+never be written anywhere. The script the fragment points at comes from `codex-hook.sh.tmpl`; this
+file does nothing without it, and it does nothing without this file.
+
+**Never write `${CODEX_HOME}/hooks.json`.** A user-global hook fires in every repo the user opens, is
+not evidenced by this repo, and the project-scoped file removes any need for it.
+
+Two things that have no Claude Code equivalent, and both change what you may claim
+--------------------------------------------------------------------------------
+
+**1. `hooks.json` rejects unknown keys at the top level, and the failure is silent.** Measured on
+codex-cli 0.152.1: a file carrying an `_agentify` object beside `hooks` produced
+
+    failed to parse hooks config …/.codex/hooks.json: unknown field `_agentify`,
+    expected `description` or `hooks` at line 3 column 13
+
+and **the whole file then loaded zero hooks** — surfaced only as a `warnings` entry in `hooks/list`,
+never as an error the user sees. The accepted top-level keys are exactly `description` and `hooks`.
+So, unlike `settings-hooks.json.tmpl`, the fragment below carries **no `_agentify` key at all** —
+not even one marked "do not merge". There is no safe home for it here, and pasting one in is the
+single easiest way to silently disable every hook in the repo. Identity lives in the wiring instead:
+the command path, plus the script's own `# agentify-*` header, plus the build manifest entry.
+
+**2. A generated hook is INSTALLED, not ARMED.** Every hook written by the research probe came back
+from `hooks/list` with `"trustStatus": "untrusted"` and `"enabled": true`. Codex keys trust to a hash
+of the hook definition, so editing a trusted hook re-arms the prompt. Phase 8 can prove the JSON
+loads, the event is recognised and the script runs on a fixture; it **cannot** prove the hook is
+live, and must never say it is. The report's manual checklist must carry: *"Run `/hooks` in Codex and
+trust the new hooks; until you do, they are installed but do not run."* **Never emit or suggest
+`--dangerously-bypass-hook-trust`.** If a hook never appears in `hooks/list` despite the file being
+present and the project trusted, the likely cause is an enterprise `allow_managed_hooks_only`
+setting, not a malformed file — say that rather than guessing.
+
+And the prerequisite that governs every repo-scoped Codex artifact: `[projects."<abs path>"]
+trust_level = "trusted"` gates `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json` and
+`.codex/rules/` together. In an untrusted repo this file is inert. agentify never edits `config.toml`
+to set it.
+
+Merge procedure — read, splice, rewrite. Never replace.
+------------------------------------------------------
+
+1. Read `<repo>/.codex/hooks.json`. If it does not exist, create it with exactly two keys:
+   `description` and `hooks`. Nothing else is accepted.
+2. Parse it as JSON. If it does not parse, **stop**: report the parse error, write the intended
+   content to `<repo>/.codex/hooks.json.agentify-proposed`, record a needs-you item, and record the
+   hook as skipped. Never overwrite a file you could not read.
+3. Take a copy of the file's bytes before touching it, and record `pre_existing_sha256` and
+   `restore: span` on the artifact's manifest entry. Nothing else recovers them.
+4. Ensure a top-level `"hooks"` object exists, and that `hooks["{{HOOK_EVENT}}"]` is an array.
+   Create only what is missing.
+5. **Idempotency first.** Look for a handler object anywhere under that event whose `command`
+   contains `/.codex/hooks/{{HOOK_FILE_NAME}}`. That command path is the idempotency key — there is
+   no marker and no metadata key, and there never can be.
+   - Found: replace **that one handler object** in place and stop. Never append a second copy.
+   - Not found: go to step 6.
+6. Find a matcher group in that event array whose `matcher` equals yours and append your handler to
+   **that group's** `hooks` array — groups are routinely shared with hooks the user wrote. If there
+   is no such group, append the fragment's whole matcher group to the end of the event array.
+7. Never touch another event, another group, another handler, or a top-level `description` the user
+   wrote. agentify may set `description` **only when it created the file.**
+8. Escape every substituted value for JSON before merging: a raw double quote, backslash, or newline
+   in a value breaks the file.
+9. Write to a temp file in the same directory and `os.replace()` it into place. Preserve the file's
+   existing indentation and trailing newline, then re-read and parse to confirm it is still valid
+   JSON. `verify_artifacts.py` re-checks this and also confirms the referenced script exists and is
+   executable — so `chmod 0755` the script before verifying.
+
+Two levels are named `hooks`
+----------------------------
+
+`hooks` (the top-level object, keyed by event) → an array of **matcher groups** → each group's own
+`hooks` array of **handlers**. Exactly the shape of Claude Code's `settings.json`. Getting it wrong
+produces a file that parses and does nothing.
+
+Event names — emit only from this list, exact CamelCase
+-------------------------------------------------------
+
+`PreToolUse` · `PermissionRequest` · `PostToolUse` · `PreCompact` · `PostCompact` · `SessionStart` ·
+`SessionEnd` · `UserPromptSubmit` · `SubagentStart` · `SubagentStop` · `Stop` · `Interrupt`
+
+All twelve are VERIFIED as loadable. **A misspelled event fails silently** — a file whose only event
+was `NotAnEvent` loaded with zero hooks, zero warnings and zero errors. For every hook agentify would
+build on Claude Code, Codex has an equivalent event; `PermissionRequest`, `PostCompact`,
+`SubagentStart` and `Interrupt` have no Claude Code counterpart.
+
+Matchers — Codex tool names are NOT Claude Code tool names
+----------------------------------------------------------
+
+`matcher` is a **regex over the tool name**, and it may be omitted or `null`, meaning "all". Codex's
+observed tool vocabulary is `exec`, `exec_command`, `apply_patch`, `shell_command`, `send_message`,
+`js`, `run`, `update_plan`, `request_user_input`, `write_stdin`, `view_image`, plus the multi-agent
+tools. **There is no `Bash`, no `Edit`, no `Write`.** A hook ported from Claude Code with
+`"matcher": "^Bash$"` never fires — a real repo on the research machine has exactly that bug in
+production.
+
+| Intent | Matcher to emit |
+|---|---|
+| Any shell command | `^(exec\|exec_command\|shell_command\|run\|local_shell)$` |
+| Any file edit | `^(apply_patch\|Edit\|Write)$` (the last two are harmless and cover dual-target setups) |
+| Prompt-, session- and stop-time events | **omit the `matcher` key entirely** |
+
+Omit the key rather than emitting `""`: the schema types it as nullable, and an omitted matcher was
+verified to come back as `matcher: null`. For `SessionStart` the matcher matches the start source
+(`startup` / `resume` / `clear` / `compact`); for `PreCompact` / `PostCompact` the trigger (`manual` /
+`auto`); `UserPromptSubmit`, `Stop` and `Interrupt` ignore it.
+
+The tool-name list is what one machine's history contains, not a published enum. Say in the plan that
+the vocabulary is build-dependent, and pair a permissive matcher with a script that re-checks
+`tool_name` from its own stdin and exits 0 quietly on a shape it does not recognise — which is what
+`codex-hook.sh.tmpl` does. A narrow matcher that silently never fires is the failure mode to avoid.
+
+Handler keys
+------------
+
+| Key | Emit? |
+|---|---|
+| `type` | Required. agentify emits `"command"` only — the simplest, the most portable, and the only one testable from a shell. (`"mcp_tool"`, `prompt` and `agent` types also exist.) |
+| `command` | Required. `"\"$(git rev-parse --show-toplevel)/.codex/hooks/<name>.sh\""` — quoted, and VERIFIED in production use. There is no `$CLAUDE_PROJECT_DIR` here and no Codex equivalent of it, so the git-root subshell is what makes the hook work regardless of the process's cwd. **Never write an absolute `/Users/...` path into a committed file.** |
+| `timeout` | **Seconds.** Always emit it: the default when absent is **600 seconds**. Keep it at 5 — the script enforces its own 2-second budget internally. |
+| `timeoutSec` | **Never emit.** It is silently ignored: a handler written with `"timeoutSec": 5` came back with `timeoutSec: 600`. The docs list both spellings; only `timeout` applies. |
+| `statusMessage` | Emit a short progress line. It is how the user sees the hook working. |
+| `async` | Never emit. An async hook cannot block, which is the point of the hooks agentify builds. |
+| `additionalContextLimit`, `commandWindows`, `if`, `shell` | Present in the schema; not emitted. |
+
+Unknown keys *inside a handler object* were tolerated at 0.152.1, but the top level is strict and the
+asymmetry is undocumented. Agentify emits no metadata key anywhere in this file.
+
+Removal
+-------
+
+Delete the matched handler object from its group; prune the group and the event array **only if this
+run created them**; then delete `<repo>/.codex/hooks/{{HOOK_FILE_NAME}}`. The undo is the **JSON
+un-merge script** in `references/report-template.md` §3.1, keyed on the same command path. The
+marker-removal script must never be pointed at this file: it would find no marker, print `SKIP`, exit
+0, and leave the hook registered forever while the report called the undo a success.
+
+<<<AGENTIFY-FRAGMENT-BEGIN>>>
+```json
+{
+  "description": "Agentify-generated Codex lifecycle hooks.",
+  "hooks": {
+    "{{HOOK_EVENT}}": [
+      {
+        "matcher": "{{HOOK_MATCHER}}",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)/.codex/hooks/{{HOOK_FILE_NAME}}\"",
+            "timeout": 5,
+            "statusMessage": "{{HOOK_STATUS_MESSAGE}}"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+<<<AGENTIFY-FRAGMENT-END>>>
+
+`description` belongs to the fragment only as the value agentify writes when it **creates** the file.
+When merging into a file that already exists, take only the matcher group and leave `description`
+exactly as it was. For an event with no tool, delete the `"matcher"` line from the group entirely
+rather than leaving it empty.

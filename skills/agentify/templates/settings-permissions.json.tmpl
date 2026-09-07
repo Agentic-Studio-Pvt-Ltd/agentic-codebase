@@ -1,0 +1,172 @@
+agentify template: settings-permissions.json.tmpl
+=================================================
+
+This file is NOT written to the repo. It is a fragment to MERGE into `.claude/settings.json`, the
+same user-owned file `settings-hooks.json.tmpl` merges into. Everything above the BEGIN marker is
+instructions and must never be written anywhere.
+
+**Claude Code only.** Codex has no permissions block: its command-approval surface is
+`.codex/rules/<name>.rules`, emitted by `codex-rules.rules.tmpl`. On a Codex run the permissions
+candidate and the command-policy candidates produce **one** validated `.rules` file
+(`mapping-rules.md` §3.1). Never paste this JSON into a Codex config.
+
+What this artifact is for
+-------------------------
+
+Every permission prompt the developer answers by hand for a command their own repo defines is a
+prompt agentify can retire. Every destructive path the hooks block should also be stated
+declaratively here, so the guardrail survives a hook being deleted.
+
+Two lists, and the rules for each are different:
+
+`permissions.allow` — commands and reads that never need to be asked about again.
+  * Only commands this repo actually defines. Every entry traces to a populated
+    `discovery.commands` slot (quote its `raw_scripts["#commands"]` citation in the plan) or to a
+    `signals.transcripts.commands_requested[]` row the developer ran successfully.
+  * **Never** an entry you could not name the evidence for. "Probably useful" is not evidence.
+  * Read-only inspection is the one safe generalization: `Read(//<repo>/**)`-shaped rules and
+    read-only git are fine when the repo is not itself a secrets store.
+  * **Never allow anything that reads a secret.** No `.env*`, no credential path, no
+    `Bash(cat .env*)`, no wildcard that would match one.
+
+`permissions.deny` — the declarative half of the guardrails.
+  * The `.env*` files that actually exist in this repo, by name, from `discovery` — never a guessed
+    filename, and never `.env.example`, which is meant to be read.
+  * The package managers this repo does **not** use, once `interview.md` Q15 has settled which one
+    it does. Guessing here breaks the developer's daily loop, so no answer means no entry.
+  * The destructive commands `blueprint.md` §4.1 named for *this* stack — its migration reset, its
+    deploy command, a force push to its default branch.
+  * Never deny something the developer's own transcripts show them running successfully. That is
+    not a guardrail, it is a bug report waiting to be filed.
+
+`permissions.ask` exists too and is the middle setting: use it where blocking outright would be
+wrong but silent approval is worse — a deploy command, a destructive migration the developer does
+legitimately run sometimes. When `hook_strictness` is `warn`, prefer `ask` over `deny` for anything
+that is not a secret read.
+
+Rule syntax
+-----------
+
+Entries are `Tool(specifier)`. The forms this template uses, and nothing else:
+
+| Form | Matches |
+|---|---|
+| `Bash(<prefix>:*)` | any Bash command starting with that prefix — `Bash(bun run test:*)` |
+| `Bash(<exact>)` | that exact command only |
+| `Read(<glob>)` / `Edit(<glob>)` / `Write(<glob>)` | file access by path, gitignore-style glob |
+| `WebFetch(domain:<host>)` | one host |
+
+`Bash` prefix rules are **prefix matching, not shell semantics**: `Bash(npm:*)` does not catch
+`npx`, `pnpm`, or `npm` reached through another script. Say that in the plan entry rather than
+implying the rule is airtight — the same caveat `mapping-rules.md` §3 states for Codex's
+`prefix_rule`. A deny that the evidence shows being bypassed in practice is the wrong artifact.
+
+Merge procedure — read, merge, write. Never replace.
+---------------------------------------------------
+
+1. Read `.claude/settings.json`. If it does not exist, create it as `{}`. If it exists but does not
+   parse as JSON, stop: report the parse error, write nothing, record the artifact as skipped.
+   Never overwrite a file you could not read.
+2. Take a copy of the contents before touching it. That copy plus `shasum -a 256` is the whole undo
+   for this file, and it is gone the instant you write.
+3. Ensure `permissions` exists as an object, and each of `permissions.allow`, `.deny`, `.ask`
+   exists as an array **only if this fragment has entries for it**. Never create an empty array.
+4. For each entry in the fragment's list: append it **only if the exact string is not already
+   present** in that array. String equality, not "something similar". This is the idempotency key —
+   there is no marker and no id in this file, because JSON has no comments.
+5. **Never remove or reorder an entry you did not add.** The user's own permissions live in these
+   same arrays and are not yours. If one of theirs contradicts one of yours — they allow what you
+   would deny — keep both, and say so in `report.md`: Claude Code resolves `deny` over `allow`, so
+   the user needs to know their allow entry stopped working, and it is their call which to keep.
+6. Do NOT copy the fragment's `_agentify` key into `.claude/settings.json`. It is inert metadata.
+7. Write with 2-space indentation and a trailing newline, then re-read and parse to confirm the
+   file is still valid JSON.
+
+Recording it in the manifest
+----------------------------
+
+This artifact's `type` is `permissions`, its `format` is `json` and its `merge` record lists one
+entry per string added, so the un-merge script in `report-template.md` §3.1 can remove exactly those
+and leave the user's alone:
+
+```
+("permission_entry", "allow:Bash(bun run test:*)")
+("permission_entry", "deny:Read(./.env.local)")
+```
+
+`restore` is `span` and `action` is `modified` — the file existed before the run and is not deleted
+by any undo. Capture `pre_existing_sha256` **before** the merge.
+
+Removal
+-------
+
+Delete exactly the strings listed in the manifest's `merge.entries` from their arrays, leaving every
+other entry in place, then delete an array only if it became empty and `permissions` only if it did.
+
+<<<AGENTIFY-FRAGMENT-BEGIN>>>
+```json
+{
+  "_agentify": {
+    "agentify-id": "{{AGENTIFY_ID}}",
+    "agentify-version": 1,
+    "agentify-generated": "{{GENERATED_DATE}}",
+    "agentify-evidence": "{{EVIDENCE_LINE}}",
+    "note": "Inert metadata describing this fragment. Do not merge this key into settings.json.",
+    "merge_into": ".claude/settings.json",
+    "idempotency_key": "exact string equality within permissions.allow / .deny / .ask"
+  },
+  "permissions": {
+    "allow": [
+      "{{ALLOW_1}}",
+      "{{ALLOW_2}}",
+      "{{ALLOW_3}}"
+    ],
+    "ask": [
+      "{{ASK_1}}"
+    ],
+    "deny": [
+      "{{DENY_1}}",
+      "{{DENY_2}}"
+    ]
+  }
+}
+```
+<<<AGENTIFY-FRAGMENT-END>>>
+
+Repeat or trim every `{{ALLOW_n}}` / `{{ASK_n}}` / `{{DENY_n}}` row to the real number of entries,
+and delete any of the three arrays that ends up empty. A left-behind unfilled placeholder is a
+permission rule matching the literal string `{{ALLOW_3}}`, which matches nothing and tells the user
+the file was generated carelessly.
+
+Worked example — filled, from a repo with `bun.lock` chosen over `package-lock.json` at Q15, a
+`.env.local` on disk, and `bun run test` / `bun run lint` / `bun run typecheck` in package.json:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run test:*)",
+      "Bash(bun run lint:*)",
+      "Bash(bun run typecheck:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "ask": [
+      "Bash(bun run db:migrate:*)"
+    ],
+    "deny": [
+      "Read(./.env.local)",
+      "Read(./.env.local.bak)",
+      "Bash(npm install:*)",
+      "Bash(pnpm install:*)",
+      "Bash(git push --force:*)"
+    ]
+  }
+}
+```
+
+Every line in that example traces to something discovery found: three populated `commands` slots,
+two `.env*` files that exist by name, the two managers Q15 ruled out, and one migration command
+the repo defines. `.env.example` is absent from the deny list on purpose. Nothing was added
+because it seemed prudent.

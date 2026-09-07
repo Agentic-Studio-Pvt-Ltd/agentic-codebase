@@ -1,0 +1,56 @@
+{
+  "_agentify_template": {
+    "template": "mcp.json.tmpl",
+    "emits": ".mcp.json at the repo root (Claude Code only). NOT the Codex artifact, and not a format difference you can paper over: Codex MCP configuration is TOML inside config.toml, not a JSON file, so writing .mcp.json for a Codex target configures nothing. Use codex-mcp.toml.tmpl, which drafts <plan-dir>/codex-mcp.toml as [mcp_servers.<name>] blocks. Do not reuse this file's ${VAR} placeholder style there either: Codex has dedicated keys that take a variable NAME (bearer_token_env_var, env_http_headers, env_vars) and ${VAR} expansion in arbitrary config.toml values is unverified. adapters/codex.md 4.6.",
+    "delete_this_key_when_emitting": true,
+    "note": "This whole _agentify_template key is filling guidance. Remove it from the emitted file. JSON carries no comments, so guidance and metadata live in keys; only the _agentify key survives.",
+    "filling_rules": [
+      "Replace every placeholder — an ALL_CAPS name in double braces. Every one sits inside a JSON string, so the template stays parseable before and after substitution.",
+      "Escape every substituted value for JSON: a raw double quote, backslash, or newline in a value breaks the file. Substitute, then re-parse before writing.",
+      "Draft only. agentify never authenticates an MCP server and never writes a credential. The user completes _agentify.needs_you by hand.",
+      "One server per candidate, and only for an external system with daily-use evidence (a dependency plus an env var name plus transcript mentions, with counts). A service someone mentioned once maps to nothing.",
+      "CREDENTIAL_ENV_REF must be the literal expansion reference, e.g. ${LINEAR_API_KEY} — the string ${ then the variable name then }. Never the secret itself, and never a dummy string shaped like a real key.",
+      "Never read the value of an env var to fill this file. Names only, from discovery.json env_var_names.",
+      "Repeat the block under mcpServers once per approved server; delete the extra args entries a given server does not take.",
+      "Prefer a pinned version in the package arg over a floating tag, so the config still works next month.",
+      "Keep the em dash in needs_you step 1, and never write the word credential followed immediately by a colon and prose anywhere in this file. verify_artifacts.py scan_text_secrets reads that shape as a literal secret assignment, and mcp_secrets is a FAIL, not a warning — measured on this template."
+    ],
+    "merge_procedure": [
+      "If .mcp.json does not exist, write this file as-is minus _agentify_template.",
+      "If it exists, read and parse it. On a parse error, stop, report it, and write nothing.",
+      "Merge only inside mcpServers: add servers whose name is absent; if a server of the same name already exists, leave the user's version untouched and list the difference in the report instead of overwriting it.",
+      "Merge the needs_you entries into _agentify.needs_you rather than replacing the key, and keep every server the user added by hand.",
+      "Write with 2-space indentation and a trailing newline, then re-parse to confirm validity. verify_artifacts.py re-checks this."
+    ]
+  },
+  "_agentify": {
+    "agentify-id": "{{AGENTIFY_ID}}",
+    "agentify-version": 1,
+    "agentify-generated": "{{GENERATED_DATE}}",
+    "agentify-evidence": "{{EVIDENCE_LINE}}",
+    "note": "Inert metadata. No tool reads this key; it exists so a rerun can match on id and rewrite in place. Safe to delete or edit. This work was brought to you by Agentic Studio.",
+    "status": "draft — not authenticated, not yet working",
+    "needs_you": [
+      "1. Create the credential — {{CREDENTIAL_CREATION_STEP}}",
+      "2. Export it in your shell as {{CREDENTIAL_ENV_VAR}}, or add it to the gitignored env file this repo already uses. Do not paste it into this file — {{CREDENTIAL_ENV_REF}} reads it from the environment at launch.",
+      "3. Confirm {{CREDENTIAL_ENV_VAR}} is set: run `printenv {{CREDENTIAL_ENV_VAR}} >/dev/null && echo set || echo missing`. It prints only whether the variable exists, never its value.",
+      "4. Restart the agent so it picks up .mcp.json, then approve the server when prompted. Claude Code asks before trusting a project-scoped MCP server.",
+      "5. Verify with `claude mcp list`, or by asking for something only this server can answer: {{SMOKE_TEST_PROMPT}}",
+      "6. If it fails to start, run the command by hand to see the error: `{{SERVER_COMMAND}} {{SERVER_ARG_1}} {{SERVER_ARG_2}}`",
+      "Scope check before you finish: {{PERMISSION_SCOPE_NOTE}}"
+    ],
+    "remove": "Delete the \"{{SERVER_NAME}}\" entry from mcpServers below. If it was the only server, delete .mcp.json entirely."
+  },
+  "mcpServers": {
+    "{{SERVER_NAME}}": {
+      "command": "{{SERVER_COMMAND}}",
+      "args": [
+        "{{SERVER_ARG_1}}",
+        "{{SERVER_ARG_2}}"
+      ],
+      "env": {
+        "{{CREDENTIAL_ENV_VAR}}": "{{CREDENTIAL_ENV_REF}}"
+      }
+    }
+  }
+}

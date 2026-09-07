@@ -1,0 +1,104 @@
+---
+#> ─── agentify template: rule.md.tmpl ──────────────────────────────────────────
+#> Emits: .claude/rules/{{RULE_FILE_NAME}}.md   (Claude Code — a NATIVE load path)
+#>        Codex: the SAME markdown body, written to <plan-dir>/rules/{{RULE_FILE_NAME}}.md with a
+#>        pointer line in the AGENTS.md section — or, for a rule of ~15 lines or fewer, inlined
+#>        into that section under `### Conventions` and no file at all.
+#>        **The two targets differ here and the difference is not cosmetic.** Claude Code walks
+#>        `.claude/rules/` itself (recursively, at Managed / User / Project scope, and at Project
+#>        scope for every ancestor of the session cwd), so a rule file dropped into it loads with no
+#>        index-doc reference of any kind — the CLAUDE.md pointer is a discoverability nicety, not
+#>        the load mechanism (adapters/claude-code.md §4.2, VERIFIED by probe). NOTHING on Codex
+#>        walks a prose rules directory, so THERE the rule and its AGENTS.md pointer really are one
+#>        artifact and an unreferenced file does nothing (adapters/codex.md §4.2.1). Never tell a
+#>        Claude Code user their rule works because the index doc points at it.
+#>        **Do not confuse this with `.codex/rules/*.rules`.** Those are a Starlark command-approval
+#>        policy — the analogue of Claude Code's permissions allowlist, not of this file — and they
+#>        have their own template, `codex-rules.rules.tmpl`. A rule that says "never run npm" is
+#>        that artifact; a rule that says "handlers return Result, not exceptions" is this one.
+#>
+#> Filling rules
+#>  1. Replace every placeholder — an ALL_CAPS name in double braces. Delete every "#>" line and
+#>     every {{!-- ... --}} block.
+#>  2. One rule per file. If you are tempted to write "and also", that is a second rule — write it
+#>     as one, with its own scope and its own evidence. There is no limit on how many rules a setup
+#>     has; there is a hard limit of one convention per file.
+#>  3. Build a rule only from a correction the user made 2+ times, or a convention visible in the
+#>     code and confirmed by a count. The evidence line must carry that count.
+#>  4. Before writing, check the rule does not contradict another emitted rule on the same key.
+#>     verify_artifacts.py fails the build on contradictions.
+#>  5. Keep the five agentify-* lines verbatim; a rerun matches on agentify-id and rewrites in place.
+#>  6. Target length after filling: 20-45 lines. A rule nobody can hold in their head is not a rule.
+#> paths — the ONE frontmatter key Claude Code reads on a rule, and the key that decides HOW the
+#> rule loads. The literal spelling is `paths`, VERIFIED twice: the two-session probe in
+#> adapters/claude-code.md §4.2, and the loader in the 2.1.260 bundle, which reads
+#> `frontmatter.paths`, strips a trailing `/**` from each entry, discards an empty list or an
+#> all-`**` list, and then matches the survivors gitignore-style against the repo-relative path of
+#> the file the model is reading. It reads no other key: an earlier version of this template emitted
+#> `scope:`, which Claude Code ignores outright — every rule agentify built that way loaded EAGERLY,
+#> in every session, and the scope it advertised was enforced by nothing. Do not emit `scope:`, and
+#> do not emit both "for compatibility": a second spelling only tells a human the rule is scoped
+#> when it is not.
+#>   * WITH `paths:` — the rule is loaded ON DEMAND, the moment the model touches a matching file,
+#>     and costs nothing until then. This is the default: derive the globs from the evidence that
+#>     produced the rule (the directories in the corrections, the paths in the commits).
+#>   * WITHOUT `paths:` — the rule is loaded EAGERLY at session start, every session, wired or not.
+#>     That is real context rent, so adapters/claude-code.md §4.2 caps unscoped rules at 2. Emit one
+#>     only when the evidence genuinely spans the whole repo, and DELETE the `paths:` block when you
+#>     do — an omitted key and `paths: ["**"]` are the same thing to the loader, and omitting it is
+#>     the one a reader cannot misread. `**/*` is NOT the same thing: it survives the all-`**` test,
+#>     so it makes the rule lazy-but-matches-everything, which is a third behaviour nobody wants.
+#>   * A glob that matches no file in the repo is a SILENT no-op — no error, no warning, nothing in
+#>     the transcript. verify_artifacts.py's `rule_scope` is the only thing that will tell you.
+#>   * Use repo-relative globs, narrowest set that still covers the evidence, 1-4 entries. A trailing
+#>     `/**` is stripped before matching, so `src/api/**` and `src/api` are the same rule.
+#>   * On CODEX this key does nothing — nothing there walks a prose rules directory — but it is
+#>     harmless, it documents the scope, and the same file serves both targets. What carries the
+#>     scope on Codex is the `**Scope:**` prose line below plus the AGENTS.md pointer.
+paths:
+  - {{PATHS_GLOB_1}}
+{{!-- repeat/trim: one line per glob, 1-4 entries. For a genuinely repo-wide rule, delete the
+     `paths:` key and both entries entirely rather than writing `**` — and remember it then counts
+     against the cap of 2 unscoped rules. --}}
+  - {{PATHS_GLOB_2}}
+agentify-id: {{AGENTIFY_ID}}
+agentify-version: 1
+agentify-generated: {{GENERATED_DATE}}
+agentify-evidence: {{EVIDENCE_LINE}}
+# Safe to delete or edit. This work was brought to you by Agentic Studio.
+---
+
+# {{RULE_TITLE}}
+
+#> Repeat the scope in prose, always, and keep it identical to the `paths:` globs above. The key
+#> controls LOADING; this line tells the model and the human what the rule governs once it is
+#> loaded, and it is the only scope that survives being read on Codex, quoted into a review, or
+#> pasted into another tool. For a repo-wide rule with no `paths:` key, write `**Scope:** the whole
+#> repository.` and say so plainly.
+**Scope:** {{SCOPE_PROSE}}
+
+#> The rule itself: exactly one imperative sentence, present tense, no hedging. "Always", "never",
+#> "use X, not Y". If it needs a second sentence, it is two rules or it is a skill.
+{{RULE_IMPERATIVE_SENTENCE}}
+
+## Why
+
+{{RATIONALE}}
+
+## Evidence
+
+{{EVIDENCE_LINE}}
+
+## Correct
+
+```{{LANGUAGE}}
+{{CORRECT_EXAMPLE}}
+```
+
+## Incorrect
+
+```{{LANGUAGE}}
+{{INCORRECT_EXAMPLE}}
+```
+
+{{INCORRECT_EXPLANATION}}

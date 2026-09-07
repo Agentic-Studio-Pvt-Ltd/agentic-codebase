@@ -1,0 +1,381 @@
+#!/usr/bin/env bash
+# agentify-id: {{AGENTIFY_ID}}
+# agentify-version: 1
+# agentify-generated: {{GENERATED_DATE}}
+# agentify-evidence: {{EVIDENCE_LINE}}
+# Safe to delete or edit. This work was brought to you by Agentic Studio.
+#
+# {{HOOK_TITLE}}
+#
+# Event:   {{HOOK_EVENT}}
+#          (PreToolUse | PermissionRequest | PostToolUse | PreCompact | PostCompact |
+#           SessionStart | SessionEnd | UserPromptSubmit | SubagentStart | SubagentStop |
+#           Stop | Interrupt)
+# Matcher: {{HOOK_MATCHER}}     regex over the CODEX tool name — not Claude Code's vocabulary
+# Wired by: .codex/hooks.json — see codex-hooks.json.tmpl for the fragment and the merge
+#           procedure. This file does nothing until that fragment is merged, and it does not run
+#           until you trust it: run /hooks in Codex. Installed is not armed.
+#
+# Contract (adapters/codex.md §4.3)
+#   stdin  one JSON event object: tool_name, tool_input, cwd, session_id, hook_event_name, …
+#   stdout the decision, as JSON. Blocking is
+#            {"hookSpecificOutput":{"hookEventName":"…","permissionDecision":"deny",
+#             "permissionDecisionReason":"…"}}
+#          and permissionDecisionReason is the text the MODEL acts on — write it as an
+#          instruction ("Run: bun install"), never as a log line.
+#   exit   ALWAYS 0. Codex documents 0 and 2 (2 blocks with stderr as the reason); the meaning of
+#          every other status is undocumented, so this script never returns one. Silence plus
+#          exit 0 is "allow".
+#
+# Budget: under 2 seconds, enforced by CHECK_TIMEOUT_S below. This runs on every matching tool
+# call, so a slow check taxes every single edit. The wiring also sets an explicit timeout of 5 —
+# without one Codex waits 600 seconds.
+#
+# Fail open: any internal problem — malformed stdin, no python3, missing tool, timeout — prints
+# nothing and exits 0. A guard that breaks the session is worse than a guard that misses a
+# violation. Only a check that ran to completion and found a real violation denies.
+#
+# This script does not modify, move, or delete any file, and makes no network call.
+#> Formatting hooks are the single exception to that last line: if this hook's whole purpose is
+#> formatting, it may run the formatter on the one path in FILE_PATH, and must still exit 0. Say so
+#> in the header when you do. Any other hook that writes to the repo is a bug.
+#
+#> ─── agentify template: codex-hook.sh.tmpl ────────────────────────────────────
+#> Emits: <repo>/.codex/hooks/{{HOOK_FILE_NAME}}   (Codex — **Native**; chmod 0755 after writing —
+#>        an unexecutable hook is reported as a failed check by verify_artifacts.py)
+#>        The Claude Code counterpart is templates/hook.sh.tmpl. Two templates, not one
+#>        parameterised file, and the reason is that almost nothing is shared: a different
+#>        shebang and shell dialect, a different decision protocol (JSON on stdout here, exit 2
+#>        there), a different tool vocabulary, a different repo-root idiom, and different removal
+#>        instructions. A single file with two mutually exclusive halves is the leftover-guidance
+#>        failure mode these templates are written to avoid. With both targets selected, emit
+#>        both files from the same candidate, sharing the agentify-id and the evidence line.
+#> Filling rules
+#>  1. Replace every placeholder — an ALL_CAPS name in double braces. Delete every line starting
+#>     with "#>". Ordinary "#" comments stay: they are the emitted file's documentation.
+#>  2. Keep the five agentify-* header lines verbatim; a rerun matches on agentify-id.
+#>     `.codex/hooks.json` can carry no metadata of its own (unknown top-level keys silently
+#>     disable every hook in the repo), so this header is the artifact's only provenance and the
+#>     command path in the wiring is its only idempotency key.
+#>  3. bash, not POSIX sh — `#!/usr/bin/env bash` and `set -euo pipefail` are what adapters/codex.md
+#>     §4.3 specifies for this target. The ERR trap below is what keeps `set -e` compatible with
+#>     "always exit 0".
+#>  4. Delete whichever of the two filter blocks does not apply: the tool-name filter always stays,
+#>     the file-path filter goes when the hook matches shell commands rather than edits. Deleting it
+#>     is not optional housekeeping — a command hook that keeps the path filter hits the FAIL LOUD
+#>     branch on every single call and prints a stderr line each time. If the hook matches edits,
+#>     keep it: the extractor below reads real Codex payloads, not Claude Code's `file_path`.
+#>  5. The matcher in the wiring is deliberately permissive because Codex's tool-name list is not a
+#>     published enum. That is why the TOOL_NAME filter below re-checks it here: a shape this hook
+#>     does not recognise exits 0 quietly.
+#>  6. Build a hook only for a deterministic check that must not depend on the model remembering.
+#>     Anything needing judgement is a rule or a skill, not a hook. If the check is "never run this
+#>     command", prefer `codex-rules.rules.tmpl` — an execution-policy rule fires before the
+#>     command runs, needs no script, and cannot be missed by a matcher that does not match.
+#>  7. Other events emit other shapes. `permissionDecision` is for PreToolUse and
+#>     PermissionRequest. On UserPromptSubmit, plain-text stdout becomes additionalContext. Stop
+#>     and the session events use `continue` / `stopReason` / `systemMessage`. Read
+#>     adapters/codex.md §4.3 before emitting anything other than the deny shape below.
+#>  8. **Never interpolate generated prose into shell code.** {{BLOCK_MESSAGE}} and
+#>     {{REMEDIATION_HINT}} are read from a quoted heredoc and handed to python3 as arguments, so a
+#>     backtick or a `$(…)` in the message is literal text. Putting either inside a double-quoted
+#>     shell string instead makes the hook execute it on every violation. Measured, not theorised.
+
+set -euo pipefail
+
+# `set -e` must never turn an internal error into a non-zero exit: that is an undocumented status
+# on this target. Anything unexpected leaves quietly, allowing the work through.
+trap 'exit 0' ERR
+
+CHECK_TIMEOUT_S=2
+
+# The block message, verbatim. The delimiter is quoted, so NOTHING inside this heredoc is expanded
+# by the shell — a backtick, a $VAR or a $(command) in the text stays text. The one rule when
+# filling it: no line of the message may be the delimiter word on its own.
+BLOCK_REASON="$(cat <<'AGENTIFY_BLOCK_REASON'
+{{BLOCK_MESSAGE}}
+Fix: {{REMEDIATION_HINT}}
+AGENTIFY_BLOCK_REASON
+)"
+
+# Hooks are invoked from whatever cwd the session happens to have. Codex exports no project-root
+# variable — there is no $CLAUDE_PROJECT_DIR here — so resolve the repo root from git, which is
+# the same idiom the wiring uses in the hook's command path.
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")"
+cd "$REPO_ROOT" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Read the trigger payload. Empty or unreadable stdin means nothing to judge.
+# ---------------------------------------------------------------------------
+INPUT="$(cat 2>/dev/null || true)"
+[ -n "$INPUT" ] || exit 0
+
+# python3 is already required by agentify, so it is safe to parse with. jq is not assumed.
+command -v python3 >/dev/null 2>&1 || exit 0
+
+# json_get <dotted.path> — prints the value, or nothing if absent. Never fails.
+json_get() {
+  printf '%s' "$INPUT" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+node = data
+for key in sys.argv[1].split("."):
+    if isinstance(node, dict) and key in node:
+        node = node[key]
+    else:
+        sys.exit(0)
+if node is None:
+    sys.exit(0)
+sys.stdout.write(node if isinstance(node, str) else json.dumps(node))
+' "$1" 2>/dev/null || printf ''
+}
+
+TOOL_NAME="$(json_get tool_name)"
+
+# ---------------------------------------------------------------------------
+# Extract the command and the touched file paths from `tool_input`.
+#
+# `tool_input` is typed `true` — i.e. ANY — in Codex's own pre-tool-use /
+# post-tool-use / permission-request JSON schemas, so its shape is whatever the
+# tool's arguments were. It is NOT Claude Code's `{file_path: "..."}`, and an
+# earlier version of this template guessed `tool_input.file_path` with a
+# fallback to `tool_input.path`. Neither key exists on any Codex tool. Measured
+# over 240 real rollouts in ${CODEX_HOME:-~/.codex}/sessions:
+#
+#   apply_patch     1068/1068 calls  a FREEFORM tool: its whole input is the raw
+#                                    patch text, starting `*** Begin Patch`.
+#                                    No object, no file_path, no path. The
+#                                    paths live in the envelope headers.
+#   exec_command    5004/5004 calls  {"cmd": "...", "workdir", ...}. The key is
+#                                    `cmd`. `command` does not exist, so the old
+#                                    `tool_input.command` read empty here too.
+#   shell_command    122/122  calls  {"command": "...", "workdir"} — a string.
+#   exec            4920/4920 calls  code-mode: input is a JS source string.
+#
+# The patch envelope is fixed by the binary's own grammar (VERIFIED, read out of
+# the Codex bundle): `*** Add File: <path>`, `*** Delete File: <path>`,
+# `*** Update File: <path>`, `*** Move to: <path>`. And a patch can carry SEVERAL
+# files, which is why this yields a LIST, not a scalar — filtering on the first
+# path only would let an edit to a matching file slip past behind an unmatching
+# one.
+#
+# UNVERIFIED, deliberately, with an exit condition: how Codex serialises a
+# freeform tool's input INTO the `tool_input` field — as the bare string, or
+# wrapped as {"input": "..."} — was not established from the bundle or the
+# rollouts, both of which record the model-facing call rather than the hook
+# payload. Both spellings are handled below, plus the argv form
+# {"command": ["apply_patch", "<patch>"]} that the function-typed apply_patch
+# uses. To settle it: run a PreToolUse hook that does `cat > /tmp/payload.json`
+# and read the file. When it is settled, delete the branches that did not fire.
+#
+# What is NOT handled is handled LOUDLY: an unrecognised shape prints a
+# diagnostic to stderr and lets the check run UNFILTERED rather than skipping
+# it. A guardrail that quietly matches nothing is the failure this comment
+# block exists to prevent.
+# ---------------------------------------------------------------------------
+payload_fields() {
+  printf '%s' "$INPUT" | python3 -c '
+import json, sys
+
+HEADERS = ("*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: ")
+
+def patch_paths(text):
+    out = []
+    for line in text.splitlines():
+        for header in HEADERS:
+            if line.startswith(header):
+                value = line[len(header):].strip()
+                if value:
+                    out.append(value)
+    return out
+
+def is_patch(text):
+    return text.lstrip().startswith("*** Begin Patch")
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+if not isinstance(data, dict):
+    sys.exit(0)
+
+payload = data.get("tool_input")
+# Some transports double-encode: a JSON object arriving as a JSON string.
+if isinstance(payload, str) and payload.lstrip()[:1] in ("{", "["):
+    try:
+        payload = json.loads(payload)
+    except Exception:
+        pass
+
+paths, command, shape = [], "", ""
+
+if isinstance(payload, str):
+    if is_patch(payload):
+        paths, shape = patch_paths(payload), "freeform-patch"
+    else:
+        command, shape = payload, "freeform-string"
+elif isinstance(payload, dict):
+    for key in ("file_path", "path", "filename", "file"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            paths.append(value.strip())
+            shape = shape or ("path-key:" + key)
+    for key in ("input", "patch", "content", "text"):
+        value = payload.get(key)
+        if isinstance(value, str) and is_patch(value):
+            paths.extend(patch_paths(value))
+            shape = shape or ("patch-key:" + key)
+    raw = payload.get("cmd")
+    if raw is None:
+        raw = payload.get("command")
+    if isinstance(raw, str):
+        command = raw
+        shape = shape or "command-string"
+    elif isinstance(raw, list):
+        parts = [item for item in raw if isinstance(item, str)]
+        if parts and parts[0] in ("apply_patch", "applypatch") and len(parts) > 1:
+            paths.extend(patch_paths(parts[1]))
+            shape = shape or "argv-apply_patch"
+        else:
+            command = " ".join(parts)
+            shape = shape or "command-argv"
+    if not shape:
+        shape = "object-unrecognised"
+elif payload is None:
+    shape = "absent"
+else:
+    shape = "unrecognised"
+
+out = ["SHAPE\t" + shape, "COMMAND\t" + " ".join(command.split())]
+seen = set()
+for item in paths:
+    if item not in seen:
+        seen.add(item)
+        out.append("PATH\t" + item.replace("\t", " "))
+sys.stdout.write("\n".join(out))
+' 2>/dev/null || printf ''
+}
+
+PAYLOAD_SHAPE=""
+COMMAND=""
+FILE_PATHS=""
+while IFS="$(printf '\t')" read -r _key _value; do
+  case "$_key" in
+    SHAPE) PAYLOAD_SHAPE="$_value" ;;
+    COMMAND) COMMAND="$_value" ;;
+    PATH) FILE_PATHS="${FILE_PATHS}${_value}
+" ;;
+  esac
+done <<AGENTIFY_PAYLOAD_FIELDS
+$(payload_fields)
+AGENTIFY_PAYLOAD_FIELDS
+
+# The first touched path, for a {{CHECK_COMMAND}} that takes one file. Use
+# "$FILE_PATHS" (newline-separated) when the check can take several.
+FILE_PATH="$(printf '%s' "$FILE_PATHS" | head -n 1)"
+
+# deny <reason> [check output] — the only blocking primitive. Exits 0; the reason reaches the
+# model. Both arguments are passed to python3 as ARGUMENTS, never spliced into code, and python3
+# does the JSON escaping — so a reason containing quotes, newlines or backticks cannot break the
+# protocol or run anything. No python3, no JSON, no decision: the work is allowed through.
+deny() {
+  python3 -c '
+import json, sys
+parts = [sys.argv[1].strip()]
+if len(sys.argv) > 2 and sys.argv[2].strip():
+    parts.append("--- {{CHECK_LABEL}} output (first 20 lines) ---")
+    parts.append(sys.argv[2].strip())
+parts.append(
+    "This check comes from .codex/hooks/{{HOOK_FILE_NAME}} (agentify-id: {{AGENTIFY_ID}}). "
+    "To remove it, delete that file and its handler in .codex/hooks.json."
+)
+print(json.dumps({"hookSpecificOutput": {
+    "hookEventName": "{{HOOK_EVENT}}",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "\n\n".join(parts),
+}}))
+' "$1" "${2:-}" 2>/dev/null || true
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Filters. Every early exit here is a tool call this hook costs nothing on.
+# The wiring's regex matcher is permissive on purpose; this is the real filter.
+# ---------------------------------------------------------------------------
+case "$TOOL_NAME" in
+  {{TOOL_NAME_GLOB}}) ;;
+  *) exit 0 ;;
+esac
+
+# A patch can touch several files, so this matches if ANY touched path matches.
+if [ -n "$FILE_PATHS" ]; then
+  path_matched=0
+  while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    case "$candidate" in
+      {{PATH_GLOB}}) path_matched=1; break ;;
+    esac
+  done <<AGENTIFY_PATH_FILTER
+$FILE_PATHS
+AGENTIFY_PATH_FILTER
+  [ "$path_matched" = 1 ] || exit 0
+else
+  # FAIL LOUD. This hook was built with a path filter, and no path came out of
+  # the payload — so either Codex sent a shape not handled above, or this tool
+  # carries no path at all and the filter should have been deleted when the
+  # template was filled. Either way, do NOT silently skip: a guardrail that
+  # matches nothing looks identical to a guardrail that passed. Say so on
+  # stderr, which is diagnostic-only and cannot break the session, and let the
+  # check run unfiltered.
+  printf 'agentify hook {{AGENTIFY_ID}}: no file path in tool_input for tool %s (payload shape: %s); running the check UNFILTERED. If %s carries no path, delete this hook'"'"'s path filter.\n' \
+    "${TOOL_NAME:-<none>}" "${PAYLOAD_SHAPE:-<none>}" "${TOOL_NAME:-that tool}" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# The check.
+# ---------------------------------------------------------------------------
+TMP_OUT="$(mktemp 2>/dev/null || printf '/tmp/agentify-hook-%s.out' "$$")"
+trap 'rm -f "$TMP_OUT"' EXIT
+
+# run_check must return 0 when clean and 1 when it found a real violation. Any other status is
+# treated as "the check could not run" and lets the work through.
+#> Fill {{CHECK_COMMAND}} with the repo's own command, taken from discovery.json commands/raw_scripts
+#> — never a command this repo does not already have. It must read, not write, and it must be scoped
+#> to the triggering change ($FILE_PATH / $COMMAND) rather than sweeping the whole repo, or it will
+#> blow the 2 second budget.
+run_check() {
+  {{CHECK_COMMAND}}
+}
+
+# run_guarded <command...> — runs with a hard time budget, no dependency on timeout(1),
+# which is absent on stock macOS.
+run_guarded() {
+  "$@" >"$TMP_OUT" 2>&1 &
+  local cmd_pid=$!
+  ( sleep "$CHECK_TIMEOUT_S"; kill -TERM "$cmd_pid" ) >/dev/null 2>&1 &
+  local watchdog_pid=$!
+  local rc=0
+  wait "$cmd_pid" || rc=$?
+  kill -TERM "$watchdog_pid" >/dev/null 2>&1 || true
+  return "$rc"
+}
+
+status=0
+run_guarded run_check || status=$?
+
+case "$status" in
+  0)
+    exit 0
+    ;;
+  1)
+    deny "$BLOCK_REASON" "$(head -n 20 "$TMP_OUT" 2>/dev/null || true)"
+    ;;
+  *)
+    # Undetermined. Say so on stderr, which is diagnostic only, and allow.
+    printf 'agentify hook {{AGENTIFY_ID}}: check did not complete (exit %s), allowing.\n' "$status" >&2
+    exit 0
+    ;;
+esac

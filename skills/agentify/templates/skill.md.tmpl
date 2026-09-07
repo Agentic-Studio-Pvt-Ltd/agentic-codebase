@@ -1,0 +1,159 @@
+---
+#> ─── agentify template: skill.md.tmpl ─────────────────────────────────────────
+#> Emits: .claude/skills/{{SKILL_NAME}}/SKILL.md        (Claude Code)
+#>        .agents/skills/{{SKILL_NAME}}/SKILL.md          (Codex — committable; NOT `.codex/skills/`,
+#>        which is not a load path). Same format and same `name` + `description` progressive
+#>        disclosure on both, so this one template serves both targets and the body is identical.
+#>        With both targets selected, write both files rather than symlinking, and never write a
+#>        skill into a tree the user already has it in — `discovery` reports shared entries by
+#>        resolved path. adapters/codex.md §4.4.
+#>
+#> Filling rules
+#>  1. Replace every placeholder. A placeholder is an ALL_CAPS name inside double braces.
+#>  2. Fill every token from discovery.json / signals.json. A token you can only fill by guessing
+#>     means this candidate has no evidence — drop the candidate, do not invent content.
+#>  3. Delete every line beginning with "#>" and every {{!-- ... --}} block before writing the file.
+#>     Nothing marked that way may survive into the emitted skill.
+#>  4. Lines marked "repeat/trim" are variable-length lists: duplicate or delete rows to match the
+#>     real number of items. Never leave an unfilled row behind.
+#>  5. Keep the five agentify-* lines verbatim. verify_artifacts.py parses them, and a rerun matches
+#>     on agentify-id to rewrite this file in place instead of writing a second copy.
+#>  6. Optional frontmatter key: add `allowed-tools: Read, Grep, Glob, Bash` only when the skill
+#>     genuinely needs a narrower tool set than the session default. Omit the key otherwise.
+#>  7. Target length after filling: 60-150 lines. Longer skills get skimmed, not followed. Push the
+#>     detail into reference files (rule 9) rather than growing this file.
+#>  8. No attribution anywhere in the body. The one comment line below is the only placement.
+#>  9. REFERENCE FILES — how a skill gets deep without getting long. Put anything the skill needs
+#>     only at one step into `references/<name>.md` beside this file, and link it from the step
+#>     that needs it. The agent loads a reference only when it reaches that step, so the skill's
+#>     resident cost stays small. The four that recur, and what each holds:
+#>       references/conventions.md   — this repo's conventions for the thing the skill produces,
+#>                                     read off the code: naming, file layout, the idioms the
+#>                                     existing examples use. Cite the real files it was read from.
+#>       references/context.md       — the context-gathering procedure: which files to read, which
+#>                                     commands to run, and what question each one answers, BEFORE
+#>                                     writing anything. This is what makes the output fit the repo.
+#>       references/output-format.md — the exact shape of what the skill produces, with one filled
+#>                                     example taken from this repo.
+#>       references/guardrails.md    — what the skill must never do here, drawn from corrections[]
+#>                                     and pain_signals[], in the developer's own words.
+#>     Write a reference file only when it has real repo-specific content. Two thin ones are worse
+#>     than none. Every reference file gets the same agentify metadata header as this file, in an
+#>     HTML comment, and is listed in the build manifest as type `reference`.
+#> 10. THE PERSONALIZATION CHECK — run it before writing the file, on the filled text.
+#>     Five tests, from blueprint.md §1.1: does it name at least 3 concrete identifiers from this
+#>     repo? does it state THIS repo's convention rather than a best practice? does its evidence
+#>     line name a field and a number? **can you name a repo it would be false in?** does it answer
+#>     something the developer actually hit? A skill that fails any of them is rewritten, not
+#>     shipped. Test 4 is the sharp one: if the file would be equally true in an unrelated project,
+#>     it is a template, and templates are the one thing this tool does not produce.
+name: {{SKILL_NAME}}
+#> description — the only line the agent reads when deciding whether to load this skill, so it
+#> decides whether the skill ever fires. Write it in third person, one paragraph, under 1024
+#> characters, covering three things in this order:
+#>   (a) what the skill does, concretely, naming the real paths or commands it touches;
+#>   (b) the literal trigger phrases a developer types for it — lift the wording from the
+#>       request_shapes examples in signals.json rather than paraphrasing;
+#>   (c) a "Not for ..." clause naming the nearest neighbour it must not steal work from.
+#> No first person, no "this skill", no "helps you", no marketing adjectives.
+#> Shape to copy: "Adds a REST endpoint under src/api/ with a zod schema, handler, route
+#> registration, and a Vitest suite. Use when the user says 'add an endpoint', 'new route',
+#> 'expose X over the API', or 'wire up an API for'. Not for changing an existing endpoint's
+#> business logic, and not for GraphQL resolvers."
+description: {{SKILL_DESCRIPTION}}
+agentify-id: {{AGENTIFY_ID}}
+agentify-version: 1
+agentify-generated: {{GENERATED_DATE}}
+agentify-evidence: {{EVIDENCE_LINE}}
+# Safe to delete or edit. This work was brought to you by Agentic Studio.
+---
+
+# {{SKILL_TITLE}}
+
+{{ONE_SENTENCE_PURPOSE}}
+
+## When to use
+
+Use this skill when the request is one of these:
+
+{{!-- repeat/trim: 2-5 bullets, each quoting how this repo's history actually phrases it --}}
+- {{TRIGGER_PHRASE_1}}
+- {{TRIGGER_PHRASE_2}}
+- {{TRIGGER_PHRASE_3}}
+
+## When not to use
+
+{{!-- repeat/trim: 2-4 bullets. Each names the wrong-fit case and where the work belongs instead. --}}
+- {{NON_TRIGGER_1}} — do {{NON_TRIGGER_1_ALTERNATIVE}} instead.
+- {{NON_TRIGGER_2}} — do {{NON_TRIGGER_2_ALTERNATIVE}} instead.
+
+Stop and ask the user rather than guessing when {{AMBIGUITY_CONDITION}}.
+
+## Inputs
+
+Gather these before step 1. Infer what the request already states; ask only for what is missing.
+
+| Input | Required | Default |
+|---|---|---|
+| {{INPUT_1_NAME}} | yes | — |
+| {{INPUT_2_NAME}} | no | {{INPUT_2_DEFAULT}} |
+{{!-- repeat/trim: one row per input, 1-4 rows. Required inputs first. --}}
+
+Read these for context before changing anything: {{CONTEXT_PATHS}}.
+
+{{!-- repeat/trim: drop this line when there is no references/context.md --}}
+Full context-gathering procedure: [references/context.md](references/context.md). Follow it before
+step 1 — the output is only as good as what was read first.
+
+## Steps
+
+{{!-- repeat/trim: 3-9 steps. Each starts with an imperative verb, names exact paths and exact
+     commands, and is checkable — a step nobody can tell they finished is not a step. Put every
+     command in backticks so it can be copied. --}}
+1. {{STEP_1}}
+2. {{STEP_2}}
+3. {{STEP_3}}
+4. {{STEP_4}}
+5. {{STEP_5}}
+
+## Verification
+
+Run these and do not report success until every one passes:
+
+```sh
+{{VERIFY_COMMAND_1}}
+{{VERIFY_COMMAND_2}}
+```
+
+Then confirm by inspection:
+
+{{!-- repeat/trim: 2-4 checks, each phrased so the answer is yes or no --}}
+- [ ] {{VERIFY_CHECK_1}}
+- [ ] {{VERIFY_CHECK_2}}
+
+If one of these commands does not exist in this repo, say so and stop. Do not substitute a
+different command and do not claim a check passed that was never run.
+
+## Failure modes
+
+| Symptom | Likely cause | Do this |
+|---|---|---|
+| {{FAILURE_1_SYMPTOM}} | {{FAILURE_1_CAUSE}} | {{FAILURE_1_FIX}} |
+| {{FAILURE_2_SYMPTOM}} | {{FAILURE_2_CAUSE}} | {{FAILURE_2_FIX}} |
+{{!-- repeat/trim: 2-5 rows, drawn from corrections and pain_signals in signals.json --}}
+
+Never {{FORBIDDEN_ACTION}}. If following a step would require it, stop and report why.
+
+## References
+
+{{!-- repeat/trim: one row per reference file actually written beside this skill. Delete the whole
+     section when there are none. Every row must point at a file that exists — a link to a
+     reference that was never written is the same defect as an index-doc row for a skipped
+     artifact. --}}
+
+| File | Read it | Holds |
+|---|---|---|
+| [references/context.md](references/context.md) | before step 1 | {{REF_CONTEXT_SUMMARY}} |
+| [references/conventions.md](references/conventions.md) | at step {{REF_CONVENTIONS_STEP}} | {{REF_CONVENTIONS_SUMMARY}} |
+| [references/output-format.md](references/output-format.md) | at step {{REF_OUTPUT_STEP}} | {{REF_OUTPUT_SUMMARY}} |
+| [references/guardrails.md](references/guardrails.md) | before reporting done | {{REF_GUARDRAILS_SUMMARY}} |

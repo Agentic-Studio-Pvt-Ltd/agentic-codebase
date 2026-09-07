@@ -1,0 +1,32 @@
+{
+  "name": "agentify",
+  "owner": {
+    "name": "Agentic Studio",
+    "url": "https://github.com/PLACEHOLDER-ORG"
+  },
+  "plugins": [
+    {
+      "name": "agentify",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Derives a customized Claude Code setup from your repo and your own transcripts: rules, hooks, skills, subagents, and MCP drafts, each traced to evidence, behind a plan you approve first.",
+      "author": {
+        "name": "Agentic Studio",
+        "url": "https://github.com/PLACEHOLDER-ORG"
+      },
+      "homepage": "https://github.com/PLACEHOLDER-ORG/agentify",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": [
+        "claude-code",
+        "setup",
+        "skills",
+        "subagents",
+        "hooks",
+        "rules",
+        "mcp",
+        "codebase-analysis"
+      ]
+    }
+  ]
+}

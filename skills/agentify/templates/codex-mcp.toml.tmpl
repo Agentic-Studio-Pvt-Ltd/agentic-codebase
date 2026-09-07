@@ -1,0 +1,151 @@
+#> ─── agentify template: codex-mcp.toml.tmpl ───────────────────────────────────
+#> Emits: <plan-dir>/codex-mcp.toml   (Codex — **Draft**, the default and usually the only path)
+#>        Opt-in only: appended as a whole table block to <repo>/.codex/config.toml under the
+#>        contract below. Authority on the bytes: adapters/codex.md §4.6. Verdict on support:
+#>        adapters/capabilities.md, row "MCP servers".
+#>
+#> This is the Codex half of one artifact type; the Claude Code half is `mcp.json.tmpl`. They are
+#> NOT interchangeable: Codex MCP configuration is TOML inside `config.toml`, not a JSON file, and
+#> the two use different credential mechanisms. Writing `.mcp.json` for a Codex target configures
+#> nothing.
+#>
+#> ══ THREE RULES, IN ORDER OF PRECEDENCE ══════════════════════════════════════
+#> **Rule 1 — `${CODEX_HOME}/config.toml` is never modified. No exceptions.** It is user-global,
+#> hand-maintained, and it contains live credentials — a plaintext bearer token was present on the
+#> research machine. Encountering someone's token is not permission to move it: never echo it,
+#> never store it, never copy it into a generated file, never quote it in the report. agentify
+#> reads a config file only to answer the structural questions in Rule 3, and never reproduces a
+#> value it read.
+#>
+#> **Rule 2 — the default is a draft, not a write.** Emit this file to `<plan-dir>/codex-mcp.toml`,
+#> copy-paste ready, and put a needs-you entry in `report.md` naming the destination file, the
+#> environment variables to export, and the auth step per service. The reason is not squeamishness
+#> about TOML: the user has to authenticate and restart Codex regardless, so writing the block
+#> finishes nothing and buys no reversibility the draft does not already have. agentify is
+#> stdlib-only on Python 3.9; `tomllib` is read-only and 3.11+, and there is no TOML writer in the
+#> standard library at any version.
+#>
+#> **Rule 3 — writing into `<repo>/.codex/config.toml` is an explicit interview opt-in**, never the
+#> default, and it splits in two:
+#>   * **The file does not exist** — creating it from this template is authoring a whole file:
+#>     repo-scoped, committable, reversible by deleting it, holding no pre-existing secret. Safe.
+#>   * **The file exists** — then it is an append, and the contract refuses more often than it
+#>     proceeds:
+#>       a. Only ever append a COMPLETE `[table]` block, header first. **Never append a bare
+#>          key/value pair** — a `[table]` header ends the previous table, so a stray key binds to
+#>          whatever table precedes it. Measured: `project_doc_fallback_filenames` written after a
+#>          `[projects."…"]` header parsed silently as `projects."…".project_doc_fallback_filenames`
+#>          and had no effect.
+#>       b. Refuse if the table already exists — scan for `^\s*\[\s*mcp_servers\.<name>\b` and
+#>          `^\s*\[\s*mcp_servers\.<name>\.`. A duplicate table header is a TOML parse error.
+#>       c. Refuse if the file contains `"""` or `'''` anywhere: line-based scanning cannot tell a
+#>          table header inside a multi-line string from a real one.
+#>       d. Refuse if the file does not end in a newline, or normalise it first, then append
+#>          `"\n" + block + "\n"`.
+#>       e. Write to a temp file in the same directory and `os.replace()`.
+#>       f. Validate after writing with `codex --strict-config app-server`, which reports
+#>          `unknown configuration field …` with file, line and column and exits 1 BEFORE any auth
+#>          or model call. Do not use `codex --strict-config exec`: on a valid config it goes on to
+#>          run a real turn. On failure, restore the pre-write bytes from `pre_existing_sha256` and
+#>          record a needs-you item. **If no Codex binary resolved (§1.3), do not write at all.**
+#>       g. Record `pre_existing_sha256` and `restore: span` on the manifest entry.
+#>   Any refusal falls back to Rule 2's draft — silently to the user, explicitly in the plan. The
+#>   plan must name, per server, which path was taken and why, before the build starts.
+#>
+#> Filling rules
+#>  1. Replace every placeholder — an ALL_CAPS name in double braces. Delete every line starting
+#>     with "#>". Plain "#" comments stay: they are the draft's instructions to the user and the
+#>     only place its provenance can live.
+#>  2. Keep the five agentify-* header lines verbatim; a rerun matches on agentify-id.
+#>  3. **Never a literal secret, and never a `${VAR}` placeholder either.** Codex has dedicated
+#>     keys that take a variable NAME — `bearer_token_env_var`, `env_http_headers`, `env_vars` —
+#>     and whether generic `${VAR}` expansion works in arbitrary `config.toml` strings is
+#>     UNVERIFIED. With these keys the question is moot. Variable names come from
+#>     `discovery.env_var_names`; the analyzer never read a value and neither does this emitter.
+#>  4. Keep the ONE server block that matches the service, and delete the other. A server is either
+#>     remote (`url`) or local (`command` + `args`) — never both.
+#>  5. One server per approved candidate, and only for an external system with daily-use evidence
+#>     (a dependency plus an env var name plus transcript mentions, with counts). Having a
+#>     dependency is not a request; a service mentioned once maps to nothing.
+#>  6. agentify never authenticates, never launches a server, and never tests connectivity. The
+#>     user does all three. Say so in the report rather than implying the server works.
+#>  7. Server names may contain `:`, `@`, `/` and `.` as of v0.152.0 — do not over-validate a name
+#>     the user already uses.
+#>  8. Prefer a pinned version in the package arg over a floating tag, so the draft still works
+#>     next month.
+#>  8a. Keep the em dash in step 1 of the user instructions, and never write the word credential
+#>     followed immediately by a colon and prose anywhere in this file. `verify_artifacts.py`'s
+#>     `scan_text_secrets` reads that shape as a literal secret assignment, and `mcp_secrets` is a
+#>     FAIL, not a warning — measured on this template.
+#>  8b. Manifest entry: `"type": "mcp"`, `"path": "<plan-dir>/codex-mcp.toml"`. `mcp_json` reads
+#>     the FORMAT, not the type name: for a non-`.json` path it checks this file as Codex TOML —
+#>     at least one complete `[mcp_servers.<name>]` table, and no bare key/value pair above the
+#>     first `[table]` header (that pair binds to whatever table precedes it once pasted into
+#>     config.toml, and the setting silently does nothing). `mcp_secrets` works on this file
+#>     either way — it runs the raw-text scan regardless of format, and Codex's dedicated
+#>     env-var-name keys are correctly not flagged (measured). The removal mechanism is read the
+#>     same way: this draft is a file agentify created whole, so `rm` removes it and it must NOT
+#>     be routed to the JSON un-merge script. **Expect zero FAILs on a correct file.**
+#>  9. Verified accepted keys: `command`, `args`, `env`, `env_vars`, `url`, `http_headers`,
+#>     `env_http_headers`, `bearer_token_env_var`, `startup_timeout_sec`, `tool_timeout_sec`,
+#>     `enabled`, `enabled_tools`, `disabled_tools`, and `tools.<tool>.approval_mode`.
+#>     `approval_mode` accepts exactly `auto`, `prompt`, `writes`, `approve` — the parser rejects
+#>     anything else by name. Emit nothing outside this list.
+
+# agentify-id: {{AGENTIFY_ID}}
+# agentify-version: 1
+# agentify-generated: {{GENERATED_DATE}}
+# agentify-evidence: {{EVIDENCE_LINE}}
+# Safe to delete or edit. This work was brought to you by Agentic Studio.
+#
+# DRAFT — not authenticated, not yet working. agentify wrote the shape; you supply the access.
+#
+# What to do with this file:
+#   1. Create the credential — {{CREDENTIAL_CREATION_STEP}}
+#   2. Export it in your shell as {{CREDENTIAL_ENV_VAR}}, or add it to the gitignored env file
+#      this repo already uses. Do not paste it into any config file — the key below takes the
+#      variable's NAME and Codex reads the value from the environment at launch.
+#   3. Confirm it is set, without printing it:
+#        printenv {{CREDENTIAL_ENV_VAR}} >/dev/null && echo set || echo missing
+#   4. Append the block below to <repo>/.codex/config.toml (create the file if it is absent).
+#      Append it whole, header line included, at the END of the file. Never paste a bare
+#      key/value pair into an existing file: it binds to whatever [table] precedes it.
+#   5. Confirm the config still parses: `codex --strict-config app-server` — it validates and
+#      exits before any auth or model call.
+#   6. Restart Codex, then ask for something only this server can answer:
+#        {{SMOKE_TEST_PROMPT}}
+#   7. Scope check before you finish: {{PERMISSION_SCOPE_NOTE}}
+#
+# Remove: delete the [mcp_servers.{{SERVER_NAME}}] block from <repo>/.codex/config.toml, and
+# delete this draft. If it was the only table you added, the file can go entirely.
+#
+# Not this file's job: the user-global ${CODEX_HOME}/config.toml is yours and agentify never
+# touches it. If you
+# want this server available in every repo, move the block there yourself.
+
+#> Remote / streamable-HTTP server. Delete this whole block for a local stdio server.
+[mcp_servers.{{SERVER_NAME}}]
+url = "{{SERVER_URL}}"
+#> bearer_token_env_var takes the NAME of the environment variable holding the token. Never the
+#> token, never a dummy string shaped like one.
+bearer_token_env_var = "{{CREDENTIAL_ENV_VAR}}"
+#> env_http_headers maps a header name to the NAME of the env var holding its value. Delete the
+#> line unless the service needs a header beyond the bearer token.
+env_http_headers = { "{{EXTRA_HEADER_NAME}}" = "{{EXTRA_HEADER_ENV_VAR}}" }
+#> http_headers carries only non-secret literal values. Delete the line if there are none.
+http_headers = { "{{STATIC_HEADER_NAME}}" = "{{STATIC_HEADER_VALUE}}" }
+
+#> Per-tool approval, one table per tool that writes. Emit it for anything that mutates state in
+#> the external system, and delete the block entirely when every tool is read-only.
+[mcp_servers.{{SERVER_NAME}}.tools.{{WRITE_TOOL_NAME}}]
+approval_mode = "approve"
+
+#> Local / stdio server. Delete this whole block for a remote server — a server is one or the
+#> other, never both.
+[mcp_servers.{{LOCAL_SERVER_NAME}}]
+command = "{{SERVER_COMMAND}}"
+args = ["{{SERVER_ARG_1}}", "{{SERVER_ARG_2}}"]
+#> env_vars forwards named environment variables into the server process. Names only — the values
+#> stay in the environment and are never written here.
+env_vars = ["{{FORWARDED_ENV_VAR}}"]
+startup_timeout_sec = 30

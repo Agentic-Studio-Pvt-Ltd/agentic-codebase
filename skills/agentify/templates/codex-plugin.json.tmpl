@@ -1,0 +1,56 @@
+{
+  "_agentify_template": {
+    "template": "codex-plugin.json.tmpl",
+    "emits": "{{PLUGIN_DIR}}/.codex-plugin/plugin.json — the Codex manifest that packages THIS repo's generated setup so it can be installed elsewhere. It is not agentify's own manifest. The Claude Code counterpart is plugin.json.tmpl, which emits {{PLUGIN_DIR}}/.claude-plugin/plugin.json. When both targets are selected, DUAL-SHIP: write both manifests side by side over the same source tree, exactly as real cross-tool plugins do, and say in report.md which artifacts each one packages.",
+    "authority": "adapters/codex.md 4.7 owns the bytes; adapters/capabilities.md row 'Plugin manifest' owns the verdict (Native, opt-in).",
+    "delete_this_key_when_emitting": true,
+    "note": "This whole _agentify_template key is filling guidance. Remove it from the emitted file. JSON carries no comments, so guidance and metadata live in keys; only the _agentify key survives.",
+    "filling_rules": [
+      "Replace every placeholder — an ALL_CAPS name in double braces. Every one sits inside a JSON string, so the template parses before and after substitution.",
+      "Escape every substituted value for JSON: a raw double quote, backslash, or newline in a value breaks the file. Substitute, then re-parse before writing.",
+      "Build this only when the interview says the setup is meant to travel — a team, or a second repo. A solo setup in one repo does not need packaging, and an unused manifest is one more file to maintain.",
+      "The schema is the .claude-plugin one (name, version, description, author, homepage, repository, license, keywords) plus the Codex-specific `skills` key: a PATH to the plugin's skills directory. Both were read from a real manifest in the local plugin cache.",
+      "`skills` is a PATH, and the path must be REAL: it resolves against the plugin root ({{PLUGIN_DIR}}), NOT against the repo root and NOT against .codex-plugin/. agentify writes its Codex skills to <repo>/.agents/skills/<name>/, which is nowhere near the plugin root, so the key is a dangling pointer until the copy in packaging_steps has actually run. Perform that copy, THEN write this manifest; if this setup built no skills, DELETE the `skills` key instead of shipping a path to an empty or absent directory. Same rule as the Claude manifest's component paths, and verify_artifacts.py's `plugin_paths` check now fails a manifest whose path keys do not resolve.",
+      "`interface` — displayName, shortDescription, category, capabilities[], defaultPrompt[] and policy URLs — is store-listing copy, not configuration. Agentify OMITS it: whether it is required for a non-marketplace plugin is unconfirmed, and inventing marketing text is not evidence-derived.",
+      "name: lowercase, hyphenated, no spaces. It is the install handle, so make it repo-specific, e.g. acme-api-agentic-setup. Use the SAME name as the Claude manifest when dual-shipping — one plugin, two manifests.",
+      "version: start at 0.1.0 and bump on every rerun that changes a component. Semver, no leading v. Keep it in step with the Claude manifest.",
+      "author: take name and email from `git config user.name` / `git config user.email`, or from the top contributor in mine_git.py output. This is the setup's owner, not agentify.",
+      "Plugin-shipped HOOKS are found by PATH on this target, not by a manifest key: <plugin>/hooks.json, <plugin>/hooks/hooks.json and <plugin>/.codex/hooks.json are all verified load locations. Do not add a `hooks` key here; place the file instead.",
+      "Codex exports $PLUGIN_ROOT/$PLUGIN_DATA and also $CLAUDE_PLUGIN_ROOT/$CLAUDE_PLUGIN_DATA, which is why real cross-tool plugins reference ${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}. Use that form in any path a packaged hook script resolves, so one script serves both manifests.",
+      "Do not add keys outside the list above. Codex's hooks.json rejects unknown top-level keys outright, and whether this manifest is equally strict is UNVERIFIED — so keep the file minimal and treat the _agentify key below as the one deliberate exception, to be dropped if the plugin fails to load."
+    ],
+    "packaging_steps": [
+      "STEP 1, and it is not optional — copy the built artifacts into the plugin root, because nothing else in the run does it and the manifest below points at the result: `mkdir -p {{PLUGIN_DIR}}/skills && cp -R <repo>/.agents/skills/. {{PLUGIN_DIR}}/skills/`. Copy any packaged hook script beside its hooks.json in the same pass. Skip this step and every path key in the manifest is dangling.",
+      "STEP 2 — confirm the copy landed before writing anything: `ls {{PLUGIN_DIR}}/skills/*/SKILL.md`. Empty output means there is nothing to package: delete the `skills` key from the manifest, or skip the plugin artifact entirely.",
+      "STEP 3 — write this manifest to {{PLUGIN_DIR}}/.codex-plugin/plugin.json (the manifest lives one level down; its `./skills/` is still relative to {{PLUGIN_DIR}}, not to .codex-plugin/).",
+      "STEP 4 — validate that it parses AND that every path key resolves: `python3 -c \"import json,os,sys;d=os.path.dirname(os.path.dirname(sys.argv[1]));m=json.load(open(sys.argv[1]));bad=[v for k,v in m.items() if isinstance(v,str) and v.startswith('./') and not os.path.exists(os.path.join(d,v))];print('DANGLING:',bad) if bad else print('ok')\" {{PLUGIN_DIR}}/.codex-plugin/plugin.json`. Anything but `ok` means step 1 did not run.",
+      "State the caveat before promising team distribution: the binary logs 'repository-scoped plugin migration is not allowed', so a manifest committed to a repo may not be installable directly from there. The reliably shareable unit remains the committed AGENTS.md, .codex/ and .agents/skills/ files, which a teammate gets by cloning.",
+      "Publishing to a marketplace is the user's call and is out of scope for this run: say so in report.md rather than doing it."
+    ]
+  },
+  "_agentify": {
+    "agentify-id": "{{AGENTIFY_ID}}",
+    "agentify-version": 1,
+    "agentify-generated": "{{GENERATED_DATE}}",
+    "agentify-evidence": "{{EVIDENCE_LINE}}",
+    "note": "Inert metadata. Nothing reads this key; it exists so a rerun can match on id and rewrite this file in place. Safe to delete or edit. This work was brought to you by Agentic Studio.",
+    "if_the_plugin_fails_to_load": "Delete this whole _agentify key and try again, then report it: Codex rejects unknown top-level keys in hooks.json, and whether the plugin manifest is equally strict is unverified. The artifact's identity survives without it — agentify owns this whole file, and the build manifest records its path.",
+    "remove": "Delete {{PLUGIN_DIR}}. Removing the package leaves the artifacts in the repo untouched."
+  },
+  "name": "{{PLUGIN_NAME}}",
+  "version": "{{PLUGIN_VERSION}}",
+  "description": "{{PLUGIN_DESCRIPTION}}",
+  "author": {
+    "name": "{{AUTHOR_NAME}}",
+    "email": "{{AUTHOR_EMAIL}}",
+    "url": "{{AUTHOR_URL}}"
+  },
+  "homepage": "{{PLUGIN_HOMEPAGE}}",
+  "repository": "{{PLUGIN_REPOSITORY}}",
+  "license": "{{PLUGIN_LICENSE}}",
+  "keywords": [
+    "{{KEYWORD_1}}",
+    "{{KEYWORD_2}}"
+  ],
+  "skills": "./skills/"
+}
