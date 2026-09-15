@@ -655,22 +655,94 @@ import hashlib, io, json, os, re
 #                   .mcp.json, .codex/hooks.json
 #         "toml" -- one whole marked [table] block appended to a TOML file:
 #                   <repo>/.codex/config.toml
-# entry kinds: ("hook_command",     "<the hook artifact's manifest `command`>")
+# entry kinds: ("hook_command",     "<the hook artifact's manifest `command`>", "<Event>")
 #              ("permission_entry", "<allow|ask|deny>:<exact rule string>")
 #              ("mcp_server",       "<server name under mcpServers>")
 #              ("toml_table",       "<table name, e.g. mcp_servers.linear>")
+# A hook_command entry carries a THIRD element, the event it was registered under, because the
+# event is half of a handler's identity: the same script the user wired into a second event is
+# their wiring, not this run's. Older manifests wrote two elements; then the command must resolve
+# to exactly one registration or the arm stops rather than guess. Identity is the whole normalised
+# command path either way -- never a basename.
 UNMERGE = [
     ("MODIFIED_PATH", "MODIFIED_ID", "UNMERGE_FORMAT", "modified", "PRE_EXISTING_SHA256",
-     [("hook_command", "${CLAUDE_PROJECT_DIR}/.claude/hooks/HOOK_FILE_NAME")]),
+     [("hook_command", "${CLAUDE_PROJECT_DIR}/.claude/hooks/HOOK_FILE_NAME", "HOOK_EVENT")]),
 ]
 
 def key(value):
-    """Command identity: last non-comment line, unquoted, plus its basename. Tolerates an
-    older '# agentify:<id>' + newline + '<path>' spelling, ${CLAUDE_PROJECT_DIR} vs an absolute
-    path, and Codex's quoted '"$(git rev-parse --show-toplevel)/.codex/hooks/x.sh"'."""
+    """Command identity: the whole NORMALISED path of the command, and never its basename.
+    Takes the last non-comment line (tolerating an older '# agentify:<id>' + newline + '<path>'
+    spelling), unquotes it, rewrites every spelling of "this repo's root" that agentify actually
+    emits -- ${CLAUDE_PROJECT_DIR}, the bare $CLAUDE_PROJECT_DIR, Codex's
+    '$(git rev-parse --show-toplevel)', a literal absolute path into the directory these steps run
+    from -- to one '<repo>' token, and normalises the remainder. Nothing else is rewritten:
+    ${CLAUDE_PLUGIN_ROOT} is a DIFFERENT root, so folding it in here would invent the same false
+    identity this function exists to stop. Two commands are the same handler only when this whole
+    string is equal. The user's own tools/block-npm.sh and agentify's .codex/hooks/block-npm.sh
+    share a basename and are NOT the same hook; matching on the basename deleted both of them."""
     lines = [l.strip() for l in str(value).splitlines() if l.strip() and not l.strip().startswith("#")]
-    last = (lines[-1] if lines else str(value).strip()).strip("\"'")
-    return last, last.rsplit("/", 1)[-1]
+    text = (lines[-1] if lines else str(value).strip()).strip("\"'").strip()
+    here = os.path.abspath(".")
+    for root in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR",
+                 '"$(git rev-parse --show-toplevel)"', "$(git rev-parse --show-toplevel)",
+                 here if here not in ("", os.sep) else ""):
+        if root and (text == root or text.startswith(root + "/")):
+            text = "<repo>" + text[len(root):]
+            break
+    if not text.startswith("<repo>") and not os.path.isabs(text) and not text.startswith("$"):
+        text = "<repo>/" + (text[2:] if text.startswith("./") else text)
+    return os.path.normpath(text).replace("\\", "/")
+
+def entry_parts(entry):
+    """One `merge.entries` item -> (kind, value, event). The event is None on the two-element
+    spelling an older manifest wrote, and then it constrains nothing."""
+    parts = list(entry)
+    kind = parts[0] if parts else ""
+    value = parts[1] if len(parts) > 1 else ""
+    event = parts[2] if len(parts) > 2 and parts[2] else None
+    return kind, value, event
+
+def owns_handler(handler, event, wanted):
+    """True only for a handler THIS run registered: the whole normalised command path is equal
+    AND, when the manifest recorded the event, it is that event. Never a basename, never a
+    substring -- both of those take the user's hooks out with agentify's."""
+    if not isinstance(handler, dict):
+        return False
+    got = key(handler.get("command", ""))
+    return any(got == want and (scope is None or scope == event) for want, scope in wanted)
+
+def inventory(data):
+    """Every entry the JSON arm could conceivably remove, as a set of identity strings. The
+    preservation check compares this before and after: anything that disappeared and is not one
+    of this run's own recorded entries is a bug in the undo, and nothing is written."""
+    found = set()
+    if not isinstance(data, dict):
+        return found
+    for name in data:
+        found.add("top:%s" % name)
+    hooks = data.get("hooks")
+    if isinstance(hooks, dict):
+        for event, groups in hooks.items():
+            if not isinstance(groups, list):
+                continue
+            for group in groups:
+                inner = group.get("hooks") if isinstance(group, dict) else None
+                if not isinstance(inner, list):
+                    continue
+                for handler in inner:
+                    if isinstance(handler, dict):
+                        found.add("hook:%s:%s" % (event, key(handler.get("command", ""))))
+    mcp = data.get("mcpServers")
+    if isinstance(mcp, dict):
+        for name in mcp:
+            found.add("mcp:%s" % name)
+    block = data.get("permissions")
+    if isinstance(block, dict):
+        for listname, arr in block.items():
+            if isinstance(arr, list):
+                for item in arr:
+                    found.add("perm:%s:%s" % (listname, item))
+    return found
 
 def outside_repo(path):
     """True for anything not under the directory these steps are run from. agentify never
@@ -682,7 +754,8 @@ def outside_repo(path):
 def unmerge_json(path, aid, action, want, entries, raw):
     """Remove this run's entries from a JSON object. Returns (status, removed, out, empty, msg)."""
     try:
-        data = json.loads(raw)
+        data, before = json.loads(raw), json.loads(raw)   # `before` stays untouched, for the
+                                                          # preservation check at the end
     except ValueError as exc:
         return ("stop", 0, "", False,
                 "STOP  %s: not valid JSON (%s) -- nothing removed, edit it by hand" % (path, exc))
@@ -690,10 +763,27 @@ def unmerge_json(path, aid, action, want, entries, raw):
         return ("stop", 0, "", False,
                 "STOP  %s: top level is not an object -- nothing removed, edit it by hand" % path)
 
-    wanted = [key(v) for k, v in entries if k == "hook_command"]
-    servers = [v for k, v in entries if k == "mcp_server"]
-    perms = [v.split(":", 1) for k, v in entries if k == "permission_entry" and ":" in v]
+    parts = [entry_parts(e) for e in entries]
+    wanted = [(key(v), ev) for k, v, ev in parts if k == "hook_command"]
+    servers = [v for k, v, _ev in parts if k == "mcp_server"]
+    perms = [v.split(":", 1) for k, v, _ev in parts if k == "permission_entry" and ":" in v]
     removed = 0
+    before_ids = inventory(before)
+
+    # An entry that records no event cannot say WHICH registration of that command is this run's.
+    # One is unambiguous; two is a question the manifest did not answer, and guessing takes the
+    # user's own wiring of the same script out with agentify's.  Stop instead.
+    for want, scope in wanted:
+        if scope is not None:
+            continue
+        events = sorted(set(ident.split(":", 2)[1] for ident in before_ids
+                            if ident.startswith("hook:") and ident.split(":", 2)[2] == want))
+        if len(events) > 1:
+            return ("stop", 0, "", False,
+                    "STOP  %s: `%s` is registered under %s and this run's manifest entry records "
+                    "no event, so which registration is agentify's cannot be decided -- nothing "
+                    "removed. Delete the one under the event the report names, by hand."
+                    % (path, want, " and ".join(events)))
 
     hooks = data.get("hooks")
     if wanted and isinstance(hooks, dict):
@@ -706,9 +796,7 @@ def unmerge_json(path, aid, action, want, entries, raw):
                 inner = group.get("hooks") if isinstance(group, dict) else None
                 if not isinstance(inner, list):
                     kept_groups.append(group); continue
-                keep = [h for h in inner
-                        if not (isinstance(h, dict) and any(key(h.get("command", "")) == w or
-                                                            key(h.get("command", ""))[1] == w[1] for w in wanted))]
+                keep = [h for h in inner if not owns_handler(h, event, wanted)]
                 removed += len(inner) - len(keep)
                 if inner and not keep:
                     continue                      # a matcher group this run created: drop it
@@ -754,7 +842,8 @@ def unmerge_json(path, aid, action, want, entries, raw):
             data.pop("permissions", None)
 
     meta = data.get("_agentify")
-    if isinstance(meta, dict) and meta.get("agentify-id") == aid:
+    owned_meta = isinstance(meta, dict) and meta.get("agentify-id") == aid
+    if owned_meta:
         data.pop("_agentify"); removed += 1
 
     if action == "created":
@@ -762,6 +851,30 @@ def unmerge_json(path, aid, action, want, entries, raw):
         # on a created file that key is agentify's own and goes back out with the rest of it. On a
         # file the user already had, the description is theirs and is never touched.
         data.pop("description", None)
+
+    # Preservation check, BEFORE anything is returned to be written. Everything that vanished
+    # between `before` and `data` has to be something this run recorded; if one entry is not, the
+    # identity is wrong and the user's file is left exactly as it is rather than half-repaired.
+    # This is the guard the basename match had no answer to.
+    allowed = set(["top:hooks", "top:mcpServers", "top:permissions"])
+    for ident in before_ids:
+        if ident.startswith("hook:"):
+            _kind, ev, command = ident.split(":", 2)
+            if any(command == w and (scope is None or scope == ev) for w, scope in wanted):
+                allowed.add(ident)
+    allowed.update("mcp:%s" % name for name in servers)
+    allowed.update("perm:%s:%s" % (listname, rule) for listname, rule in perms)
+    if owned_meta:
+        allowed.add("top:_agentify")
+    if action == "created":
+        allowed.add("top:description")
+    lost = sorted(before_ids - inventory(data) - allowed)
+    if lost:
+        return ("stop", 0, "", False,
+                "STOP  %s: removing this run's entries would also drop %d entry(s) it does not "
+                "own (%s) -- nothing was written and your file is untouched. This is a bug in the "
+                "undo's identity, not in your file; report it and remove the entries by hand."
+                % (path, len(lost), ", ".join(lost[:4])))
     return ("ok", removed, json.dumps(data, indent=2, ensure_ascii=False) + "\n", not data, "")
 
 def unmerge_toml(path, aid, action, want, entries, raw):
@@ -823,21 +936,24 @@ for path, aid, fmt, action, want, entries in UNMERGE:
     if empty and action == "created":
         os.remove(path)
         print("%s: deleted (agentify created it and it now holds nothing else)" % path); continue
-    io.open(path, "w", encoding="utf-8", newline="").write(out)
+    # The pre-run hash is compared BEFORE the file is written, not after: a check that fires
+    # once the bytes are already on disk reports a loss instead of preventing one.
     got = hashlib.sha256(out.encode("utf-8")).hexdigest()
     if want and got == want:
-        print("%s: %d entry(s) removed, restored byte-for-byte (id=%s)" % (path, removed, aid))
+        note = "%s: %d entry(s) removed, restored byte-for-byte (id=%s)" % (path, removed, aid)
     elif want:
-        print("%s: %d entry(s) removed; your own entries are intact but the bytes differ from the "
-              "pre-run file (%s...). Expected only if you edited it after the run, or it was not "
-              "written in the convention agentify found. Diff it before assuming a problem."
-              % (path, removed, got[:12]))
+        note = ("%s: %d entry(s) removed; every entry this run does not own is still there, but "
+                "the bytes differ from the pre-run file (%s...). Expected only if you edited it "
+                "after the run, or it was not written in the convention agentify found. Diff it "
+                "before assuming a problem." % (path, removed, got[:12]))
     else:
-        print("%s: %d entry(s) removed (id=%s)" % (path, removed, aid))
+        note = "%s: %d entry(s) removed (id=%s)" % (path, removed, aid)
+    io.open(path, "w", encoding="utf-8", newline="").write(out)
+    print(note)
 PY
 ```
 
-Eight properties are load-bearing, and each one is a failure that was measured while writing this:
+Nine properties are load-bearing, and each one is a failure that was measured while writing this:
 
 - **It dispatches on the manifest, not on the path.** `format` picks the arm; `merge.entries` fills
   the tuple. Adding a target that merges into a fifth kind of file is one new arm and one new
@@ -854,6 +970,21 @@ Eight properties are load-bearing, and each one is a failure that was measured w
   agentify's hook into an existing matcher group when one matches, so the group is usually **shared
   with the user's own hooks**. Deleting the group, the event array or the `hooks` key wholesale takes
   the user's hooks with it. A group that was already empty before the run is left exactly as it was.
+- **A handler's identity is its whole normalised command path plus the event it sits under — never
+  its basename.** `key()` rewrites `${CLAUDE_PROJECT_DIR}`, the bare `$CLAUDE_PROJECT_DIR`, Codex's
+  quoted `"$(git rev-parse --show-toplevel)/…"` and a literal absolute path into the repo to one
+  `<repo>` token, and the match is equality on the result. Measured: handed agentify's
+  `/repo/.codex/hooks/block-npm.sh` while the user's own `/repo/tools/block-npm.sh` sat in the same
+  matcher group, a basename fallback removed **both** and returned `{}` — and the loop then printed
+  a byte comparison over the damage, because it had already written the file. Two things follow and
+  both are in the script: the event travels in the `hook_command` entry, so the same script the user
+  wired into a *second* event stays wired — and an entry that records no event, from a manifest an
+  older agentify wrote, stops rather than guess as soon as that command resolves to more than one
+  registration; and before it returns anything to be written, the arm
+  compares an inventory of the file's hooks, servers, permission strings and top-level keys against
+  the same inventory afterwards and **stops without writing** if one entry disappeared that this run
+  did not record. Zero risk of a silent loss is what that check buys; a `STOP` the user can read is
+  what it costs.
 - **The TOML arm never parses or re-serialises TOML.** It removes a byte range agentify appended and
   can still prove it appended — nothing else. That is what makes it implementable at all: agentify is
   stdlib-only and targets Python 3.9, where `tomllib` does not exist (it is 3.11+, and read-only even
@@ -888,7 +1019,9 @@ Eight properties are load-bearing, and each one is a failure that was measured w
   2-space indentation and a trailing newline, and appended to a TOML file only after normalising its
   trailing newline, so the un-merge reproduces the pre-run bytes exactly when the user's file already
   used that convention — and says plainly when it does not, instead of claiming a restore it cannot
-  prove. Only `PRE_EXISTING_SHA256` decides which line is printed.
+  prove. Only `PRE_EXISTING_SHA256` decides which line is printed — and it is compared **before**
+  the file is written, not after, so the hash is a decision the loop takes about bytes it is holding
+  rather than a verdict it pronounces over bytes it has already committed to disk.
 
 **Re-measured by extracting this exact block from this file and running it** against fixtures built
 by running each adapter's merge procedure first, so the "before" and "after" are the real ones.

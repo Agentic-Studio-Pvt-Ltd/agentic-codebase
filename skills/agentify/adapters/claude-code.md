@@ -708,8 +708,12 @@ defensively and must not crash on an unexpected shape — an exception in a hook
    a trailing newline — the un-merge reproduces the pre-run bytes exactly only when the merge wrote
    the file back in the convention it found.
 7. Record `pre_existing_sha256` (the file's hash **before** this merge) and `restore: span` on the
-   artifact's manifest entry. Nothing else recovers them, and the un-merge script's byte proof is
-   built from them.
+   artifact's manifest entry, and write the `merge` record's hook entry as
+   `["hook_command", "<the command line you wrote>", "<Event>"]` — **the event is half of the
+   handler's identity**, because the same script the user wired into a second event is their wiring
+   and not this run's, and the un-merge removes the handler only from the event recorded here
+   (`report-template.md` §3.1 block C). Nothing else recovers them, and the un-merge script's byte
+   proof is built from them.
 8. Write to a temp file in the same directory and `os.replace()` it into place, so an interrupted
    run cannot leave a truncated settings file.
 
@@ -730,10 +734,12 @@ whose `command` ends with that suffix and replace that object in place. Never ap
 
 > **Cross-file note — `templates/settings-hooks.json.tmpl` still writes the unbraced
 > `$CLAUDE_PROJECT_DIR`.** Change it to `${CLAUDE_PROJECT_DIR}` for the PowerShell reason in the
-> bullet list above. The change is safe by construction: the idempotency key and the un-merge
-> script both key on the **suffix** `/.claude/hooks/<name>.sh`, which is identical in both
-> spellings, so a rerun over a setup built by the current template still matches its own hook and
-> replaces it in place rather than appending a second copy.
+> bullet list above. The change is safe by construction: the idempotency key matches on the
+> **suffix** `/.claude/hooks/<name>.sh`, and the un-merge script normalises both spellings of the
+> project-root variable to the same `<repo>/.claude/hooks/<name>.sh` before comparing the **whole**
+> path — a basename is never an identity there (`report-template.md` §3.1 block C) — so a rerun over
+> a setup built by the current template still matches its own hook and replaces that one command
+> object in place rather than appending a second copy.
 
 **Do not merge the fragment's `_agentify` key into `settings.json`** (template step 6). It is inert
 metadata describing the fragment, not settings, and this is the one `_agentify` block that is never
