@@ -20,6 +20,13 @@ What this script will and will not do (PRD 13, contract "Non-negotiables"):
   * SCRUBBED FIRST.  Every string passes through `lib.scrub.scrub()` BEFORE
     it enters any accumulator.  There is no code path on which an unscrubbed
     example can reach stdout.
+  * THE CONSENT WINDOW IS THE TURN'S.  Under `--days N` a record is analyzed
+    only when ITS OWN timestamp is inside the window, and an undated record is
+    not analyzed at all.  A directory name or a file mtime is a pre-filter that
+    saves I/O and decides nothing.  Stated in full above `_iso_cutoff()`, and
+    it is one rule because the two halves have been broken in opposite
+    directions -- 80-day-old text admitted by a fresh file, a thread resumed an
+    hour ago dropped by an old directory.
   * LOCAL ONLY.  No network, no telemetry, no writes, no subprocess.  Read-only
     on `~/.claude/projects`, `${CODEX_HOME:-~/.codex}/sessions` and
     `${CODEX_HOME:-~/.codex}/archived_sessions`.
@@ -120,6 +127,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 import datetime  # noqa: E402
+import hashlib  # noqa: E402
 import json  # noqa: E402
 
 from lib import emit as emit_lib  # noqa: E402
@@ -580,84 +588,67 @@ def normalize_git_url(url):
     return value.strip("/").lower()
 
 
+def diagnostic_git_url(url):
+    """
+    A git remote in the form it may be PRINTED in, which is not the form it is
+    read in.
+
+    A remote routinely carries credentials -- `https://user:token@host/org/repo`
+    is what a CI checkout or a PAT-authenticated clone leaves in `.git/config`
+    -- and `--debug` writes to stderr, which is outside the JSON object every
+    other string in this script is scrubbed on the way into.  Printing the raw
+    URL put a password on a terminal and into whatever captured it.
+
+    `normalize_git_url()` already drops the scheme and the userinfo, which is
+    exactly the credential-bearing part, and what it leaves is the form the
+    repository match was actually made on -- so the diagnostic says more about
+    the match than the raw URL did, not less.  The `@` sweep behind it is belt
+    and braces for a URL shape the normalizer does not recognise and therefore
+    returns unchanged.
+    """
+    value = normalize_git_url(url)
+    if not value:
+        return "-"
+    if "@" in value:
+        value = value.rsplit("@", 1)[-1]
+    return value or "-"
+
+
 # --- walking the date tree -------------------------------------------------
-
-#: Extra days kept when `--days` prunes a whole date directory.
-#:
-#: A rollout is filed under the date the session STARTED and keeps being
-#: appended to while the session is resumed, so its directory can be older than
-#: its last write.  Pruning is the cheap coarse pass; `select_sessions()` still
-#: applies `--days` to every surviving file's mtime, which is the authoritative
-#: test.  The slack buys back the resume case for a week.
-CODEX_DIR_PRUNE_SLACK_DAYS = 7
-
-
-def _date_dir_upper_bound(parts):
-    """
-    Latest calendar date a `YYYY[/MM[/DD]]` directory can hold, or None when
-    the path segments are not a date at all (an unknown layout is never pruned).
-    """
-    if not parts or len(parts) > 3:
-        return None
-    numbers = []
-    for index, part in enumerate(parts):
-        if not part.isdigit():
-            return None
-        width = 4 if index == 0 else 2
-        if len(part) != width:
-            return None
-        numbers.append(int(part))
-    year = numbers[0]
-    if year < 1970 or year > 9999:
-        return None
-    try:
-        if len(numbers) == 1:
-            return datetime.date(year, 12, 31)
-        month = numbers[1]
-        if len(numbers) == 2:
-            if month == 12:
-                return datetime.date(year, 12, 31)
-            return datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)
-        return datetime.date(year, month, numbers[2])
-    except ValueError:
-        return None
 
 
 def list_codex_session_files(roots, days=None, warnings=None):
     """
-    `[(path, mtime, size)]` for every Codex rollout, newest first, with whole
-    date directories pruned by `--days` BEFORE anything is opened.
+    `[(path, mtime, size)]` for every Codex rollout, newest first, pre-filtered
+    by `--days` on each file's LAST WRITE time and on nothing else.
 
-    Pruning at the directory level is what makes `--days` cheap on this target:
-    Claude Code has to stat every file in one project directory, while Codex's
-    `sessions/YYYY/MM/DD` layout lets a 30-day window skip years of history
-    without a single `stat`.  The archived tree is flat on at least one real
-    install, so a directory that does not parse as a date is never pruned.
+    THE DIRECTORY NAME IS NOT A FILTER.  `sessions/YYYY/MM/DD` records the date
+    the session STARTED, and a rollout keeps being appended to for as long as
+    the thread is resumed, so an 80-day-old directory routinely holds a thread
+    that was worked on an hour ago.  This function used to prune whole date
+    directories with a few days of slack, which is cheaper and is wrong in
+    exactly that case: the slack papered over a resume inside the first week and
+    silently dropped every longer-lived thread, consent window or not.
+
+    A last-write time is the one cheap fact that can EXCLUDE a file soundly -- a
+    file whose last write predates the cutoff cannot hold a record written after
+    it -- and it is the same test `select_sessions()` applies on the Claude Code
+    side.  Applying it here rather than only there is worth doing because
+    `match_codex_sessions()` opens the head of every row this returns.
+
+    The pre-filter only narrows I/O; it decides nothing.  See the consent rule
+    above `_iso_cutoff()`: `read_codex_session()` still tests every turn's own
+    timestamp, which is what the window actually means.
     """
     rows = []
-    pruned = 0
-    prune_before = None
+    skipped_old = 0
+    cutoff_epoch = None
     if days and days > 0:
-        prune_before = (
-            _utc_now().date()
-            - datetime.timedelta(days=int(days) + CODEX_DIR_PRUNE_SLACK_DAYS)
-        )
+        cutoff_epoch = (_utc_now() - datetime.timedelta(days=int(days))).timestamp()
 
     for root in roots or []:
         try:
-            walker = os.walk(root)
-            for dirpath, dirnames, filenames in walker:
-                if prune_before is not None:
-                    rel = os.path.relpath(dirpath, root)
-                    parts = [] if rel == "." else rel.split(os.sep)
-                    kept = []
-                    for name in dirnames:
-                        bound = _date_dir_upper_bound(parts + [name])
-                        if bound is not None and bound < prune_before:
-                            pruned += 1
-                            continue
-                        kept.append(name)
-                    dirnames[:] = kept
+            for dirpath, _dirnames, filenames in os.walk(root):
                 for name in filenames:
                     if not name.endswith(".jsonl"):
                         continue
@@ -666,22 +657,21 @@ def list_codex_session_files(roots, days=None, warnings=None):
                         stat = os.stat(full)
                     except OSError:
                         continue
+                    if cutoff_epoch is not None and stat.st_mtime < cutoff_epoch:
+                        skipped_old += 1
+                        continue
                     rows.append((full, stat.st_mtime, stat.st_size))
         except OSError:
             continue
 
-    if pruned and warnings is not None:
+    if skipped_old and warnings is not None:
         emit_lib.warn(
             warnings,
-            "--days %d: %d Codex date director%s pruned before any file was "
-            "opened (a %d-day margin is kept for sessions started earlier and "
-            "resumed inside the window)"
-            % (
-                int(days),
-                pruned,
-                "y" if pruned == 1 else "ies",
-                CODEX_DIR_PRUNE_SLACK_DAYS,
-            ),
+            "--days %d: %d Codex rollout(s) whose last write predates the window "
+            "were not opened; a thread filed under an older date but resumed "
+            "inside the window IS read, because the date directory records when "
+            "the session started, not when it was last worked on"
+            % (int(days), skipped_old),
         )
 
     rows.sort(key=lambda row: (-row[1], row[0]))
@@ -977,7 +967,38 @@ def _utc_now():
     return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
 
+# THE CONSENT RULE.  Stated once, here, because two defects broke it in
+# opposite directions and each of the obvious repairs re-broke the other.
+#
+#   1. THE TURN'S OWN TIMESTAMP DECIDES.  Under bounded consent ("last N days")
+#      a record is analyzed only when its own timestamp is inside the window.
+#      A record carrying NO timestamp cannot be shown to be inside it, so it is
+#      not analyzed at all -- silence is the only answer that is not a guess
+#      about something the user set a boundary on.  Under unbounded consent
+#      ("yes") there is no window and every record is in scope.
+#
+#   2. A DIRECTORY NAME OR A FILE MTIME IS ONLY A PRE-FILTER.  It exists to
+#      avoid I/O, never to decide.  It may WIDEN the candidate set -- a rollout
+#      filed under the date its session started and appended to for months is
+#      read in full, and rule 1 then drops the turns that are actually old --
+#      and it may never ADMIT an out-of-window turn.  It may narrow the set only
+#      where narrowing is provable: a file whose LAST WRITE predates the cutoff
+#      cannot hold a record written after it.  A creation-date directory proves
+#      nothing of the kind and is never used to exclude anything.
+#
+# Enforcement sites, all of them: `select_sessions()` and
+# `list_codex_session_files()` implement rule 2; `read_claude_session()`,
+# `read_codex_session()` and the `last-prompt` fallback in `main()` implement
+# rule 1.
+
+
 def _iso_cutoff(days):
+    """
+    The window boundary as an ISO prefix, or None for unbounded consent.
+
+    None is the whole of "consent: yes": every caller reads `if cutoff_iso` and
+    a falsy cutoff means no window exists to test a turn against.
+    """
     if not days or days <= 0:
         return None
     moment = _utc_now() - datetime.timedelta(days=int(days))
@@ -1029,9 +1050,12 @@ def select_sessions(rows, days, max_sessions, max_bytes, warnings):
     """
     Apply --days, --max-sessions and --max-bytes, newest first.
 
-    --days is enforced twice: here on file mtime (a file whose last write
-    predates the cutoff cannot hold a record after it, so skipping it is both
-    correct and the single biggest speedup available) and again per record.
+    --days here is rule 2 of the consent rule above: a pre-filter on file mtime,
+    sound because a file whose last write predates the cutoff cannot hold a
+    record written after it, and the single biggest speedup available.  It
+    decides nothing -- the readers still test every record's own timestamp,
+    which is rule 1, and a file that survives this test can still contribute
+    zero turns.
     """
     selected = []
     skipped_old = 0
@@ -2008,6 +2032,13 @@ def read_claude_session(path, cutoff_iso, signals, stats):
     Stream one Claude Code session file.  Binary line iteration plus substring
     rejects: the 95% of bytes that are tool output never get decoded, let
     alone parsed.
+
+    Returns `(used, last_prompts)` where `last_prompts` is
+    `[(text, session_id, timestamp)]` -- the fallback source, WITH the
+    timestamp each record carried, or "" when it carried none.  The timestamp
+    is retained rather than dropped because `main()` has to apply rule 1 of the
+    consent rule to these records too: they are collected before the window is
+    known to be relevant, so the window is applied where they are consumed.
     """
     session_id = os.path.basename(path)[:-6] or os.path.basename(path)
     used = False
@@ -2041,7 +2072,14 @@ def read_claude_session(path, cutoff_iso, signals, stats):
             if kind == "last-prompt":
                 prompt = record.get("lastPrompt")
                 if isinstance(prompt, str) and prompt.strip():
-                    last_prompts.append((prompt, record.get("sessionId") or session_id))
+                    # Keep the timestamp.  The record is not filtered here --
+                    # whether the fallback is used at all is only known once
+                    # every file has been read -- so the window is enforced at
+                    # the point of use, and it cannot be enforced there on a
+                    # timestamp that was thrown away here.
+                    last_prompts.append(
+                        (prompt, record.get("sessionId") or session_id, timestamp)
+                    )
                 continue
 
             if kind != "user":
@@ -2280,13 +2318,28 @@ def unwrap_codex(text):
 
 def _turn_key(text):
     """
-    Identity of one user turn, for de-duplication.
+    Identity of one user turn's TEXT, for recognising the SAME turn arriving
+    twice -- in two record shapes, or re-serialized by a fork.
 
-    Whitespace-insensitive and case-insensitive over a bounded prefix: the same
-    turn arrives in two record shapes whose only differences are formatting,
-    and a fork re-serializes it a third time.
+    Whitespace- and case-insensitive over the COMPLETE text, hashed so a 2 MB
+    turn costs 40 bytes in the accumulator and no raw prose is retained.
+
+    It was a 400-character PREFIX, and a prefix is not an identity.  Two
+    different long requests that open the same way -- "refactor the pricing
+    module ... then rename X" and "refactor the pricing module ... then delete
+    Y" -- reduced to one key, and one of the two was erased.
+
+    A key ALONE de-duplicates nothing.  Only `(key, ordinal)` does, where the
+    ordinal is the occurrence number within its record stream: three identical
+    requests typed on three different days are three pieces of evidence, and
+    collapsing them is how `npm test` fell out of `commands_requested` entirely
+    on a repo whose developer asked for it every morning.  See
+    `read_codex_session()`.
     """
-    return _WS_RE.sub(" ", (text or "")).strip().lower()[:400]
+    normalized = _WS_RE.sub(" ", (text or "")).strip().lower()
+    if not normalized:
+        return ""
+    return hashlib.sha1(normalized.encode("utf-8", "replace")).hexdigest()
 
 
 def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=None):
@@ -2305,17 +2358,39 @@ def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=Non
     `session_meta.history_mode: "paginated"` and emit ZERO `event_msg` user
     records -- Codex is migrating the format, and a miner that prefers
     `event_msg` reads nothing at all on a new session.  So `response_item` is
-    primary, `event_msg` fills gaps, and the two are merged on `_turn_key()`
-    so the 99% overlap is not counted twice.
+    primary, `event_msg` fills gaps, and the two are merged so the 99% overlap
+    is not counted twice.
+
+    DE-DUPLICATION IS ONE-FOR-ONE, NEVER ACROSS OCCURRENCES.  Both overlaps
+    this function removes are duplicate REPRESENTATIONS of a turn, so both are
+    removed by matching representations pairwise and nothing else:
+
+      cross-stream  the Nth time a text appears in `event_msg` is the copy of
+                    the Nth time it appears in `response_item`.  A fourth
+                    `event_msg` record with only three `response_item` records
+                    behind it is a turn `response_item` did not record, and it
+                    is kept.
+      fork prefix   a fork COPIES its parent's leading turns, in order, so the
+                    copies are the child's turns 0..k-1 matching the parent's
+                    turns 0..k-1.  Matching is positional and stops at the
+                    first divergence: past the fork point the two threads are
+                    separate work, and a request the child repeats there counts
+                    again even though the parent said it too.
+
+    Identity is `(_turn_key(text), ordinal)` -- complete text plus occurrence
+    number within its stream -- never text alone.  Three identical requests at
+    three timestamps are three turns; that repetition IS the evidence this
+    whole report exists to count.
 
     NEVER read: `role: "developer"` (766 records, 100% harness), `compacted`
     (its `replacement_history` re-serializes earlier turns and would
     double-count them), `turn_context` (config echo), or any `agent_message`.
 
-    `inherited` is the set of turn keys already seen in the thread this rollout
-    was FORKED FROM; those turns are copies and are not counted again.  `own`
-    collects this rollout's keys (plus what it inherited) so its own forks can
-    do the same.  See `codex_read_order()` for why the caller reads ancestors
+    `inherited` is the ORDERED list of turn identities in the thread this
+    rollout was FORKED FROM; `own` is the list this rollout appends its own
+    identities to, in read order, so its own forks can be matched against it.
+    Order is the whole point -- a set would lose the position a fork prefix is
+    recognised by.  See `codex_read_order()` for why the caller reads ancestors
     first.
     """
     session_id = os.path.basename(path)
@@ -2374,24 +2449,60 @@ def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=Non
                 if isinstance(value, str) and value.strip():
                     secondary.append((value, timestamp))
 
+    # Merge the two streams, dropping only the `event_msg` records that pair
+    # one-for-one with a `response_item` record of the same text.  `order` is
+    # the read position, kept as the sort tiebreak so two records written in
+    # the same second stay in the order the file recorded them.
     merged = []
-    keys = set()
-    for text, timestamp in primary + secondary:
+    primary_seen = {}
+    order = 0
+    for text, timestamp in primary:
         key = _turn_key(text)
-        if not key or key in keys:
+        if not key:
             continue
-        keys.add(key)
-        merged.append((text, timestamp, key))
-    merged.sort(key=lambda row: (row[1] or "", row[2]))
+        ordinal = primary_seen.get(key, 0)
+        primary_seen[key] = ordinal + 1
+        merged.append((timestamp or "", order, text, key, ordinal))
+        order += 1
+
+    secondary_seen = {}
+    for text, timestamp in secondary:
+        key = _turn_key(text)
+        if not key:
+            continue
+        ordinal = secondary_seen.get(key, 0)
+        secondary_seen[key] = ordinal + 1
+        if ordinal < primary_seen.get(key, 0):
+            # This occurrence is already present as a `response_item` record:
+            # one turn, its second representation.
+            continue
+        merged.append((timestamp or "", order, text, key, ordinal))
+        order += 1
+
+    merged.sort(key=lambda row: (row[0], row[1]))
 
     used = False
-    for text, timestamp, key in merged:
+    # `diverged` turns the fork comparison off for good at the first turn that
+    # does not match the parent's, so only a genuine COPIED PREFIX is
+    # suppressed.  With no parent there is nothing to compare against.
+    diverged = not inherited
+    for index, row in enumerate(merged):
+        timestamp, _order, text, key, ordinal = row
+        identity = (key, ordinal)
+        # Recorded before any filter: a fork inherits its parent's whole turn
+        # sequence, including turns this run's consent window excluded.
         if own is not None:
-            own.add(key)
+            own.append(identity)
+        fork_copy = False
+        if not diverged:
+            if index < len(inherited) and inherited[index] == identity:
+                fork_copy = True
+            else:
+                diverged = True
         if cutoff_iso and timestamp and timestamp[:19] < cutoff_iso:
             stats["out_of_window"] += 1
             continue
-        if inherited and key in inherited:
+        if fork_copy:
             stats["fork_duplicates"] += 1
             continue
         stats["user_turns_total"] += 1
@@ -3102,9 +3213,11 @@ def main(argv=None):
         if rows:
             match_mode = "cwd+git" if repo_url else "cwd"
         if args.debug:
+            # The remote goes through diagnostic_git_url(): stderr is not
+            # covered by the scrubber and a remote can carry a password.
             emit_lib.eprint(
                 "codex: %d rollout(s) on disk, %d for this repo (origin=%s)"
-                % (found, len(rows), repo_url or "-")
+                % (found, len(rows), diagnostic_git_url(repo_url))
             )
     else:
         transcript_root, match_mode = locate_claude_root(repo, home, warnings)
@@ -3152,13 +3265,15 @@ def main(argv=None):
     if args.target == "codex":
         # Ancestors before their forks, so a copied turn can be recognised as
         # one; see codex_read_order().
+        # ORDERED lists, not sets: a fork is recognised by its copied PREFIX,
+        # which is a statement about position as well as content.
         keys_by_thread = {}
         for path in codex_read_order(selected, codex_metas):
             meta = codex_metas.get(path) or {}
             thread_id = str(meta.get("id") or meta.get("session_id") or path)
             parent = meta.get("forked_from_id")
             inherited = keys_by_thread.get(str(parent)) if parent else None
-            own = set(inherited) if inherited else set()
+            own = []
             used = read_codex_session(path, cutoff_iso, signals, stats, inherited, own)
             keys_by_thread[thread_id] = own
             size = sizes.get(path, 0)
@@ -3177,8 +3292,31 @@ def main(argv=None):
                     "read %s (%d bytes, used=%s)" % (os.path.basename(path), size, used)
                 )
 
-    # `last-prompt` records are a cheap fallback source: truncated, no
-    # timestamp, but present even when the user records are unusable.
+    # `last-prompt` records are a cheap fallback source: truncated, sometimes
+    # undated, but present even when the user records are unusable.
+    #
+    # RULE 1 APPLIES TO THEM TOO.  A `last-prompt` record lives in whatever file
+    # the session last wrote, so under `--days 7` a file touched minutes ago
+    # routinely carries a prompt from months back; feeding that to the
+    # accumulator hands the user content from outside the window they set.  The
+    # record's own timestamp decides, and a record with no timestamp cannot be
+    # shown to be inside the window, so under bounded consent it is not read.
+    if cutoff_iso and fallback_prompts:
+        in_window = [
+            row for row in fallback_prompts if row[2] and row[2][:19] >= cutoff_iso
+        ]
+        outside = len(fallback_prompts) - len(in_window)
+        if outside:
+            stats["out_of_window"] += outside
+            emit_lib.warn(
+                warnings,
+                "--days %d: %d 'last-prompt' fallback record(s) were dated outside "
+                "the window or carried no timestamp and were not analyzed (the "
+                "record's own timestamp decides, not the file's)"
+                % (int(args.days), outside),
+            )
+        fallback_prompts = in_window
+
     if signals.turns_analyzed == 0 and fallback_prompts:
         emit_lib.warn(
             warnings,
@@ -3186,13 +3324,13 @@ def main(argv=None):
             "records -- shapes are reliable, counts are not"
             % len(fallback_prompts),
         )
-        for prompt, session_id in fallback_prompts:
+        for prompt, session_id, timestamp in fallback_prompts:
             stats["user_turns_total"] += 1
             clean, slash = unwrap(prompt)
             signals.note_slash(slash)
             if clean is None:
                 continue
-            signals.add_turn(clean, session_id, "")
+            signals.add_turn(clean, session_id, timestamp)
 
     if stats["parse_errors"]:
         emit_lib.warn(
@@ -3850,6 +3988,326 @@ def selftest():
             code == 0 and parsed.get("history_bucket") == "none" and bool(parsed.get("warnings")),
             "exit=%s bucket=%s" % (code, parsed.get("history_bucket")),
         )
+
+        # -- the consent window is decided by the TURN'S OWN timestamp --------
+        #
+        # Four fixtures for one rule, because two real defects pulled in
+        # opposite directions.  A `last-prompt` record 80 days old arrived in a
+        # file written minutes ago and was analyzed under `--days 7`; a rollout
+        # filed under an 80-day-old date directory and resumed an hour ago was
+        # dropped under the same flag.  Both are the same mistake -- letting a
+        # FILE or a DIRECTORY decide what a TURN's timestamp decides -- and the
+        # checks below pin each direction so neither can be fixed back into the
+        # other.
+
+        def _stamp(moment):
+            return moment.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        stale_moment = _utc_now() - datetime.timedelta(days=80)
+        recent_moment = _utc_now() - datetime.timedelta(hours=1)
+
+        def run(argv):
+            """
+            One miner run with BOTH streams captured.  stderr matters here:
+            `--debug` writes to it, and it is outside the JSON object that
+            everything else in this script is scrubbed on the way into.
+            """
+            out_buf = io.StringIO()
+            err_buf = io.StringIO()
+            saved_out, saved_err = sys.stdout, sys.stderr
+            try:
+                sys.stdout, sys.stderr = out_buf, err_buf
+                exit_code = main(argv)
+            finally:
+                sys.stdout, sys.stderr = saved_out, saved_err
+            out_text = out_buf.getvalue()
+            try:
+                parsed_json = json.loads(out_text)
+            except ValueError:
+                parsed_json = {}
+            return exit_code, out_text, err_buf.getvalue(), parsed_json
+
+        def last_prompt(text_, session, stamp=None):
+            record = {"type": "last-prompt", "lastPrompt": text_, "sessionId": session}
+            if stamp:
+                record["timestamp"] = stamp
+            return json.dumps(record)
+
+        # A project whose user records are unusable, so the `last-prompt`
+        # fallback is the only source -- two records dated 80 days ago and one
+        # carrying no timestamp at all, in files written just now.
+        fb_repo = os.path.join(sandbox, "fallback-repo")
+        os.makedirs(fb_repo)
+        fb_config = os.path.join(sandbox, "fallback-config")
+        fb_project = os.path.join(fb_config, "projects", encode_project_dir(fb_repo))
+        os.makedirs(fb_project)
+        with open(os.path.join(fb_project, "stale-1.jsonl"), "w") as handle:
+            handle.write(
+                "\n".join(
+                    [
+                        last_prompt(
+                            "run npm test and fix the failing suite", "f1", _stamp(stale_moment)
+                        ),
+                        last_prompt(
+                            "run npm test again for the api package", "f1", _stamp(stale_moment)
+                        ),
+                    ]
+                )
+                + "\n"
+            )
+        with open(os.path.join(fb_project, "stale-2.jsonl"), "w") as handle:
+            handle.write(last_prompt("run npm test one more time before release", "f2") + "\n")
+
+        os.environ["CLAUDE_CONFIG_DIR"] = fb_config
+        os.environ["CODEX_HOME"] = os.path.join(sandbox, "no-such-codex")
+
+        _code, fb_raw, _fb_err, fb = run(
+            ["--repo", fb_repo, "--target", "claude-code", "--days", "7"]
+        )
+        fb_sessions = fb.get("sessions", {})
+        add(
+            "a last-prompt fallback record older than --days is not analyzed",
+            fb_sessions.get("user_turns_analyzed") == 0
+            and fb_sessions.get("user_turns_total") == 0,
+            "analyzed=%s total=%s"
+            % (fb_sessions.get("user_turns_analyzed"), fb_sessions.get("user_turns_total")),
+        )
+        add(
+            "no evidence is derived from out-of-window last-prompt records",
+            not (fb.get("commands_requested") or [])
+            and not (fb.get("request_shapes") or [])
+            and not (fb.get("slash_commands") or [])
+            and not (fb.get("corrections") or [])
+            and "npm test" not in fb_raw,
+            "commands=%s shapes=%s"
+            % (fb.get("commands_requested"), fb.get("request_shapes")),
+        )
+
+        # An undated fallback record on its own: it cannot be SHOWN to be inside
+        # the window, so under bounded consent it is not read.
+        und_config = os.path.join(sandbox, "fallback-config-undated")
+        und_project = os.path.join(und_config, "projects", encode_project_dir(fb_repo))
+        os.makedirs(und_project)
+        with open(os.path.join(und_project, "undated.jsonl"), "w") as handle:
+            handle.write(last_prompt("run npm test one more time before release", "u1") + "\n")
+        os.environ["CLAUDE_CONFIG_DIR"] = und_config
+        _code, und_raw, _und_err, und = run(
+            ["--repo", fb_repo, "--target", "claude-code", "--days", "7"]
+        )
+        add(
+            "an undated last-prompt fallback is skipped under bounded consent",
+            und.get("sessions", {}).get("user_turns_analyzed") == 0
+            and "npm test" not in und_raw,
+            "analyzed=%s" % (und.get("sessions", {}).get("user_turns_analyzed"),),
+        )
+
+        # Consent "yes" (no window) must still get the fallback -- the repair is
+        # a window check, not a deletion of the fallback.
+        os.environ["CLAUDE_CONFIG_DIR"] = fb_config
+        _code, _unb_raw, _unb_err, unb = run(["--repo", fb_repo, "--target", "claude-code"])
+        add(
+            "unbounded consent still reads the last-prompt fallback",
+            unb.get("sessions", {}).get("user_turns_analyzed") == 3
+            and any(
+                row.get("command") == "npm test" and row.get("count") == 3
+                for row in (unb.get("commands_requested") or [])
+            ),
+            "analyzed=%s commands=%s"
+            % (
+                unb.get("sessions", {}).get("user_turns_analyzed"),
+                unb.get("commands_requested"),
+            ),
+        )
+
+        # -- codex de-duplication: same turn once, repeated work N times ------
+        #
+        # De-duplication exists for two real overlaps -- one turn recorded in
+        # both record streams, and a fork that re-copies its parent's prefix --
+        # and for nothing else.  Keyed on a 400-character text prefix it also
+        # erased three identical requests typed on three different days, which
+        # is the exact evidence `request_shapes` and `commands_requested` exist
+        # to carry, and merged two different long prompts that happened to open
+        # the same way.
+        f10_repo = os.path.join(sandbox, "dedup-repo")
+        os.makedirs(f10_repo)
+        f10_home = os.path.join(sandbox, "dedup-codex")
+        f10_day = os.path.join(f10_home, "sessions", "2026", "09", "01")
+        os.makedirs(f10_day)
+        os.makedirs(os.path.join(f10_home, "archived_sessions"))
+
+        repeated_turn = "run npm test and fix the failing suite"
+        long_prefix = (
+            "please refactor the checkout pricing module so that every currency "
+            "conversion happens in one helper instead of being duplicated across "
+            "the cart the invoice and the receipt renderer and make sure the "
+            "rounding behaviour stays identical to what the finance team signed "
+            "off on last quarter and keep the existing public function names so "
+            "the other packages do not have to change and add a short comment "
+            "explaining the rounding rule "
+        )
+        long_a = (
+            long_prefix + "then rename src/alpha/service.ts to keep the handler naming consistent."
+        )
+        long_b = (
+            long_prefix + "then delete the dead feature guard inside src/alpha/service.ts before we ship."
+        )
+
+        dup_session = [meta(f10_repo, id="t-dup")]
+        for index in range(3):
+            dup_session.append(uturn(repeated_turn, "2026-09-01T10:0%d:00.000Z" % index))
+        dup_session.append(uturn(long_a, "2026-09-01T10:10:00.000Z"))
+        dup_session.append(uturn(long_b, "2026-09-01T10:11:00.000Z"))
+        # ONE turn, both record shapes.  This is what de-duplication is for.
+        dup_session.append(uturn("deploy the worker to staging please", "2026-09-01T10:20:00.000Z"))
+        dup_session.append(
+            event_uturn("deploy the worker to staging please", "2026-09-01T10:20:01.000Z")
+        )
+
+        parent_turns = [
+            "rotate the staging database credentials for the worker",
+            "add a health check endpoint to the billing service",
+            "write the migration for the invoice totals column",
+        ]
+        f10_parent = [meta(f10_repo, id="t-parent")]
+        for index, line in enumerate(parent_turns):
+            f10_parent.append(uturn(line, "2026-09-01T11:0%d:00.000Z" % index))
+        f10_child = [meta(f10_repo, id="t-child", forked_from_id="t-parent")]
+        for index, line in enumerate(parent_turns):
+            f10_child.append(uturn(line, "2026-09-01T12:0%d:00.000Z" % index))
+        f10_child.append(
+            uturn("back out the invoice totals migration for now", "2026-09-01T12:30:00.000Z")
+        )
+
+        for name_, lines_ in (
+            ("rollout-2026-09-01T10-00-00-dup.jsonl", dup_session),
+            ("rollout-2026-09-01T11-00-00-parent.jsonl", f10_parent),
+            ("rollout-2026-09-01T12-00-00-child.jsonl", f10_child),
+        ):
+            with open(os.path.join(f10_day, name_), "w") as handle:
+                handle.write("\n".join(lines_) + "\n")
+
+        os.environ["CODEX_HOME"] = f10_home
+        os.environ["CLAUDE_CONFIG_DIR"] = os.path.join(sandbox, "no-such-config")
+        _code, _f10_raw, _f10_err, f10 = run(["--repo", f10_repo, "--target", "codex"])
+        f10_sessions = f10.get("sessions", {})
+        add(
+            "three identical codex turns at three timestamps stay three turns",
+            any(
+                row.get("command") == "npm test" and row.get("count") == 3
+                for row in (f10.get("commands_requested") or [])
+            ),
+            "commands=%s analyzed=%s"
+            % (f10.get("commands_requested"), f10_sessions.get("user_turns_analyzed")),
+        )
+        add(
+            "two different long prompts sharing a 400-character prefix stay two turns",
+            any(
+                row.get("path") == "src/alpha/service.ts" and row.get("mentions") == 2
+                for row in (f10.get("file_hotspots") or [])
+            ),
+            "hotspots=%s" % (f10.get("file_hotspots"),),
+        )
+        add(
+            "the same codex turn in two record streams is still counted once",
+            f10_sessions.get("user_turns_total") == 10
+            and f10_sessions.get("user_turns_analyzed") == 10,
+            "total=%s analyzed=%s"
+            % (
+                f10_sessions.get("user_turns_total"),
+                f10_sessions.get("user_turns_analyzed"),
+            ),
+        )
+        add(
+            "a forked thread's copied prefix is counted once and its new turn kept",
+            any("forked thread" in w for w in (f10.get("warnings") or []))
+            and f10_sessions.get("count") == 3,
+            "sessions=%s warnings=%s" % (f10_sessions.get("count"), f10.get("warnings")),
+        )
+
+        # -- a thread filed under an old date and resumed inside the window ---
+        f11_repo = os.path.join(sandbox, "resumed-repo")
+        os.makedirs(f11_repo)
+        f11_home = os.path.join(sandbox, "resumed-codex")
+        old_date = (_utc_now() - datetime.timedelta(days=80)).date()
+        f11_day = os.path.join(
+            f11_home,
+            "sessions",
+            "%04d" % old_date.year,
+            "%02d" % old_date.month,
+            "%02d" % old_date.day,
+        )
+        os.makedirs(f11_day)
+        os.makedirs(os.path.join(f11_home, "archived_sessions"))
+        with open(os.path.join(f11_day, "rollout-resumed.jsonl"), "w") as handle:
+            handle.write(
+                "\n".join(
+                    [
+                        meta(f11_repo, id="t-resumed"),
+                        uturn("clean up the legacy billing importer", _stamp(stale_moment)),
+                        uturn("run npm test and fix the failing suite", _stamp(recent_moment)),
+                    ]
+                )
+                + "\n"
+            )
+        os.environ["CODEX_HOME"] = f11_home
+        _code, f11_raw, _f11_err, f11 = run(
+            ["--repo", f11_repo, "--target", "codex", "--days", "7"]
+        )
+        add(
+            "a codex thread filed under an old date but resumed inside the window is read",
+            f11.get("sessions", {}).get("user_turns_analyzed") == 1
+            and f11.get("sessions", {}).get("files") == 1,
+            "analyzed=%s files=%s warnings=%s"
+            % (
+                f11.get("sessions", {}).get("user_turns_analyzed"),
+                f11.get("sessions", {}).get("files"),
+                f11.get("warnings"),
+            ),
+        )
+        add(
+            "an out-of-window turn in a freshly written file is still not analyzed",
+            "legacy billing importer" not in f11_raw
+            and f11.get("sessions", {}).get("user_turns_analyzed") == 1,
+            "analyzed=%s" % (f11.get("sessions", {}).get("user_turns_analyzed"),),
+        )
+
+        # -- --debug diagnostics never carry credentials ----------------------
+        f12_repo = os.path.join(sandbox, "remote-repo")
+        os.makedirs(os.path.join(f12_repo, ".git"))
+        with open(os.path.join(f12_repo, ".git", "config"), "w") as handle:
+            handle.write(
+                "[core]\n\trepositoryformatversion = 0\n"
+                '[remote "origin"]\n\turl = https://svcuser:s3cr3t@example.invalid/repo.git\n'
+            )
+        f12_home = os.path.join(sandbox, "remote-codex")
+        f12_day = os.path.join(f12_home, "sessions", "2026", "09", "01")
+        os.makedirs(f12_day)
+        os.makedirs(os.path.join(f12_home, "archived_sessions"))
+        with open(os.path.join(f12_day, "rollout-remote.jsonl"), "w") as handle:
+            handle.write(
+                "\n".join(
+                    [
+                        meta(f12_repo, id="t-remote"),
+                        uturn("check the deploy script once more", "2026-09-01T10:00:00.000Z"),
+                    ]
+                )
+                + "\n"
+            )
+        os.environ["CODEX_HOME"] = f12_home
+        _code, f12_out, f12_err, _f12 = run(
+            ["--repo", f12_repo, "--target", "codex", "--debug"]
+        )
+        add(
+            "--debug never prints a credential-bearing git remote",
+            "s3cr3t" not in f12_out
+            and "s3cr3t" not in f12_err
+            and "svcuser" not in f12_out
+            and "svcuser" not in f12_err,
+            # Never echo the value itself, not even a synthetic one.
+            "password_in_stdout=%s password_in_stderr=%s user_in_stderr=%s"
+            % ("s3cr3t" in f12_out, "s3cr3t" in f12_err, "svcuser" in f12_err),
+        )
+
     finally:
         if saved_env is None:
             os.environ.pop("CLAUDE_CONFIG_DIR", None)
