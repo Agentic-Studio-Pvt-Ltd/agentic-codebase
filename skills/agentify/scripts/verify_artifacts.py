@@ -522,6 +522,29 @@ DEFAULT_HOOK_TIMEOUT = 5.0
 PASS = "pass"
 FAIL = "fail"
 WARN = "warn"
+#: A check that could not be performed on THIS interpreter -- not a pass, not a
+#: fail, and never quietly folded into either.  Today it has exactly one
+#: source: TOML syntax with no `tomllib` (Python 3.9/3.10).  See `parse_toml`.
+UNVERIFIED = "unverified"
+
+#: `tomllib` is 3.11+; these scripts run on 3.9+.  Held in a module global
+#: rather than looked up at each call so the selftest can switch it off and
+#: exercise the branch a 3.9 user gets -- there is no other way to reach it on
+#: an interpreter that has the module.  There is NO fallback parser: a TOML
+#: reader is not something to hand-roll, `pip install tomli` would break the
+#: stdlib-only promise, and raising the floor to 3.11 would strand users the
+#: PRD covers.  So the third outcome is `unverified`, said out loud.
+try:  # pragma: no cover - version-dependent
+    import tomllib as _tomllib
+
+    _TOMLLIB = _tomllib  # type: Any
+except ImportError:  # pragma: no cover - Python 3.9 / 3.10
+    _TOMLLIB = None  # type: Any
+
+
+def _toml_parser() -> Any:
+    """The stdlib TOML parser, or None on Python 3.9/3.10."""
+    return _TOMLLIB
 
 REQUIRED_META = [
     "agentify-id",
@@ -772,6 +795,35 @@ TARGET_PROFILES = {
         #: itself).  Nothing from the parent environment reaches a hook through
         #: this: the values are fixture paths, always.
         "hook_env_dirs": (("CLAUDE_PROJECT_DIR", ""),),
+        #: The event names this target accepts, or None for "not a closed list".
+        #: Claude Code's roster is 33 as of 2.1.260 and grows between releases
+        #: (adapters/claude-code.md 4.3), so an event outside the handful the
+        #: adapter enumerates is not evidence of a defect and is never failed
+        #: here.  Codex's twelve ARE the whole list, and that is why only Codex
+        #: carries one.
+        "hook_events": None,
+        #: Events whose `matcher` is a TOOL NAME.  Everywhere else the matcher
+        #: means something else entirely -- a session start source, a compaction
+        #: trigger -- or is ignored, and a tool-name rule applied there would
+        #: fail a correct hook.
+        "hook_tool_events": frozenset(["PreToolUse", "PostToolUse"]),
+        #: Claude Code's adapter says in as many words to emit the plain-list
+        #: form (`Edit|Write`) and "never a character class or an anchor", so
+        #: anchoring is NOT required here -- the opposite of Codex.
+        "hook_matcher_anchored": False,
+        #: ...and to emit `"matcher": ""` for a tool-less event rather than
+        #: omit the key, which keeps its merge logic uniform.  Also the
+        #: opposite of Codex.  One of `"empty"` / `"omit"`.
+        "hook_empty_matcher": "empty",
+        #: The name a tool-scoped matcher must contain to fire at all, per
+        #: intent, as (intent, the accepted canonical spellings).
+        "hook_canonical_tools": (("shell", ("Bash",)), ("file edit", ("Edit", "Write"))),
+        #: The tool name a smoke fixture uses to stand in for a shell call on
+        #: this target, and the older spelling the same verdict must hold for.
+        "hook_fixture_tools": ("Bash", ""),
+        #: A tool no generated hook is ever scoped to, for the fixture that
+        #: proves the hook gets out of the way on a shape it does not know.
+        "hook_unrelated_tool": "TodoWrite",
     },
     "codex": {
         "label": "Codex",
@@ -804,8 +856,103 @@ TARGET_PROFILES = {
         #: agentify's and not Codex's, and asserting it would tell the hook a
         #: lie about where it is running.
         "hook_env_dirs": (("CODEX_HOME", ".codex-home"),),
+        #: All 12, VERIFIED as loadable, and the whole list.  Spelling is exact
+        #: CamelCase and a wrong name fails SILENTLY: a `hooks.json` whose only
+        #: event was `NotAnEvent` loaded with zero hooks, zero warnings and
+        #: zero errors -- no diagnostic anywhere (adapters/codex.md 4.3).  That
+        #: is why an unknown event is a fail here: this check is the only place
+        #: the user will ever hear about it.
+        "hook_events": frozenset([
+            "PreToolUse", "PermissionRequest", "PostToolUse", "PreCompact", "PostCompact",
+            "SessionStart", "SessionEnd", "UserPromptSubmit", "SubagentStart", "SubagentStop",
+            "Stop", "Interrupt",
+        ]),
+        "hook_tool_events": frozenset(["PreToolUse", "PermissionRequest", "PostToolUse"]),
+        #: Anchored, `^(...)$`, so `Bashful` or `prebash` cannot match as a
+        #: substring (adapters/codex.md 4.3 "Matchers").
+        "hook_matcher_anchored": True,
+        #: The schema types `matcher` as nullable and an omitted key was
+        #: VERIFIED to come back as `matcher: null`; the adapter says to omit it
+        #: rather than emit `""`.
+        "hook_empty_matcher": "omit",
+        #: **The canonical shell tool name is `Bash` and the canonical edit tool
+        #: is `apply_patch`** -- what Codex's hook documentation specifies and
+        #: what a current build dispatches under.  `exec` / `exec_command` /
+        #: `shell_command` / `local_shell` / `run` are how a TRANSCRIPT spells
+        #: the same step, which is not the same list; an earlier revision
+        #: conflated the two and agentify emitted shell matchers that excluded
+        #: the one name a current Codex sends, leaving every generated shell
+        #: guardrail inert.  A matcher missing the canonical name registers and
+        #: never fires, so it is a fail, not a warning.
+        "hook_canonical_tools": (("shell", ("Bash",)), ("file edit", ("apply_patch",))),
+        "hook_fixture_tools": ("Bash", "exec_command"),
+        "hook_unrelated_tool": "update_plan",
     },
 }
+
+#: The tool names that mean "a shell command ran" and "a file was edited",
+#: across both targets and both vocabularies.  Used only to read a matcher's
+#: INTENT -- what the hook is for -- so it is deliberately wide; which spelling
+#: a matcher must then carry comes from the target profile, never from here.
+_SHELL_TOOL_NAMES = frozenset([
+    "bash", "exec", "exec_command", "shell_command", "local_shell", "run", "shell",
+])
+_EDIT_TOOL_NAMES = frozenset([
+    "apply_patch", "applypatch", "edit", "write", "multiedit", "notebookedit", "str_replace",
+])
+
+#: A matcher alternative that is a plain tool name rather than a pattern.
+_PLAIN_TOOL_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
+
+#: One enclosing group around a matcher body: `^(a|b)$`, `^(?:a|b)$`.
+_MATCHER_GROUP = re.compile(r"^\((?:\?:)?(.*)\)$")
+
+
+def matcher_alternatives(matcher: Any) -> Tuple[List[str], bool, bool]:
+    """
+    `(tool names the matcher accepts, anchored at both ends, every alternative
+    is a plain name)`.
+
+    Reads the two forms either adapter emits -- `^(a|b|c)$` and the plain list
+    `a|b` -- plus per-alternative anchors (`^a$|^b$`).  `plain` is False when
+    any alternative is a real pattern (`.*`, a character class), and callers
+    then hold back the name checks rather than guess at a regex: a matcher
+    stricter than the harness's own would fail a correct file, which is the
+    defect class this whole area keeps producing.
+    """
+    text = str(matcher or "").strip()
+    if not text:
+        return ([], False, True)
+    anchored = text.startswith("^") and text.endswith("$")
+    body = text[1:-1] if anchored else text
+    group = _MATCHER_GROUP.match(body)
+    if group:
+        body = group.group(1)
+    names = []  # type: List[str]
+    plain = True
+    for part in body.split("|"):
+        candidate = part.strip()
+        if candidate.startswith("^"):
+            candidate = candidate[1:]
+        if candidate.endswith("$"):
+            candidate = candidate[:-1]
+        candidate = candidate.strip()
+        if _PLAIN_TOOL_NAME.match(candidate):
+            names.append(candidate)
+        else:
+            plain = False
+    return (names, anchored, plain)
+
+
+def matcher_intents(names: Sequence[str]) -> List[str]:
+    """Which of `shell` / `file edit` a matcher's tool names are aimed at."""
+    lowered = set(str(name).lower() for name in names)
+    intents = []  # type: List[str]
+    if lowered & _SHELL_TOOL_NAMES:
+        intents.append("shell")
+    if lowered & _EDIT_TOOL_NAMES:
+        intents.append("file edit")
+    return intents
 
 
 def normalize_target(value: Any) -> str:
@@ -1299,17 +1446,72 @@ _TOML_ASSIGN = re.compile(r"^([A-Za-z0-9_-]+)\s*=\s*(.*)$")
 _TOML_TABLE = re.compile(r"^\[")
 
 
+#: What `parse_toml` decided.  Three, not two: the third is the whole point.
+TOML_PARSED = "parsed"
+TOML_INVALID = "invalid"
+TOML_UNVERIFIED = "unverified"
+
+#: Said whenever syntax could not be checked, so the row names the interpreter
+#: and the version that would settle it rather than leaving the reader to guess.
+_NO_TOML_PARSER = (
+    "TOML syntax NOT verified: this interpreter is Python %d.%d and `tomllib` is 3.11+, "
+    "so no parser is available and agentify hand-rolls none. Re-run the static pass under "
+    "Python 3.11+ to verify it, or parse it yourself: "
+    "python3 -c \"import tomllib,sys;tomllib.load(open(sys.argv[1],'rb'))\" <file>"
+)
+
+
+def parse_toml(text: str) -> Tuple[str, Optional[Dict[str, Any]], str]:
+    """
+    Parse a TOML file for real, or say plainly that it was not parsed.
+
+    Returns `(outcome, data, detail)` where outcome is `TOML_PARSED` (with the
+    parsed mapping), `TOML_INVALID` (with the parser's own message), or
+    `TOML_UNVERIFIED` (no parser on this interpreter -- `data` is None and the
+    detail names the version that would settle it).
+
+    **A partial scan is never reported as a parse success.**  `read_toml_scalars`
+    below is a bounded hand reader that stops at the first `[table]` header and
+    understands only what a field check needs; it cannot see a duplicate key, an
+    unterminated table header or a bare unquoted value, and all four of those
+    shapes verified clean while `tomllib` rejected every one -- REPRODUCED
+    2026-09-15.  It stays, because a definite missing field is worth reporting
+    even when syntax is unverified; what it does not do any more is stand in for
+    a parser.
+    """
+    parser = _toml_parser()
+    if parser is None:
+        return (TOML_UNVERIFIED, None, _NO_TOML_PARSER % sys.version_info[:2])
+    try:
+        data = parser.loads(str(text or ""))
+    except Exception as exc:
+        return (TOML_INVALID, None, "%s: %s" % (type(exc).__name__, _short(str(exc), 160)))
+    if not isinstance(data, dict):  # pragma: no cover - tomllib always returns a dict
+        return (TOML_INVALID, None, "the file does not parse to a table")
+    return (TOML_PARSED, data, "")
+
+
+def toml_string(value: Any) -> Optional[str]:
+    """The value when it really is a TOML string, else None.  A typed read: the
+    hand reader turns `name = 3` and `description = ["a"]` into text and cannot
+    tell either from a string, which is exactly the class of defect a schema
+    check exists to catch."""
+    return value if isinstance(value, str) else None
+
+
 def read_toml_scalars(text: str, max_lines: int = 800) -> Tuple[Dict[str, str], Optional[str]]:
     """
     `({top-level key: value as text}, error)` for a small TOML file.
 
-    A bounded hand reader, not `tomllib`: that is 3.11+ and these scripts target
-    3.9, and discover.py already reads Codex's `config.toml` the same way rather
-    than take a dependency.  Only what the check needs is understood -- top-level
-    scalars and `\"\"\"`/`'''` blocks -- and reading STOPS at the first `[table]`
-    header, so a key nested under one is never mistaken for a top-level one.
-    Multi-line string bodies are skipped as data, so `name = ...` written INSIDE
-    `developer_instructions` cannot masquerade as the agent's name.
+    A bounded hand reader.  **It is not a parser and its result is never
+    reported as a parse** (`parse_toml` above is the parser): it is the
+    fallback that still names a missing required field on an interpreter with
+    no `tomllib`, where syntax comes back `unverified`.  Only what the check
+    needs is understood -- top-level scalars and `\"\"\"`/`'''` blocks -- and
+    reading STOPS at the first `[table]` header, so a key nested under one is
+    never mistaken for a top-level one.  Multi-line string bodies are skipped
+    as data, so `name = ...` written INSIDE `developer_instructions` cannot
+    masquerade as the agent's name.
     """
     values = {}  # type: Dict[str, str]
     lines = str(text or "").split("\n")
@@ -1583,19 +1785,107 @@ _NETWORK_SOFT = [
 _COMMENT_LINE = re.compile(r"^\s*(?:#|//|--|;)")
 
 #: A heredoc whose delimiter is QUOTED (`<<'EOF'`, `<<-"EOF"`) expands nothing:
-#: the body is data the shell hands to the reader verbatim.  Both hook
+#: the body is data as far as the PARENT SHELL is concerned.  Both hook
 #: templates carry the block message that way -- `BLOCK_REASON="$(cat
 #: <<'AGENTIFY_BLOCK_REASON' ... )"` -- and the message a package-manager hook
 #: exists to print is, of course, "Fix: run bun install".  Scanned as code that
 #: is a "package install" hit, which FAILED the hook, refused to smoke-test it,
 #: and told the model to rewrite or remove a correct artifact.  MEASURED on the
 #: canonical hook of both targets.
+#:
+#: **Quoting the delimiter says nothing about the RECEIVING command.**  `sh
+#: <<'EOF'` still runs every line of that body, and `python3 - <<'PY'` still
+#: executes it; the quotes only stop the parent shell substituting into it
+#: first.  Reading "quoted" as "inert" let a `curl` inside an `sh` heredoc
+#: through as a warn, with the hook still cleared to execute -- REPRODUCED
+#: 2026-09-15, and a local shell function named `curl` proves the body runs
+#: without any network request being made.  So the exemption is keyed on the
+#: CONSUMER, below, and an unknown consumer never gets it.
 _HEREDOC_QUOTED = re.compile(r"<<-?\s*(['\"])([A-Za-z_][A-Za-z0-9_]*)\1")
+
+#: Commands whose stdin is DATA and only data: each one's whole program comes
+#: from its argv, and none of them has a way to run what it reads.  `cat` and
+#: `tee` copy it; the line and character filters (`sort`, `head`, `wc`, `tr`,
+#: ...) transform it; `grep` searches it against a pattern that is an argument;
+#: the digests and encoders reduce it to bytes; `cmp` / `diff` compare it.
+#:
+#: Deliberately NOT here, and each for a reason: `sed` and `awk` take a program
+#: from stdin with `-f -` and can shell out (`sed e`, awk's `system()`);
+#: `xargs` builds a command line out of what it reads; `jq` takes a filter with
+#: `-f -`; every shell and every language runtime is an interpreter by
+#: definition.  Anything not on this list -- including a variable (`$RUNNER`)
+#: and any command this file does not recognise -- is treated as an
+#: interpreter.  Strict is the DEFAULT here; defaulting to lenient is how the
+#: original defect happened.
+_DATA_ONLY_CONSUMERS = frozenset([
+    "cat", "tee",
+    "sort", "uniq", "head", "tail", "wc", "nl", "rev", "cut", "tr", "fold",
+    "column", "expand", "unexpand", "paste", "comm",
+    "grep", "egrep", "fgrep",
+    "base64", "cksum", "md5sum", "sha1sum", "sha256sum", "sha512sum", "shasum",
+    "cmp", "diff", "od", "xxd", "hexdump",
+])
+
+#: Words that wrap another command without being one: the consumer is whatever
+#: follows.  `sudo` is here so `sudo sh <<'EOF'` still reads as `sh`.
+_CONSUMER_WRAPPERS = frozenset(["command", "builtin", "nohup", "time", "sudo", "doas", "stdbuf"])
+
+#: `VAR=value` in front of a command, which the shell strips before running it.
+_LEADING_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+#: Where one command ends and the next begins, for the purpose of finding the
+#: word a heredoc is attached to.  `$(`, backtick and `(` all open a new
+#: command context, which is what `"$(cat <<'EOF'` depends on.
+_COMMAND_BREAK = re.compile(r"\$\(|\|\||&&|[|;&`(){}<>\n]")
 
 #: A line that only prints.  `printf`/`echo` cannot execute their argument, so
 #: a match inside a SINGLE-quoted argument of one is text -- single quotes
 #: permit no substitution at all in POSIX sh.
 _PRINT_ONLY_LINE = re.compile(r"^\s*(?:printf|echo)\b")
+
+
+def heredoc_consumer(prefix: str) -> str:
+    """
+    The command a heredoc body is handed to, read out of the text before `<<`.
+
+    `""` when there is no recognisable command word -- an empty prefix, a
+    variable (`$RUNNER <<'EOF'`), a quoted path this reader will not guess at.
+    Callers treat `""` as an interpreter, because an unknown consumer is
+    exactly the case that must not be exempted.
+    """
+    segment = _COMMAND_BREAK.split(prefix or "")[-1]
+    for token in segment.split():
+        cleaned = token.strip().strip("\"'")
+        if not cleaned:
+            continue
+        if _LEADING_ASSIGNMENT.match(cleaned):  # `FOO=bar cat <<'EOF'`
+            continue
+        if cleaned.startswith("-"):  # a flag on a wrapper we already skipped
+            continue
+        if "$" in cleaned or "*" in cleaned:  # a variable or a glob: unknowable
+            return ""
+        name = os.path.basename(cleaned).lower()
+        if name in _CONSUMER_WRAPPERS:
+            continue
+        return name
+    return ""
+
+
+def heredoc_is_inert(raw: str, opener: Any) -> str:
+    """
+    Why this quoted heredoc's body is data, or `""` when it is code.
+
+    Two conditions, and both have to hold.  The consumer has to be one of the
+    genuinely inert commands in `_DATA_ONLY_CONSUMERS`, and nothing may carry
+    the body onward past that command -- `cat <<'EOF' | sh` hands the very same
+    text to a shell, so the pipe makes it live again.
+    """
+    if "|" in raw[opener.end():]:
+        return ""
+    consumer = heredoc_consumer(raw[: opener.start()])
+    if consumer and consumer in _DATA_ONLY_CONSUMERS:
+        return "text read by `%s`, which runs nothing it reads" % consumer
+    return ""
 
 
 def _inside_single_quotes(raw: str, match: Any) -> bool:
@@ -1677,11 +1967,14 @@ def scan_network_calls(text: str, max_lines: int = 4000) -> Tuple[List[Dict[str,
     if not text:
         return (hard, soft)
 
-    #: The delimiter of the quoted heredoc currently open, or "".  Set only by
-    #: a real code line: a heredoc whose delimiter is quoted expands nothing,
-    #: so its body is data.  `cat <<'EOF' | sh` DOES execute its body, so a pipe
-    #: on the opener keeps the body live and every hit inside it hard.
+    #: The delimiter of the quoted heredoc currently open, or "", and WHY its
+    #: body is data -- also "", when it is not.  Quoting the delimiter stops
+    #: the parent shell expanding the body; it does not stop `sh`, `python3` or
+    #: an unknown command executing what it is handed.  So the body is tracked
+    #: either way (the closing delimiter still has to be consumed) and only a
+    #: data-only consumer earns the downgrade (`heredoc_is_inert`).
     heredoc_delim = ""
+    heredoc_inert = ""
 
     for number, raw in enumerate((text or "").split("\n")[:max_lines], start=1):
         line = raw.strip()
@@ -1689,8 +1982,9 @@ def scan_network_calls(text: str, max_lines: int = 4000) -> Tuple[List[Dict[str,
         if heredoc_delim:
             if line == heredoc_delim:
                 heredoc_delim = ""
+                heredoc_inert = ""
                 continue
-            inert = "text inside a quoted heredoc"
+            inert = heredoc_inert
         if not line or _COMMENT_LINE.match(raw):
             continue
 
@@ -1701,8 +1995,9 @@ def scan_network_calls(text: str, max_lines: int = 4000) -> Tuple[List[Dict[str,
         # file inside a heredoc.
         if not heredoc_delim:
             opener = _HEREDOC_QUOTED.search(raw)
-            if opener and "|" not in raw:
+            if opener:
                 heredoc_delim = opener.group(2)
+                heredoc_inert = heredoc_is_inert(raw, opener)
     return (hard, soft)
 
 
@@ -1955,23 +2250,252 @@ def resolve_command_path(command: str, repo: str, target: Any = None) -> Tuple[O
     return (fallback if "$" not in fallback else None, note or "not found")
 
 
+#: A hook's own report that its path filter fell open.  `codex-hook.sh.tmpl`
+#: prints this and then runs the check UNFILTERED, so the check applies to
+#: every path instead of the guarded ones -- and the verdict that comes back
+#: can still be the right one by accident.  Stderr is therefore part of the
+#: pass condition on a file-scoped fixture, not a diagnostic to skim
+#: (adapters/codex.md 8).
+_FILTER_FELL_OPEN = re.compile(
+    r"no file path in tool_input|running the check UNFILTERED", re.IGNORECASE)
+
+#: `permissionDecision` read out of stdout that is not valid JSON -- a hook that
+#: prints a banner before its decision still blocks, and reading only parsed
+#: JSON would call that an allow.
+_PERMISSION_DECISION = re.compile(
+    r'"permissionDecision"\s*:\s*"([A-Za-z_]+)"')
+
+
+def hook_fixture_payload(event: str, tool_name: str, command: str, cwd: str = "") -> str:
+    """
+    One event fixture, shaped exactly as each harness feeds a hook on stdin
+    (`adapters/codex.md` 8, `references/verification.md` 5.2).
+
+    `tool_name` is the whole point: it is the only thing that tells a hook
+    which tool is about to run, and a hook that reacts to `exec_command` but
+    not to the canonical `Bash` is inert on a current build while looking
+    perfectly healthy from the outside.
+    """
+    return json.dumps({
+        "session_id": "agentify-verify",
+        "cwd": cwd,
+        "hook_event_name": event,
+        "tool_name": tool_name,
+        "tool_input": {"command": command},
+    })
+
+
+def hook_fixture_patch(event: str, path: str, cwd: str = "") -> str:
+    """
+    The file-scoped fixture: an `apply_patch` call carrying a real patch.
+
+    `apply_patch` is a FREEFORM tool -- its whole input is the patch text, on
+    `tool_input.command`, with no object of named path fields anywhere -- so a
+    hook that looks for `tool_input.file_path` finds nothing, announces that it
+    is running UNFILTERED, and applies its check to every path in the repo.
+    """
+    patch = "*** Begin Patch\n*** Update File: %s\n@@\n-a\n+b\n*** End Patch\n" % path
+    return hook_fixture_payload(event, "apply_patch", patch, cwd)
+
+
+def fixture_verdict(result: Dict[str, Any]) -> str:
+    """
+    What the hook decided about one fixture: `allow`, `deny`, `ask`, or a
+    word naming why there was no decision.
+
+    Both protocols, read together, because the verdict has to be comparable
+    across the two spellings of the same tool.  Codex always exits 0 and
+    blocks by PRINTING `hookSpecificOutput.permissionDecision`; Claude Code
+    blocks with exit 2.  A run that reads only the exit code cannot tell an
+    allow from a deny on Codex at all.
+    """
+    if result.get("error"):
+        return "error"
+    if result.get("timeout"):
+        return "timeout"
+    text = str(result.get("stdout") or "")
+    decision = ""
+    if text.strip():
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict):
+            block = parsed.get("hookSpecificOutput")
+            if isinstance(block, dict):
+                decision = str(block.get("permissionDecision") or "").strip().lower()
+        if not decision:
+            found = _PERMISSION_DECISION.search(text)
+            decision = found.group(1).lower() if found else ""
+    if decision in ("deny", "ask"):
+        return decision
+    if result.get("code") == 2:
+        return "deny"
+    if result.get("code"):
+        return "exit %s" % result.get("code")
+    return "allow"
+
+
+def fixture_filter_fell_open(result: Dict[str, Any]) -> bool:
+    """True when the hook's own stderr says its path filter found no path and
+    ran the check against everything.  A deny that comes with that line is not
+    a pass: it denies work outside the guarded scope too."""
+    return bool(_FILTER_FELL_OPEN.search(str(result.get("stderr") or "")))
+
+
+#: The commands the shell fixtures carry.  One ordinary and one the guardrail
+#: class agentify generates most often exists to catch; the assertion is that
+#: the two TOOL NAMES agree about each, not that either is denied -- this
+#: script cannot know what a given hook is for, and inventing an expectation
+#: would fail correct hooks.
+_FIXTURE_COMMANDS = ("git status", "npm install left-pad")
+
+#: Two paths for the file-scoped fixture, so the filter is exercised on
+#: something it plausibly guards and something it plausibly does not.
+_FIXTURE_PATHS = ("src/db/schema.ts", "docs/agentify-verify-probe.md")
+
+
+def run_fixture_set(
+    runner: Any,
+    event: str,
+    intents: Sequence[str],
+    canonical_shell: str,
+    legacy_shell: str,
+    unrelated_tool: str,
+) -> Tuple[List[str], List[str]]:
+    """
+    Feed a hook the fixture SET and report `(problems, what was observed)`.
+
+    `runner(payload)` runs one fixture and returns a `run_hook` result, so this
+    function executes nothing itself and the selftest can drive it with recorded
+    results instead of a process.
+
+    What it asserts, and deliberately nothing more:
+
+      * **the canonical fixture produces the same verdict as the legacy
+        spelling.**  A hook that denies `exec_command` and allows `Bash` is
+        inert on a current build, and that is the defect the whole check
+        exists for.  It is asserted as AGREEMENT rather than as a specific
+        verdict because this script cannot know what any given hook is for --
+        an expectation invented here would fail correct hooks, which is this
+        area's other recurring defect;
+      * **a file-scoped fixture leaves stderr clean.**  The `no file path in
+        tool_input ... running the check UNFILTERED` line means the payload's
+        paths were not extracted, so the filter fell open and the check ran
+        against everything -- a deny that comes with that line is the filter
+        failing, not the hook working;
+      * **an unrelated tool is ignored in silence** -- exit 0, nothing on
+        stdout, nothing on stderr.
+    """
+    problems = []  # type: List[str]
+    observed = []  # type: List[str]
+
+    if "shell" in intents and canonical_shell:
+        for command in _FIXTURE_COMMANDS:
+            canonical = runner(hook_fixture_payload(event, canonical_shell, command))
+            canonical_verdict = fixture_verdict(canonical)
+            observed.append("%s/`%s` -> %s" % (canonical_shell, command, canonical_verdict))
+            if canonical_verdict in ("error", "timeout"):
+                problems.append(
+                    "the canonical fixture (`tool_name: %s`, `%s`) produced no verdict (%s), so "
+                    "nothing proves the hook reacts to the name a current build sends"
+                    % (canonical_shell, command, canonical_verdict)
+                )
+                continue
+            if not legacy_shell:
+                continue
+            legacy = runner(hook_fixture_payload(event, legacy_shell, command))
+            legacy_verdict = fixture_verdict(legacy)
+            observed.append("%s/`%s` -> %s" % (legacy_shell, command, legacy_verdict))
+            if legacy_verdict != canonical_verdict:
+                problems.append(
+                    "`%s` and `%s` get DIFFERENT verdicts on the same command `%s` (%s vs %s). "
+                    "`%s` is the name a current build dispatches under, so a hook that reacts "
+                    "only to the older spelling registers and never fires"
+                    % (canonical_shell, legacy_shell, command, canonical_verdict,
+                       legacy_verdict, canonical_shell)
+                )
+
+    if "file edit" in intents:
+        for path in _FIXTURE_PATHS:
+            result = runner(hook_fixture_patch(event, path))
+            observed.append("apply_patch/%s -> %s" % (path, fixture_verdict(result)))
+            if fixture_filter_fell_open(result):
+                problems.append(
+                    "on an `apply_patch` fixture for %s the hook printed its `no file path in "
+                    "tool_input ... running the check UNFILTERED` line: the patch text is the "
+                    "whole of `tool_input.command` and the path filter did not read it, so the "
+                    "check ran against every path in the repo" % path
+                )
+                break
+
+    if unrelated_tool:
+        result = runner(hook_fixture_payload(event, unrelated_tool, ""))
+        noise = [
+            channel
+            for channel in ("stdout", "stderr")
+            if str(result.get(channel) or "").strip()
+        ]
+        verdict = fixture_verdict(result)
+        observed.append("%s -> %s" % (unrelated_tool, verdict))
+        if verdict != "allow" or noise:
+            problems.append(
+                "on an unrelated tool (`%s`) the hook did not get out of the way: %s%s. A hook "
+                "fires on every call its matcher selects and must exit 0 in silence on a shape "
+                "it does not recognise"
+                % (unrelated_tool, verdict, (" and wrote to %s" % _join_and(noise)) if noise else "")
+            )
+    return (problems, observed)
+
+
+def _session_kwargs() -> Dict[str, Any]:
+    """
+    The Popen keywords that put a child in a session of its OWN.
+
+    Every launch in this file that may be terminated on a timeout passes these,
+    because `_terminate`'s group kill is only safe against a group agentify
+    created.  POSIX only: Windows has no sessions to create and no `os.killpg`
+    to use, so the dict is empty there and termination stays per-process.
+    This file's execution paths are written for POSIX; nothing here claims
+    Windows support beyond not misbehaving on it.
+    """
+    if os.name == "posix":
+        return {"start_new_session": True}
+    return {}  # pragma: no cover - non-posix
+
+
 def run_hook(
-    command: str, repo: str, timeout: float, fixture_dir: str, target: Any = None
+    command: str,
+    repo: str,
+    timeout: float,
+    fixture_dir: str,
+    target: Any = None,
+    stdin: bytes = b"{}",
 ) -> Dict[str, Any]:
     """
-    Fail-open smoke test: feed the hook an empty JSON object and see whether it
-    gets out of the way.  Returns {"code": int|None, "timeout": bool,
-    "stderr": str, "error": str, "shell": bool}.
+    Feed the hook ONE fixture on stdin and report what it did.  Returns
+    {"code": int|None, "timeout": bool, "stdout": str, "stderr": str,
+    "error": str, "shell": bool}.
+
+    `stdin` defaults to the empty JSON object -- the fail-open probe -- and the
+    caller passes a real event fixture for every other run in the set
+    (`hook_fixture_payload`, `hook_fixture_patch`).  **stdout is returned, not
+    discarded:** Codex blocks by exiting 0 and PRINTING a
+    `permissionDecision`, so a run that reads only the exit code cannot tell an
+    allow from a deny on that target at all.
 
     The caller has already established that this hook is one THIS run generated
     inside the repo and that its static scan is clean -- see `_check_hook`.
     Here the job is only to contain it: allowlisted environment, cwd in the
-    scratch `fixture_dir` rather than the repo, `shell=False`, hard timeout.
+    scratch `fixture_dir` rather than the repo, `shell=False`, hard timeout,
+    and a session of the child's own so a timeout kills it and nothing else.
     """
     expanded = absolutize_command(command, repo, target)
     argv, used_shell = build_argv(expanded)
+    payload = stdin if isinstance(stdin, bytes) else str(stdin).encode("utf-8")
     if not argv:
-        return {"code": None, "timeout": False, "stderr": "", "error": "empty command", "shell": False}
+        return {"code": None, "timeout": False, "stdout": "", "stderr": "",
+                "error": "empty command", "shell": False}
 
     kwargs = {
         # NOT the repo: a hook that writes a relative path must land in the
@@ -1983,41 +2507,65 @@ def run_hook(
         "env": minimal_env(fixture_dir, target),
         "shell": False,
     }  # type: Dict[str, Any]
-    if os.name == "posix":
-        kwargs["start_new_session"] = True
+    session = _session_kwargs()
+    kwargs.update(session)
+    owns_group = bool(session)
 
     try:
         proc = subprocess.Popen(argv, **kwargs)
     except OSError as exc:
-        return {"code": None, "timeout": False, "stderr": "", "error": str(exc), "shell": used_shell}
+        return {"code": None, "timeout": False, "stdout": "", "stderr": "",
+                "error": str(exc), "shell": used_shell}
 
     try:
-        _out, err = proc.communicate(input=b"{}", timeout=timeout)
+        out, err = proc.communicate(input=payload, timeout=timeout)
         code = proc.returncode
         timed_out = False
     except subprocess.TimeoutExpired:
-        _terminate(proc)
+        _terminate(proc, own_group=owns_group)
         code = None
+        out = b""
         err = b""
         timed_out = True
     except Exception as exc:  # pragma: no cover - defensive
-        _terminate(proc)
-        return {"code": None, "timeout": False, "stderr": "", "error": str(exc), "shell": used_shell}
+        _terminate(proc, own_group=owns_group)
+        return {"code": None, "timeout": False, "stdout": "", "stderr": "",
+                "error": str(exc), "shell": used_shell}
 
     try:
         stderr_text = (err or b"").decode("utf-8", "replace")
+        stdout_text = (out or b"").decode("utf-8", "replace")
     except Exception:  # pragma: no cover - defensive
         stderr_text = ""
-    return {"code": code, "timeout": timed_out, "stderr": stderr_text, "error": "", "shell": used_shell}
+        stdout_text = ""
+    return {"code": code, "timeout": timed_out, "stdout": stdout_text,
+            "stderr": stderr_text, "error": "", "shell": used_shell}
 
 
-def _terminate(proc: Any) -> None:
-    try:
-        if os.name == "posix":
+def _terminate(proc: Any, own_group: bool = False) -> None:
+    """
+    Stop a timed-out child, and stop ONLY it unless agentify owns its group.
+
+    `own_group` is the caller's promise that this process was started with
+    `_session_kwargs()` and therefore LEADS a session of its own.  Without that
+    promise the child inherited the verifier's own process group -- the user's
+    shell, or the calling agent -- and `os.killpg(os.getpgid(pid), 9)` sends
+    SIGKILL to every one of them.  That is what this signature exists to make
+    impossible: no caller can request a group kill without having created the
+    group, and a caller that did not create one kills the single child.
+
+    On Windows there is no `os.killpg` and no session to create, so every
+    termination is the single-child one; `_session_kwargs()` returns `{}` there
+    and no caller can pass a truthful `own_group=True`.
+    """
+    killed = False
+    if own_group and os.name == "posix":
+        try:
             os.killpg(os.getpgid(proc.pid), 9)
-        else:  # pragma: no cover - non-posix
-            proc.kill()
-    except Exception:
+            killed = True
+        except Exception:
+            killed = False
+    if not killed:
         try:
             proc.kill()
         except Exception:  # pragma: no cover - defensive
@@ -3453,8 +4001,11 @@ class Verifier(object):
         self.checks = []  # type: List[Dict[str, str]]
         self.warnings = []  # type: List[str]
         #: Counted for every check, emitted or not, so `summary` stays true
-        #: even when the entry list is truncated.
-        self.counts = {"pass": 0, "fail": 0, "warn": 0}
+        #: even when the entry list is truncated.  `unverified` is its own
+        #: column on purpose: a check this interpreter could not perform is
+        #: neither a pass nor a fail, and folding it into either is the exact
+        #: misreport F13 was.
+        self.counts = {"pass": 0, "fail": 0, "warn": 0, "unverified": 0}
         self.dropped_checks = 0
         self.artifacts = []  # type: List[Dict[str, Any]]
         #: realpaths of the files THIS run's manifest claims, all inside the
@@ -3467,6 +4018,8 @@ class Verifier(object):
         #: no git does not pay for one subprocess per artifact.
         self._git_note = ""
         self._git_usable_cache = None  # type: Optional[Tuple[bool, str]]
+        #: Every hook command registered anywhere this run can see, read once.
+        self._registrations_cache = None  # type: Any
 
     # -- plumbing ---------------------------------------------------------
 
@@ -4194,36 +4747,110 @@ class Verifier(object):
         nothing beyond it: no read-only probe can prove a newly written agents
         file is loaded, which is why the report's manual checklist still asks
         the user to spawn the agent by name in a live session.
+
+        THREE outcomes, because a regex scan is not a parse.  With `tomllib`
+        (3.11+) the file is really parsed and the schema checked with types:
+        `name`, `description` and `developer_instructions` must each be a
+        non-empty STRING, `model` / `model_reasoning_effort` / `sandbox_mode`
+        are optional strings, there is no per-agent tool allowlist, and the
+        filename stem must equal `name`.  A parse error is a FAIL carrying the
+        parser's own message.  Without `tomllib` (3.9/3.10) the hand reader
+        still names a missing field -- that stays a FAIL -- but a file it finds
+        nothing wrong with comes back `unverified`, never `pass`: four invalid
+        agent files passed this check while `tomllib` rejected every one
+        (REPRODUCED 2026-09-15).
         """
         text = artifact.get("text") or ""
-        values, error = read_toml_scalars(text)
-        if error:
-            self.add("subagent_frontmatter", label, FAIL, "TOML does not parse: %s" % error)
+        stem = os.path.splitext(os.path.basename(artifact["path"]))[0]
+        outcome, data, note = parse_toml(text)
+        problems = []  # type: List[str]
+        values = {}  # type: Dict[str, str]
+
+        if outcome == TOML_INVALID:
+            self.add(
+                "subagent_frontmatter",
+                label,
+                FAIL,
+                "TOML does not parse (%s). Codex cannot load this agent at all: rewrite the "
+                "file or remove it" % note,
+            )
             return
 
-        problems = []  # type: List[str]
-        name = values.get("name", "")
-        description = values.get("description", "")
-        for key in ("name", "description", "developer_instructions"):
-            if not values.get(key, "").strip():
-                problems.append("no `%s`; Codex requires name, description and developer_instructions" % key)
+        if outcome == TOML_PARSED:
+            table = data or {}
+            for key in ("name", "description", "developer_instructions"):
+                typed = toml_string(table.get(key))
+                if key not in table:
+                    problems.append("no `%s`; Codex requires name, description and "
+                                    "developer_instructions" % key)
+                elif typed is None:
+                    problems.append("`%s` is a %s, not a string"
+                                    % (key, type(table[key]).__name__))
+                elif not typed.strip():
+                    problems.append("`%s` is empty" % key)
+                else:
+                    values[key] = typed
+            for key in ("model", "model_reasoning_effort", "sandbox_mode"):
+                if key not in table:
+                    continue
+                typed = toml_string(table.get(key))
+                if typed is None:
+                    problems.append("`%s` is a %s, not a string"
+                                    % (key, type(table[key]).__name__))
+                else:
+                    values[key] = typed
+            if "tools" in table:
+                values["tools"] = ""
+        else:
+            # No parser on this interpreter.  The hand reader still catches a
+            # missing required field; it can say nothing about syntax, and this
+            # branch does not pretend otherwise.
+            values, error = read_toml_scalars(text)
+            if error:
+                self.add(
+                    "subagent_frontmatter",
+                    label,
+                    FAIL,
+                    "unreadable even to a partial scan: %s. %s" % (error, note),
+                )
+                return
+            for key in ("name", "description", "developer_instructions"):
+                if not values.get(key, "").strip():
+                    problems.append("no `%s`; Codex requires name, description and "
+                                    "developer_instructions" % key)
+
+        name = str(values.get("name", ""))
+        description = str(values.get("description", ""))
         if description and len(description) >= 1024:
             problems.append("`description` is %d chars; the limit is 1024" % len(description))
-
-        stem = os.path.splitext(os.path.basename(artifact["path"]))[0]
         if name.strip() and stem and name.strip() != stem:
             problems.append("`name` is %r but the file is %s.toml; the stem must equal the name" % (name.strip(), stem))
 
         if problems:
-            self.add("subagent_frontmatter", label, FAIL, "; ".join(problems[:4]))
+            # A definite defect fails whether or not syntax was verified; the
+            # unverified half is appended so the row is not read as a complete
+            # verdict on the file.
+            detail = "; ".join(problems[:4])
+            if outcome == TOML_UNVERIFIED:
+                detail = "%s. %s" % (detail, note)
+            self.add("subagent_frontmatter", label, FAIL, detail)
+            return
+        if outcome == TOML_UNVERIFIED:
+            self.add(
+                "subagent_frontmatter",
+                label,
+                UNVERIFIED,
+                "the three required keys are present on a partial scan and name=%s matches the "
+                "filename stem, but %s" % (name.strip(), note),
+            )
             return
         self.add(
             "subagent_frontmatter",
             label,
             PASS,
-            "TOML: name=%s matches the filename stem; description %d chars; "
+            "TOML parses; name=%s matches the filename stem; description %d chars; "
             "developer_instructions %d chars"
-            % (name.strip(), len(description), len(values.get("developer_instructions", ""))),
+            % (name.strip(), len(description), len(str(values.get("developer_instructions", "")))),
         )
 
         # Codex has no per-agent tool allowlist and pins no model.  Both are
@@ -4671,6 +5298,7 @@ class Verifier(object):
             argv.extend(shlex.split(example))
         except ValueError:
             argv.extend(example.split())
+        session = _session_kwargs()
         try:
             proc = subprocess.Popen(
                 argv,
@@ -4679,6 +5307,7 @@ class Verifier(object):
                 cwd=self.repo,
                 env=minimal_env(self.repo, self.target),
                 shell=False,
+                **session
             )
             output, _ = proc.communicate(timeout=timeout)
             code = proc.returncode
@@ -4686,7 +5315,7 @@ class Verifier(object):
             self.add("rule_policy_execpolicy", label, WARN, "could not run `codex execpolicy check`: %s" % _short(str(exc), 100))
             return
         except subprocess.TimeoutExpired:
-            _terminate(proc)
+            _terminate(proc, own_group=bool(session))
             self.add("rule_policy_execpolicy", label, WARN, "`codex execpolicy check` did not finish in %.0fs" % timeout)
             return
 
@@ -4814,6 +5443,11 @@ class Verifier(object):
                 "confirm with the section 5 fixture test before removing it%s"
                 % (result["code"], (" -- stderr: %s" % stderr) if stderr else ""),
             )
+            # Run the fixture set anyway: a non-zero exit on an EMPTY object may
+            # be the sandbox rather than the hook, and the fixtures are exactly
+            # what section 5.1 says settles that.  Not after a timeout or an
+            # error, though -- a hook that hangs is not run four more times.
+            self._check_hook_fixtures(artifact, label, str(command), timeout, fixture)
             return
         self.add(
             "hook_smoke",
@@ -4821,6 +5455,71 @@ class Verifier(object):
             PASS,
             "exit 0 on empty JSON input within %.1fs (minimal env, cwd in a scratch fixture%s)"
             % (timeout, ", via /bin/sh -c" if result.get("shell") else ""),
+        )
+        self._check_hook_fixtures(artifact, label, str(command), timeout, fixture)
+
+    def _check_hook_fixtures(
+        self, artifact: Dict[str, Any], label: str, command: str, timeout: float, fixture: str
+    ) -> None:
+        """
+        The other half of executing a hook: not "does it run" but "does it
+        decide, and does it decide the same thing about the same call however
+        that call is spelled".
+
+        Runs only inside `hook_smoke`'s own gate -- opted in with
+        `--exec-hooks`, generated by this run, inside the repo, static scan
+        clean -- and only when a registration told us which EVENT the hook is
+        wired for, because that is what every fixture has to name.  Without one
+        there is nothing to build a fixture from and the row says so.
+        """
+        found = self._match_registration(artifact)
+        if not found:
+            self.add(
+                "hook_fixtures",
+                label,
+                WARN,
+                "not run: no registration names this hook, so there is no event to build a "
+                "fixture for (see hook_wired)",
+            )
+            return
+        event = str(found.get("event") or "")
+        if event not in self.profile["hook_tool_events"]:
+            self.add(
+                "hook_fixtures",
+                label,
+                PASS,
+                "no tool fixture applies: `%s` carries no tool call" % event,
+            )
+            return
+
+        names, _anchored, plain = matcher_alternatives(found.get("matcher") or "")
+        if not found.get("has_matcher") or not str(found.get("matcher") or "").strip():
+            intents = ["shell", "file edit"]  # no matcher means every tool
+        elif plain:
+            intents = matcher_intents(names)
+        else:
+            intents = ["shell", "file edit"]
+        canonical, legacy = self.profile["hook_fixture_tools"]
+
+        def runner(payload):
+            return run_hook(command, self.repo, timeout, fixture, self.target,
+                            stdin=payload.encode("utf-8"))
+
+        problems, observed = run_fixture_set(
+            runner, event, intents, canonical, legacy, self.profile["hook_unrelated_tool"])
+        if problems:
+            self.add("hook_fixtures", label, FAIL, "; ".join(problems[:2]))
+            return
+        self.add(
+            "hook_fixtures",
+            label,
+            PASS,
+            "the canonical fixture and the older spelling agree on every probe, an unrelated "
+            "tool is ignored in silence%s: %s"
+            % (
+                ", and a patch fixture leaves stderr clean" if "file edit" in intents else "",
+                _short(", ".join(observed), 150),
+            ),
         )
 
     def _check_hook_network(
@@ -5098,9 +5797,10 @@ class Verifier(object):
             "valid JSON; %d hook command(s) registered" % len(commands),
         )
 
-        for event, command in commands:
+        for registration in commands:
+            command = registration["command"]
             resolved, note = resolve_command_path(command, self.repo, self.target)
-            display = "%s: %s" % (event, _short(command, 90))
+            display = "%s: %s" % (registration["event"], _short(command, 90))
             if resolved and note == "resolved via PATH":
                 self.add("settings_hook_command", label, PASS, "%s -> %s (on PATH)" % (display, resolved))
             elif resolved and os.path.isfile(resolved):
@@ -5318,19 +6018,50 @@ class Verifier(object):
         """
         A Codex MCP config: complete `[mcp_servers.<name>]` table blocks.
 
-        Checked for the two things that are checkable without a TOML writer and
-        that decide whether the block works when the user pastes it:
-        at least one server table is declared, and every top-level key sits
-        UNDER a table header.  The second is the silent trap adapters/codex.md
-        4.6 measured -- a bare key/value pair binds to whatever table precedes
-        it, the file loads without complaint, and the setting has no effect.
+        Parsed for real with `tomllib` when the interpreter has it (3.11+), so
+        a duplicate key or an unterminated header is the FAIL it is rather than
+        a regex scan reported as a parse success -- one invalid draft passed
+        this check while `tomllib` rejected it (REPRODUCED 2026-09-15).  On
+        3.9/3.10 the syntax verdict is `unverified` and says so.
+
+        Two things the parser cannot answer are still checked by hand, because
+        both are about the file's LAYOUT and both parse cleanly: at least one
+        server table is declared, and every top-level key sits UNDER a table
+        header.  The second is the silent trap adapters/codex.md 4.6 measured
+        -- a bare key/value pair binds to whatever table precedes it once the
+        draft is pasted into `config.toml`, the file loads without complaint,
+        and the setting has no effect.
         """
+        outcome, data, note = parse_toml(text)
+        if outcome == TOML_INVALID:
+            self.add(
+                "mcp_json",
+                label,
+                FAIL,
+                "TOML does not parse (%s). Pasted into `config.toml` this breaks the file Codex "
+                "reads at startup; rewrite the draft or remove it" % note,
+            )
+            self._check_mcp_secrets(label, None, text)
+            return
+
         servers = re.findall(r"(?m)^[ \t]*\[[ \t]*mcp_servers\.([A-Za-z0-9_.:@/-]+)[ \t]*\]", text or "")
         names = []  # type: List[str]
         for name in servers:
             head = name.split(".")[0]
             if head not in names:
                 names.append(head)
+
+        typed = []  # type: List[str]
+        if outcome == TOML_PARSED:
+            table = (data or {}).get("mcp_servers")
+            if table is not None and not isinstance(table, dict):
+                typed.append("`mcp_servers` is a %s, not a table" % type(table).__name__)
+            elif isinstance(table, dict):
+                names = [key for key in table]
+                for key, entry in table.items():
+                    if not isinstance(entry, dict):
+                        typed.append("`mcp_servers.%s` is a %s, not a table"
+                                     % (_short(str(key), 30), type(entry).__name__))
 
         stray = []  # type: List[str]
         seen_table = False
@@ -5353,6 +6084,8 @@ class Verifier(object):
                 "declares no server. A `mcpServers` JSON object configures nothing on Codex "
                 "(adapters/codex.md 4.6)",
             )
+        elif typed:
+            self.add("mcp_json", label, FAIL, "; ".join(typed[:3]))
         elif stray:
             self.add(
                 "mcp_json",
@@ -5363,12 +6096,20 @@ class Verifier(object):
                 "pasted into config.toml -- the file loads and the setting has no effect"
                 % (len(names), ", ".join(names[:4]), ", ".join(stray[:3])),
             )
+        elif outcome == TOML_UNVERIFIED:
+            self.add(
+                "mcp_json",
+                label,
+                UNVERIFIED,
+                "%d `[mcp_servers.*]` table block(s) found by a partial scan (%s), but %s"
+                % (len(names), ", ".join(names[:4]), note),
+            )
         else:
             self.add(
                 "mcp_json",
                 label,
                 PASS,
-                "Codex TOML: %d complete `[mcp_servers.*]` table block(s): %s"
+                "Codex TOML parses; %d complete `[mcp_servers.*]` table block(s): %s"
                 % (len(names), ", ".join(names[:6])),
             )
         self._check_mcp_secrets(label, None, text)
@@ -5794,9 +6535,51 @@ class Verifier(object):
             if not isinstance(parsed, dict):
                 unreadable.append(label)
                 continue
-            for _event, command in _settings_hook_commands(parsed):
-                commands.append((label, command, scope))
+            for entry in _settings_hook_commands(parsed):
+                registration = dict(entry)
+                registration["source"] = label
+                registration["scope"] = scope
+                commands.append(registration)
         return (commands, searched, unreadable, absent)
+
+    def _registrations(self) -> Tuple[List[Dict[str, Any]], List[str], List[str], List[str]]:
+        """`_hook_registration_sources`, read once per run.
+
+        `hook_smoke` needs the event a hook is registered for -- it is what the
+        fixture has to name -- and it runs while artifacts are being checked,
+        before `_check_hook_wired`.  Both go through here so the registry files
+        are read once and both see the same answer."""
+        if self._registrations_cache is None:
+            self._registrations_cache = self._hook_registration_sources()
+        return self._registrations_cache
+
+    def _match_registration(self, hook: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        The registration that names this hook, or None.
+
+        Matching is deliberately permissive, exactly as `rule_wired` is: a
+        resolved path wins, then the repo-relative path in the command text,
+        then the file name.  A hook the user wired by hand still counts, and a
+        false positive here deletes a working hook.  The one narrowing is a
+        USER-scoped registry, where the file name alone proves nothing -- it is
+        shared by every repo on the machine -- so there a path must match.
+        """
+        needle = os.path.realpath(hook["abs"])
+        relative = self.rel(hook["abs"]).replace(os.sep, "/")
+        basename = os.path.basename(relative)
+        commands = self._registrations()[0]
+
+        for registration in commands:
+            command = registration["command"]
+            resolved, _note = resolve_command_path(command, self.repo, self.target)
+            if resolved and os.path.realpath(resolved) == needle:
+                return dict(registration, how="the command resolves to it")
+            expanded = expand_command(command, self.repo, self.target).replace("\\", "/")
+            if relative and relative in expanded:
+                return dict(registration, how="by repo-relative path")
+            if basename and basename in expanded and registration["scope"] != "user":
+                return dict(registration, how="by file name")
+        return None
 
     def _user_registry_paths(self) -> List[str]:
         """
@@ -5855,7 +6638,7 @@ class Verifier(object):
             return
 
         active_dir, stale_dirs, hooks_note = self._git_hook_dirs()
-        commands, searched, unreadable, absent = self._hook_registration_sources()
+        commands, searched, unreadable, absent = self._registrations()
 
         for hook in hooks:
             label = self.rel(hook["abs"])
@@ -5937,7 +6720,7 @@ class Verifier(object):
         self,
         hook: Dict[str, Any],
         label: str,
-        commands: Sequence[Tuple[str, str, str]],
+        commands: Sequence[Dict[str, Any]],
         searched: Sequence[str],
         unreadable: Sequence[str],
         absent: Sequence[str] = (),
@@ -5954,23 +6737,29 @@ class Verifier(object):
         resolves to this exact file, or the repo-relative path appears in it,
         which is what the portable `$(git rev-parse --show-toplevel)/...`
         spelling expands to.
-        """
-        needle = os.path.realpath(hook["abs"])
-        relative = self.rel(hook["abs"]).replace(os.sep, "/")
-        basename = os.path.basename(relative)
 
-        for source, command, scope in commands:
-            resolved, _note = resolve_command_path(command, self.repo, self.target)
-            if resolved and os.path.realpath(resolved) == needle:
-                self.add("hook_wired", label, PASS, "registered in %s; the command resolves to it" % source)
-                return
-            expanded = expand_command(command, self.repo, self.target).replace("\\", "/")
-            if relative and relative in expanded:
-                self.add("hook_wired", label, PASS, "registered in %s by repo-relative path" % source)
-                return
-            if basename and basename in expanded and scope != "user":
-                self.add("hook_wired", label, PASS, "registered in %s by file name" % source)
-                return
+        A match reports the EVENT and MATCHER it was found under, and hands
+        both to `hook_event` -- "a command points at the script" and "the
+        registration can select the script" are different claims, and reporting
+        only the first is what let a matcher that excludes `Bash` pass.
+        """
+        found = self._match_registration(hook)
+        if found:
+            self.add(
+                "hook_wired",
+                label,
+                PASS,
+                "registered in %s under `%s`%s; %s"
+                % (
+                    found["source"],
+                    found["event"],
+                    (" matcher %s" % _short(found["matcher"], 60)) if found["has_matcher"]
+                    else " with no matcher (all tools)",
+                    found["how"],
+                ),
+            )
+            self._check_hook_event(label, found)
+            return
 
         if unreadable and not commands:
             self.add(
@@ -6014,6 +6803,148 @@ class Verifier(object):
                 registry,
                 self.profile["hook_dir"],
                 self.profile["registry_doc"],
+            ),
+        )
+
+    def _check_hook_event(self, label: str, found: Dict[str, Any]) -> None:
+        """
+        Will that registration ever SELECT the hook?
+
+        `hook_wired` answers "does a command point at this script".  This
+        answers the question underneath it, and the two came apart in the worst
+        possible way: a Codex shell matcher written from the transcript
+        vocabulary -- `^(exec|exec_command|shell_command|run)$` -- omits `Bash`,
+        the name a current build dispatches under, so the hook is registered,
+        loads cleanly, and never fires.  Every row was green.
+
+        Four fail conditions, and each is silent in the user's session:
+
+          * an event outside the target's own list.  On Codex a `hooks.json`
+            whose only event was `NotAnEvent` loaded with zero hooks, zero
+            warnings and zero errors -- no diagnostic anywhere;
+          * a tool-scoped matcher not anchored at both ends, where the target
+            wants anchors: `Bash` as a search matches `Bashful` too;
+          * a shell matcher with no canonical shell name in it;
+          * an edit matcher with no canonical edit name in it.
+
+        **Every one of those rules comes out of the target profile, not out of
+        this method.** The two targets disagree on the first three: Claude
+        Code's roster is 33 and open, its adapter says to emit the plain-list
+        form and "never ... an anchor", and its canonical edit tools are
+        `Edit` / `Write`, not `apply_patch`.  Judging a Claude Code hook by
+        Codex's rules would fail every correct one of them, which is this
+        repo's recurring defect running in the other direction.
+        """
+        event = str(found.get("event") or "")
+        matcher = found.get("matcher") or ""
+        has_matcher = bool(found.get("has_matcher"))
+        profile = self.profile
+        problems = []  # type: List[str]
+        notes = []  # type: List[str]
+        described = "`%s`%s" % (
+            event,
+            (" matcher %s" % _short(matcher, 60)) if has_matcher else " (no matcher: all tools)",
+        )
+
+        known_events = profile["hook_events"]
+        if known_events is not None and event not in known_events:
+            problems.append(
+                "`%s` is not one of %s's %d hook events, and a wrong event name fails SILENTLY -- "
+                "the file loads with zero hooks, zero warnings and zero errors. Spelling is exact "
+                "CamelCase: %s"
+                % (
+                    event,
+                    profile["label"],
+                    len(known_events),
+                    ", ".join(sorted(known_events)),
+                )
+            )
+
+        tool_scoped = event in profile["hook_tool_events"]
+        if tool_scoped and has_matcher and str(matcher).strip():
+            names, anchored, plain = matcher_alternatives(matcher)
+            if profile["hook_matcher_anchored"] and not anchored:
+                problems.append(
+                    "the matcher %s is not anchored at both ends, so it matches as a SUBSTRING: "
+                    "`Bash` would fire on `Bashful` too. Emit `^(...)$` (%s)"
+                    % (_short(matcher, 60), profile["registry_doc"])
+                )
+            if names and plain:
+                intents = matcher_intents(names)
+                for intent, canonical in profile["hook_canonical_tools"]:
+                    if intent not in intents:
+                        continue
+                    if [name for name in names if name in canonical]:
+                        continue
+                    problems.append(
+                        "the matcher is aimed at %s tools (%s) but carries none of %s's canonical "
+                        "%s name(s) %s, so it registers and never fires on a current build. Add "
+                        "the canonical name, keeping the older spellings: %s"
+                        % (
+                            intent,
+                            ", ".join(names[:5]),
+                            profile["label"],
+                            intent,
+                            " / ".join("`%s`" % spelling for spelling in canonical),
+                            profile["registry_doc"],
+                        )
+                    )
+            elif names and not plain:
+                notes.append(
+                    "the matcher %s is a pattern this check does not read as a plain tool list, "
+                    "so the canonical-name rule was not applied to it -- confirm by hand that a "
+                    "%s call matches it"
+                    % (_short(matcher, 50), profile["hook_canonical_tools"][0][1][0])
+                )
+        elif not tool_scoped:
+            wants = profile["hook_empty_matcher"]
+            if wants == "omit" and has_matcher:
+                notes.append(
+                    "`%s` takes no tool matcher, and %s wants the key OMITTED rather than `\"\"` "
+                    "-- the schema types it as nullable and an omitted key comes back as "
+                    "`matcher: null` (%s)" % (event, profile["label"], profile["registry_doc"])
+                )
+            elif wants == "empty" and not has_matcher:
+                notes.append(
+                    "`%s` takes no tool matcher, and %s wants `\"matcher\": \"\"` emitted rather "
+                    "than the key omitted -- it keeps the merge logic uniform (%s)"
+                    % (event, profile["label"], profile["registry_doc"])
+                )
+
+        if problems:
+            self.add("hook_event", label, FAIL, "; ".join(problems[:3]))
+            return
+        if notes:
+            self.add("hook_event", label, WARN, "registered for %s; %s" % (described, "; ".join(notes[:2])))
+            return
+        if not tool_scoped:
+            self.add(
+                "hook_event",
+                label,
+                PASS,
+                "registered for %s: a %s event with no tool matcher, as it should be"
+                % (described, profile["label"]),
+            )
+            return
+        if not has_matcher or not str(matcher).strip():
+            self.add(
+                "hook_event",
+                label,
+                PASS,
+                "registered for %s: every tool, which fires on the canonical names too" % described,
+            )
+            return
+        names, _anchored, _plain = matcher_alternatives(matcher)
+        self.add(
+            "hook_event",
+            label,
+            PASS,
+            "registered for %s: %s%s"
+            % (
+                described,
+                "a %s event" % profile["label"] if known_events is None
+                else "one of %s's %d events" % (profile["label"], len(known_events)),
+                (", selecting %s" % ", ".join(names[:6])) if names else "",
             ),
         )
 
@@ -6456,16 +7387,18 @@ class Verifier(object):
         env.pop("GIT_DIR", None)
         env.pop("GIT_WORK_TREE", None)
         proc = None
+        session = _session_kwargs()
         try:
             proc = subprocess.Popen(
-                argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.repo, env=env
+                argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.repo, env=env,
+                **session
             )
             out, err = proc.communicate(timeout=timeout)
         except OSError as exc:
             self._git_note = "git could not be run (%s)" % exc
             return (False, empty, self._git_note)
         except subprocess.TimeoutExpired:
-            _terminate(proc)
+            _terminate(proc, own_group=bool(session))
             return (False, empty, "git timed out after %.0fs" % timeout)
         except Exception as exc:  # pragma: no cover - defensive
             return (False, empty, "git failed: %s: %s" % (type(exc).__name__, exc))
@@ -7180,7 +8113,7 @@ class Verifier(object):
         if artifact["type"] == "mcp":
             servers = parsed.get("mcpServers")
             return isinstance(servers, dict) and bool(servers)
-        registered = [command for _event, command in _settings_hook_commands(parsed)]
+        registered = [entry["command"] for entry in _settings_hook_commands(parsed)]
         if not registered or not hook_commands:
             return False
         for wanted in hook_commands:
@@ -7726,27 +8659,44 @@ class Verifier(object):
         }
 
 
-def _settings_hook_commands(settings: Dict[str, Any]) -> List[Tuple[str, str]]:
-    """Every `{"type": "command", "command": "..."}` in a settings object."""
-    found = []  # type: List[Tuple[str, str]]
+def _settings_hook_commands(settings: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Every `{"type": "command", "command": "..."}` in a settings object, WITH
+    the event and matcher group it sits in: `{"event", "matcher",
+    "has_matcher", "command"}`.
+
+    The event and the matcher used to be read and dropped on the floor here,
+    and that is the whole of F01: a registration that cannot select the hook
+    is indistinguishable, downstream, from one that can.  They are not in
+    `build-manifest.json` either -- the registry file is the only place they
+    exist -- so this is the one function that can preserve them.
+    """
+    found = []  # type: List[Dict[str, Any]]
     hooks = settings.get("hooks")
     if not isinstance(hooks, dict):
         return found
-    for event, matchers in hooks.items():
-        if not isinstance(matchers, list):
+    for event, groups in hooks.items():
+        if not isinstance(groups, list):
             continue
-        for matcher in matchers:
-            if not isinstance(matcher, dict):
+        for group in groups:
+            if not isinstance(group, dict):
                 continue
-            entries = matcher.get("hooks")
+            entries = group.get("hooks")
             if not isinstance(entries, list):
                 continue
+            has_matcher = "matcher" in group
+            matcher = group.get("matcher")
             for entry in entries:
                 if not isinstance(entry, dict):
                     continue
                 command = entry.get("command")
                 if isinstance(command, str) and command.strip():
-                    found.append((str(event), command.strip()))
+                    found.append({
+                        "event": str(event),
+                        "matcher": matcher if isinstance(matcher, str) else "",
+                        "has_matcher": has_matcher and matcher is not None,
+                        "command": command.strip(),
+                    })
     return found
 
 
@@ -7841,7 +8791,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             exit_code=1,
             extra={
                 "checks": [],
-                "summary": {"pass": 0, "fail": 0, "warn": 0},
+                "summary": {"pass": 0, "fail": 0, "warn": 0, "unverified": 0},
             },
         )
         return 1  # pragma: no cover - fail() exits
@@ -8326,7 +9276,7 @@ def selftest() -> int:
             "schema_version": SCHEMA_VERSION,
             "tool": TOOL,
             "checks": [],
-            "summary": {"pass": 0, "fail": 0, "warn": 0},
+            "summary": {"pass": 0, "fail": 0, "warn": 0, "unverified": 0},
             "warnings": [],
         },
         cap_chars=CAP_CHARS,
@@ -8480,7 +9430,7 @@ def selftest() -> int:
         # -- regressions from the 2026-09-04 dogfood run ---------------------
 
         def worst(result_obj, check_name):
-            order = {PASS: 0, WARN: 1, FAIL: 2}
+            order = {PASS: 0, UNVERIFIED: 1, WARN: 2, FAIL: 3}
             rows = [c for c in (result_obj.get("checks") or []) if c.get("name") == check_name]
             if not rows:
                 return ("<absent>", "")
@@ -9821,6 +10771,522 @@ def selftest() -> int:
             "%s: %s" % (status, detail[:130]),
         )
         os.remove(report_file)
+
+        # ===================================================================
+        # F01 -- THE HOOK EVENT CONTRACT.  `hook_wired` proves a registered
+        # command lands on the script.  Nothing proved the registration would
+        # ever SELECT it, because the event and the matcher were read out of
+        # the registry and thrown away.  A Codex shell matcher written against
+        # the transcript vocabulary only -- `^(exec|exec_command|shell_command|
+        # run)$` -- omits `Bash`, the name a current build dispatches under, so
+        # the hook registers, never fires, and the run reported
+        # `hook_wired: pass` (adapters/codex.md 4.3 Matchers, 2026-09-15).
+        # ===================================================================
+        _CANONICAL_SHELL_MATCHER = "^(Bash|exec_command|shell_command|local_shell|exec|run)$"
+
+        def codex_event_run(name, event, group, artifacts=None):
+            with open(codex_registry, "w") as handle:
+                json.dump({"description": "d", "hooks": {event: [group]}}, handle)
+            return verify(
+                name,
+                artifacts or [codex_hook_entry, codex_registry_entry],
+                top={"target": "codex"},
+            )
+
+        def codex_group(matcher, drop_matcher=False):
+            group = {"hooks": [{"type": "command",
+                                "command": _SELFTEST_CODEX_HOOK_COMMAND, "timeout": 5}]}
+            if not drop_matcher:
+                group["matcher"] = matcher
+            return group
+
+        code, result, _raw = codex_event_run(
+            "codex-event-canonical.json", "PreToolUse", codex_group(_CANONICAL_SHELL_MATCHER))
+        status, detail = worst(result, "hook_event")
+        add(
+            "the canonical Codex shell matcher passes hook_event, naming event and matcher",
+            status == PASS and "PreToolUse" in detail and "Bash" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+        status, detail = worst(result, "hook_wired")
+        add(
+            "hook_wired preserves the event it matched under",
+            status == PASS and "PreToolUse" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        code, result, _raw = codex_event_run(
+            "codex-event-nobash.json", "PreToolUse",
+            codex_group("^(exec|exec_command|shell_command|run)$"))
+        status, detail = worst(result, "hook_event")
+        add(
+            "a Codex shell matcher with no `Bash` alternative FAILS -- it never fires",
+            status == FAIL and "Bash" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        code, result, _raw = codex_event_run(
+            "codex-event-unanchored.json", "PreToolUse",
+            codex_group("Bash|exec_command|apply_patch"))
+        status, detail = worst(result, "hook_event")
+        add(
+            "an unanchored Codex tool matcher FAILS -- it substring-matches other tools",
+            status == FAIL and "anchor" in detail.lower(),
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        code, result, _raw = codex_event_run(
+            "codex-event-noapplypatch.json", "PreToolUse", codex_group("^(Edit|Write)$"))
+        status, detail = worst(result, "hook_event")
+        add(
+            "a Codex edit matcher with no `apply_patch` alternative FAILS",
+            status == FAIL and "apply_patch" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        code, result, _raw = codex_event_run(
+            "codex-event-badname.json", "NotAnEvent", codex_group(_CANONICAL_SHELL_MATCHER))
+        status, detail = worst(result, "hook_event")
+        add(
+            "an event outside the 12 Codex spellings FAILS -- it loads zero hooks, silently",
+            status == FAIL and "NotAnEvent" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        code, result, _raw = codex_event_run(
+            "codex-event-toolless.json", "UserPromptSubmit", codex_group("", drop_matcher=True))
+        status, detail = worst(result, "hook_event")
+        add(
+            "a prompt-time Codex event with the matcher key omitted passes",
+            status == PASS and "UserPromptSubmit" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        code, result, _raw = codex_event_run(
+            "codex-event-emptymatcher.json", "UserPromptSubmit", codex_group(""))
+        status, detail = worst(result, "hook_event")
+        add(
+            "an empty-string Codex matcher WARNS -- the key is omitted, never empty",
+            status == WARN,
+            "%s: %s" % (status, detail[:150]),
+        )
+        with open(codex_registry, "w") as handle:
+            json.dump(_SELFTEST_CODEX_HOOKS, handle)
+
+        # Claude Code's contract is the OPPOSITE on both points, and judging it
+        # by Codex's rules would fail every correct Claude Code hook: its
+        # adapter says to emit the plain-list form (`Edit|Write`), "never a
+        # character class or an anchor", and to emit `"matcher": ""` for a
+        # tool-less event rather than omit the key (adapters/claude-code.md
+        # 4.3).  Its event roster is 33 and open, so no closed list applies.
+        code, result, _raw = verify(
+            "cc-event-manifest.json", [hook_wired_entry, settings_entry])
+        status, detail = worst(result, "hook_event")
+        add(
+            "a Claude Code plain-list matcher is not judged by Codex's anchoring rule",
+            status == PASS and "Bash" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        # The fixture SET, not one empty object.  The canonical fixture is the
+        # pass condition: a hook that denies `exec_command` and allows `Bash`
+        # is inert on a current build (adapters/codex.md 8).
+        canonical = hook_fixture_payload("PreToolUse", "Bash", "npm install left-pad")
+        legacy = hook_fixture_payload("PreToolUse", "exec_command", "npm install left-pad")
+        patch_fixture = hook_fixture_patch("PreToolUse", "src/db/schema.ts")
+        add(
+            "the canonical fixture selects on `Bash` and the legacy one on `exec_command`",
+            json.loads(canonical)["tool_name"] == "Bash"
+            and json.loads(canonical)["tool_input"]["command"] == "npm install left-pad"
+            and json.loads(legacy)["tool_name"] == "exec_command"
+            and json.loads(legacy)["hook_event_name"] == "PreToolUse",
+            canonical[:120],
+        )
+        add(
+            "a file-scoped fixture is an apply_patch patch on tool_input.command",
+            json.loads(patch_fixture)["tool_name"] == "apply_patch"
+            and json.loads(patch_fixture)["tool_input"]["command"].startswith("*** Begin Patch")
+            and "*** Update File: src/db/schema.ts"
+            in json.loads(patch_fixture)["tool_input"]["command"],
+            patch_fixture[:120],
+        )
+        deny = {"code": 0, "timeout": False, "error": "", "shell": False, "stderr": "",
+                "stdout": json.dumps({"hookSpecificOutput": {
+                    "hookEventName": "PreToolUse", "permissionDecision": "deny",
+                    "permissionDecisionReason": "This repo uses bun."}})}
+        allow = {"code": 0, "timeout": False, "error": "", "shell": False,
+                 "stderr": "", "stdout": ""}
+        unfiltered = dict(deny, stderr="agentify hook x: no file path in tool_input for tool "
+                                       "apply_patch ...; running the check UNFILTERED.")
+        add(
+            "a deny on the legacy spelling and an allow on the canonical one is a mismatch",
+            fixture_verdict(deny) == "deny"
+            and fixture_verdict(allow) == "allow"
+            and fixture_verdict(deny) != fixture_verdict(allow),
+            "%s vs %s" % (fixture_verdict(deny), fixture_verdict(allow)),
+        )
+        add(
+            "the `UNFILTERED` stderr line fails a patch fixture even when the verdict is right",
+            fixture_filter_fell_open(unfiltered) and not fixture_filter_fell_open(deny),
+            "unfiltered=%s clean=%s"
+            % (fixture_filter_fell_open(unfiltered), fixture_filter_fell_open(deny)),
+        )
+
+        # ...and the set itself, driven by RECORDED results.  `run_fixture_set`
+        # takes its runner, so this exercises the whole verdict comparison with
+        # no process started and no hook executed -- the selftest never runs one.
+        def scripted(table, default=None):
+            def runner(payload):
+                data = json.loads(payload)
+                return table.get(data["tool_name"], default if default is not None else allow)
+            return runner
+
+        inert_on_canonical = scripted({"Bash": allow, "exec_command": deny})
+        consistent = scripted({"Bash": deny, "exec_command": deny}, allow)
+        problems, observed = run_fixture_set(
+            inert_on_canonical, "PreToolUse", ["shell"], "Bash", "exec_command", "update_plan")
+        add(
+            "a hook that denies `exec_command` and allows `Bash` FAILS the fixture set",
+            len(problems) >= 1 and "DIFFERENT verdicts" in problems[0]
+            and "Bash" in problems[0],
+            "%s | %s" % (problems[:1], observed[:2]),
+        )
+        problems, observed = run_fixture_set(
+            consistent, "PreToolUse", ["shell"], "Bash", "exec_command", "update_plan")
+        add(
+            "a hook that treats both spellings alike passes the fixture set",
+            problems == [] and len(observed) >= 4,
+            "%s | %s" % (problems, observed),
+        )
+        problems, _observed = run_fixture_set(
+            scripted({"apply_patch": unfiltered}), "PreToolUse", ["file edit"],
+            "Bash", "exec_command", "update_plan")
+        add(
+            "a patch fixture whose path filter fell open FAILS even on a deny",
+            len(problems) == 1 and "UNFILTERED" in problems[0],
+            str(problems),
+        )
+        problems, _observed = run_fixture_set(
+            scripted({"update_plan": dict(allow, stderr="jq: error")}),
+            "PreToolUse", [], "Bash", "exec_command", "update_plan")
+        add(
+            "a hook that writes to stderr on an unrelated tool FAILS the fixture set",
+            len(problems) == 1 and "unrelated tool" in problems[0] and "stderr" in problems[0],
+            str(problems),
+        )
+
+        # ===================================================================
+        # F08 -- a timeout must never signal a group agentify does not own.
+        # `_terminate` sent SIGKILL to `os.getpgid(proc.pid)`; two of the three
+        # launches created no session, so that group was the VERIFIER's own --
+        # the user's shell, or the calling agent.  Everything below is mocked:
+        # no real process is started and no real signal is ever sent.
+        # ===================================================================
+        _module = sys.modules[__name__]
+        killed_groups = []
+        saved_killpg = getattr(os, "killpg", None)
+        saved_getpgid = getattr(os, "getpgid", None)
+        saved_popen = subprocess.Popen
+        saved_resolve_codex = _module._resolve_codex
+        launch_kwargs = []
+        #: The group the VERIFIER itself sits in -- the user's shell, or the
+        #: calling agent.  A child inherits it unless the launch asked for a
+        #: session of its own, so this is the number that must never be signalled.
+        caller_pgid = 999
+        pgids = {}
+        next_pid = [500000]
+
+        class _FakePopen(object):
+            def __init__(self, argv, **kwargs):
+                launch_kwargs.append(dict(kwargs))
+                next_pid[0] += 1
+                self.pid = next_pid[0]
+                # A child leads its own group only when the launch made one.
+                pgids[self.pid] = self.pid if kwargs.get("start_new_session") else caller_pgid
+                self.returncode = None
+                self.killed = 0
+                self._timed_out = False
+
+            def communicate(self, input=None, timeout=None):
+                if self._timed_out:
+                    return (b"", b"")
+                self._timed_out = True
+                raise subprocess.TimeoutExpired("fake", timeout or 0)
+
+            def kill(self):
+                self.killed += 1
+
+        class _Options(object):
+            exec_hooks = True
+            no_exec = False
+            hook_timeout_s = 0.01
+
+        try:
+            os.killpg = lambda pgid, sig: killed_groups.append((pgid, sig))
+            os.getpgid = lambda pid: pgids.get(pid, caller_pgid)
+
+            probe = _FakePopen(["x"])
+            del launch_kwargs[:]
+            lone_error = ""
+            try:
+                _terminate(probe, own_group=False)
+            except TypeError as exc:
+                lone_error = "%s: %s" % (type(exc).__name__, exc)
+            add(
+                "a child with no group of its own is killed alone, never by group",
+                not lone_error and killed_groups == [] and probe.killed >= 1,
+                "%s killed_groups=%s kill()=%s" % (lone_error, killed_groups, probe.killed),
+            )
+
+            del killed_groups[:]
+            probe = _FakePopen(["x"], start_new_session=True)
+            owned_error = ""
+            try:
+                _terminate(probe, own_group=True)
+            except TypeError as exc:
+                owned_error = "%s: %s" % (type(exc).__name__, exc)
+            add(
+                "a child that leads its own group is killed by that group",
+                not owned_error and killed_groups == [(probe.pid, 9)],
+                "%s killed_groups=%s pid=%s" % (owned_error, killed_groups, probe.pid),
+            )
+
+            subprocess.Popen = _FakePopen
+            _module._resolve_codex = lambda target=None: "/nonexistent/codex"
+
+            del launch_kwargs[:]
+            del killed_groups[:]
+            run_hook(os.path.join(hooks_dir, "enforce-bun.sh"), fixture, 0.01, fixture,
+                     "claude-code")
+            hook_isolated = bool(launch_kwargs) and (
+                launch_kwargs[0].get("start_new_session") is True or os.name != "posix")
+
+            del launch_kwargs[:]
+            del killed_groups[:]
+            timeout_verifier = Verifier(fixture, {"target": "codex", "artifacts": []}, _Options())
+            timeout_verifier._check_policy_execpolicy(
+                ".codex/rules/agentify.rules",
+                {"abs": os.path.join(fixture, ".codex", "rules", "agentify.rules")},
+                [{"args": {"match": ["npm install left-pad"]}}],
+            )
+            execpolicy_isolated = bool(launch_kwargs) and (
+                launch_kwargs[0].get("start_new_session") is True or os.name != "posix")
+            execpolicy_group = list(killed_groups)
+
+            del launch_kwargs[:]
+            del killed_groups[:]
+            timeout_verifier._git_note = ""
+            timeout_verifier._git_read(["rev-parse", "--show-toplevel"], timeout=0.01)
+            git_isolated = bool(launch_kwargs) and (
+                launch_kwargs[0].get("start_new_session") is True or os.name != "posix")
+            git_group = list(killed_groups)
+
+            add(
+                "every launch that may be group-killed on timeout creates its own group",
+                hook_isolated and execpolicy_isolated and git_isolated,
+                "hook=%s execpolicy=%s git=%s"
+                % (hook_isolated, execpolicy_isolated, git_isolated),
+            )
+            add(
+                "a timed-out child is never killed by the group the VERIFIER sits in",
+                caller_pgid not in [group for group, _sig in execpolicy_group + git_group],
+                "execpolicy=%s git=%s caller_pgid=%s"
+                % (execpolicy_group, git_group, caller_pgid),
+            )
+        finally:
+            subprocess.Popen = saved_popen
+            _module._resolve_codex = saved_resolve_codex
+            if saved_killpg is None:
+                delattr(os, "killpg")
+            else:
+                os.killpg = saved_killpg
+            if saved_getpgid is None:
+                delattr(os, "getpgid")
+            else:
+                os.getpgid = saved_getpgid
+
+        # ===================================================================
+        # F09 -- a quoted heredoc delimiter stops the PARENT shell expanding
+        # the body.  It does not stop the RECEIVING INTERPRETER executing it.
+        # `sh <<'EOF'` with a `curl` inside got a warn and cleared the hook to
+        # execute; `python3 <<'PY'` with urllib produced zero hard hits.  Only
+        # a data-only consumer earns the inert-text exemption, and an UNKNOWN
+        # command gets the strict treatment, never the lenient one.
+        # ===================================================================
+        shell_heredoc = scan_network_calls(
+            "sh <<'EOF'\ncurl -s https://example.com/telemetry\nEOF\n")
+        python_heredoc = scan_network_calls(
+            "python3 - <<'PY'\nimport urllib.request\nurllib.request.urlopen('http://x')\nPY\n")
+        unknown_heredoc = scan_network_calls(
+            "$RUNNER <<'EOF'\ncurl -s https://example.com/telemetry\nEOF\n")
+        cat_heredoc = scan_network_calls(
+            'BLOCK_REASON="$(cat <<\'AGENTIFY_BLOCK_REASON\'\n'
+            "This repo uses bun. Fix: run bun install\nAGENTIFY_BLOCK_REASON\n)\"\n")
+        piped_heredoc = scan_network_calls(
+            "cat <<'EOF' | sh\ncurl -s https://example.com\nEOF\n")
+        add(
+            "a `curl` inside an `sh` heredoc is a hard hit, not inert text",
+            len(shell_heredoc[0]) == 1 and shell_heredoc[0][0]["kind"] == "curl",
+            "hard=%s soft=%s" % (shell_heredoc[0], shell_heredoc[1]),
+        )
+        add(
+            "a `python3` heredoc that imports urllib is a hard hit",
+            len(python_heredoc[0]) >= 1,
+            "hard=%s soft=%s" % (python_heredoc[0], python_heredoc[1]),
+        )
+        add(
+            "an UNKNOWN heredoc consumer gets the strict treatment, not the lenient one",
+            len(unknown_heredoc[0]) == 1,
+            "hard=%s soft=%s" % (unknown_heredoc[0], unknown_heredoc[1]),
+        )
+        add(
+            "a `cat` heredoc is still inert: the block message keeps its exemption",
+            cat_heredoc[0] == [],
+            "hard=%s soft=%s" % (cat_heredoc[0], cat_heredoc[1]),
+        )
+        add(
+            "`cat <<'EOF' | sh` is still live",
+            len(piped_heredoc[0]) == 1,
+            "hard=%s soft=%s" % (piped_heredoc[0], piped_heredoc[1]),
+        )
+
+        # ...and the GATE, which is the half that mattered: a hook whose
+        # heredoc body reaches an interpreter must never be cleared to run.
+        with open(os.path.join(hooks_dir, "heredoc-hook.sh"), "w") as handle:
+            handle.write(
+                "#!/usr/bin/env bash\n"
+                "# agentify:begin id=heredoc-hook\n"
+                "# agentify-id: heredoc-hook\n"
+                "# agentify-version: 1\n"
+                "# agentify-generated: 2026-09-15\n"
+                "# agentify-evidence: corrections: 'we use bun' x3\n"
+                "# Safe to delete or edit.\n"
+                "sh <<'EOF'\ncurl -s https://example.com/telemetry\nEOF\n"
+                "exit 0\n"
+                "# agentify:end id=heredoc-hook\n"
+            )
+        os.chmod(os.path.join(hooks_dir, "heredoc-hook.sh"), 0o755)
+        code, result, _raw = verify(
+            "heredoc-hook-manifest.json",
+            [{"id": "heredoc-hook", "type": "hook", "path": ".claude/hooks/heredoc-hook.sh",
+              "action": "created", "evidence": "corrections: 'we use bun' x3"},
+             settings_entry],
+        )
+        status, detail = worst(result, "hook_static_scan")
+        add(
+            "a hook that feeds a heredoc to `sh` is NOT clear to execute",
+            status == FAIL and "curl" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        # ===================================================================
+        # F13 -- a partial regex scan is not a parse.  Four invalid agent
+        # files and one invalid MCP draft passed the static checks while
+        # `tomllib` rejected all five.  Three outcomes now: pass (parsed and
+        # schema-valid), fail (parsed and invalid), unverified (no parser on
+        # this interpreter).  Never a partial scan reported as a parse success.
+        # ===================================================================
+        broken_agents = [
+            ("unclosed-string", 'name = "diff-reviewer\ndescription = "d"\n'
+                                'developer_instructions = "i"\n'),
+            ("duplicate-key", 'name = "duplicate-key"\nname = "other"\n'
+                              'description = "d"\ndeveloper_instructions = "i"\n'),
+            ("unclosed-table", '[section\nname = "unclosed-table"\ndescription = "d"\n'
+                               'developer_instructions = "i"\n'),
+            ("bare-value", 'name = bare-value\ndescription = "d"\n'
+                           'developer_instructions = "i"\n'),
+        ]
+        toml_header = ("# agentify-id: codex-reviewer\n# agentify-version: 1\n"
+                       "# agentify-generated: 2026-09-15\n"
+                       "# agentify-evidence: \"6 sessions asked for a diff review "
+                       "before pushing\"\n# Safe to delete or edit.\n")
+        # NOT `agent_entry`: that name was rebound to a Claude Code MARKDOWN
+        # subagent by the created_dirs probe above, and reusing it here sent
+        # every one of these through the YAML branch.
+        toml_agent = {"id": "codex-reviewer", "type": "subagent",
+                      "path": ".codex/agents/diff-reviewer.toml", "action": "created",
+                      "evidence": "6 sessions asked for a diff review before pushing"}
+        broken_results = []
+        for stem, body in broken_agents:
+            with open(os.path.join(codex_agents_dir, stem + ".toml"), "w") as handle:
+                handle.write(toml_header + body)
+            code, result, _raw = verify(
+                "codex-agent-%s.json" % stem,
+                [dict(toml_agent, path=".codex/agents/%s.toml" % stem)],
+                top={"target": "codex"},
+            )
+            broken_results.append((stem,) + worst(result, "subagent_frontmatter"))
+        add(
+            "every agent TOML that `tomllib` rejects FAILS subagent_frontmatter",
+            all(row[1] == FAIL for row in broken_results),
+            "; ".join("%s=%s" % (row[0], row[1]) for row in broken_results),
+        )
+
+        # A file that PARSES but whose schema is wrong.  The hand reader turns
+        # `["a", "b"]` into the non-empty text `["a", "b"]` and calls the field
+        # present; only a typed read can see it is an array where Codex wants a
+        # string.  `name` is correct here on purpose, so nothing else can fail.
+        with open(os.path.join(codex_agents_dir, "typed.toml"), "w") as handle:
+            handle.write(toml_header + 'name = "typed"\ndescription = ["a", "b"]\n'
+                                       'developer_instructions = "i"\n')
+        code, result, _raw = verify(
+            "codex-agent-typed.json",
+            [dict(toml_agent, path=".codex/agents/typed.toml")],
+            top={"target": "codex"},
+        )
+        status, detail = worst(result, "subagent_frontmatter")
+        add(
+            "a required key that parses but is not a string is a schema failure",
+            status == FAIL and "description" in detail and "not a string" in detail,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        with open(os.path.join(plan_dir, "broken-mcp.toml"), "w") as handle:
+            handle.write("# agentify-id: codex-mcp-draft\n# agentify-version: 1\n"
+                         "# agentify-generated: 2026-09-15\n"
+                         "# agentify-evidence: \"'linear' in 12 user turns across "
+                         "7 sessions\"\n# Safe to delete or edit.\n"
+                         "[mcp_servers.linear]\nurl = \"https://mcp.linear.app/mcp\"\n"
+                         "url = \"https://duplicate.example\"\n")
+        code, result, _raw = verify(
+            "codex-mcp-broken-manifest.json",
+            [dict(mcp_entry, path="docs/agentic-setup/broken-mcp.toml")],
+            top={"target": "codex"},
+        )
+        status, detail = worst(result, "mcp_json")
+        add(
+            "an MCP draft `tomllib` rejects FAILS mcp_json",
+            status == FAIL,
+            "%s: %s" % (status, detail[:150]),
+        )
+
+        # The 3.9/3.10 branch: no parser, so syntax is UNVERIFIED -- never a
+        # pass, never a fail.  Injected here because this interpreter HAS
+        # `tomllib`; that is the branch every run above exercised.
+        saved_toml = _module._TOMLLIB
+        try:
+            _module._TOMLLIB = None
+            code, result, _raw = verify(
+                "codex-agent-noparser.json", [toml_agent], top={"target": "codex"})
+            status, detail = worst(result, "subagent_frontmatter")
+            add(
+                "with no `tomllib` the agent TOML is `unverified`, never `pass`",
+                status == UNVERIFIED and "3.11" in detail,
+                "%s: %s" % (status, detail[:170]),
+            )
+            add(
+                "`unverified` is counted in the summary and is neither a pass nor a fail",
+                result.get("summary", {}).get("unverified", 0) >= 1
+                and result.get("summary", {}).get("fail", -1) == 0,
+                "summary=%s" % result.get("summary"),
+            )
+        finally:
+            _module._TOMLLIB = saved_toml
+        add(
+            "this interpreter really ran the 3.11+ branch",
+            _toml_parser() is not None and sys.version_info >= (3, 11),
+            "tomllib=%s python=%s" % (_toml_parser() is not None, sys.version_info[:2]),
+        )
 
         # agentify's own output verifies like anything else.
         plan_dir = os.path.join(fixture, "docs", "agentic-setup")

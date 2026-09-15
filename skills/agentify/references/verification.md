@@ -167,7 +167,7 @@ table to read a row; the name goes into the report's Check column unchanged.
 | `name_unique` | no two skills, and no two subagents, share a frontmatter `name` | fail |
 | `core_set` | `blueprint.md` §1.3's core set is present in the manifest — at least one skill, `setup-manager`, a reviewer subagent, and with `--discovery` the `db-inspector`, `qa`, analytics and env-leak artifacts the repo's services and frameworks license. **Warn only, on purpose:** a core artifact the user dropped at the gate is a correct outcome, and one the repo already carries under its own `.claude/skills/<name>` or `.claude/agents/` is not flagged; a core artifact the catalogue walk never proposed is the defect this row surfaces (measured 2026-09-07: a 268k-line repo with eight services shipped two skills and no reviewer, designer or analyst, and every other row was green because every other row is about a file that exists) | warn |
 | `skill_frontmatter` | `name` matches the skill directory; `description` is non-empty and under 1024 chars | fail |
-| `subagent_frontmatter` | the subagent's identity, read **in its own format**. Claude Code (`.claude/agents/<name>.md`): `name` and `description` in YAML frontmatter. Codex (`.codex/agents/<name>.toml`): `name`, `description` and `developer_instructions` as TOML keys, and the filename stem must equal `name` — the static contract `codex-agent.toml.tmpl` §10 states. Until 2026-09-05 this asked a TOML file for YAML frontmatter and failed every correct Codex subagent | fail |
+| `subagent_frontmatter` | the subagent's identity, read **in its own format**. Claude Code (`.claude/agents/<name>.md`): `name` and `description` in YAML frontmatter. Codex (`.codex/agents/<name>.toml`): the file is **parsed** with `tomllib` and checked against a **typed** schema — `name`, `description` and `developer_instructions` each present and each a non-empty **string**, `model` / `model_reasoning_effort` / `sandbox_mode` optional strings, and the filename stem equal to `name` (the static contract `codex-agent.toml.tmpl` §10 states). A parse error carries the parser's own message and is a fail: Codex cannot load the agent at all. **Three outcomes on TOML, not two.** `tomllib` is Python 3.11+ and these scripts run on 3.9+, so on **3.9 / 3.10** there is no parser, the row comes back **`unverified`**, and its detail names the interpreter version and the command that would settle it. A definite defect the partial scan still finds — a missing required key — stays a **fail** there, with the unverified note appended so the row is not read as a full verdict; what never happens again is a partial regex scan reported as a parse success. Measured 2026-09-15: four invalid agent files (unterminated string, duplicate key, unterminated table header, bare unquoted value) passed this check while `tomllib` rejected every one. Until 2026-09-05 this asked a TOML file for YAML frontmatter and failed every correct Codex subagent | fail |
 | `subagent_tools` | Claude Code: the declared tools look like real tool names (warn). Codex: there is **no per-agent tool allowlist**, so the check is that none was invented (warn if a `tools` key appears, because the restriction is silently lost) and that `sandbox_mode` is not `danger-full-access` (**fail** — a generated agent is never granted it). A pinned `model` is a warn: it goes stale and silently changes the user's session | fail |
 | `rule_scope` | **prose rules only** — `scope` is present and its globs parse | fail |
 | `rule_body` | **prose rules only** — the rule body is not empty | fail |
@@ -179,12 +179,14 @@ table to read a row; the name goes into the report's Check column unchanged.
 | `rule_policy_examples` | `match` is declared for every rule and every declared example behaves as written: each `match` is caught by some rule in the file, no `not_match` is caught by its own rule. Codex enforces the first at load time (`expected every example to match at least one rule`), so this finds the fatal error before the user's next session does. A `not_match` violation is a **warn**, and so is a `match` miss when any pattern in the file uses a construct this checker cannot fully read — a matcher stricter than Codex's would fail a correct file, which is the defect this whole path exists to remove. A rule with no `not_match` is a warn: prefix matching has no semantics, and `npm` does not catch `npx`, `pnpm`, or npm inside `bash -c` | fail |
 | `rule_policy_execpolicy` | Codex's own loader asked for a second opinion — `codex execpolicy check --rules <file> -- <a match example>`. Runs only when a `codex` binary resolves **and** `--exec-hooks` was passed, because this script's default posture is to execute nothing; otherwise it passes with a row that says plainly it was not consulted and prints the command to run by hand | fail |
 | `hook_script` | the hook command resolves, is executable, and starts with a shebang | fail |
-| `hook_static_scan` | no network call in the hook script or its command line — `curl`, `wget`, `nc`, `ssh`, `/dev/tcp`, a python/node http client, a package install, a remote `git` or `gh` call. A hit names the offending line, and that hook is never executed. Text a hook **prints** is not a call a hook **makes**: a match inside a quoted-delimiter heredoc (`<<'EOF'` — how both hook templates carry their block message) or inside a single-quoted `printf`/`echo` argument is downgraded to a warn, because the message a package-manager hook exists to print is, of course, *"Fix: run `bun install`"*. A body piped into a shell (`cat <<'EOF' \| sh`) is still live, and still a fail | fail |
-| `hook_smoke` | the hook was executed and exited 0 inside the timeout. Only runs with `--exec-hooks`, and only for a hook this run generated inside the repo. A hang is a fail; a non-zero exit is a warn (see §5.1); not being executed is a warn | fail |
-| `hook_wired` | something actually registers the hook — the reverse of `settings_hook_command`, and the reason both exist. **Two** registrations exist, and the target profile in `verify_artifacts.py` says which files count on this build. A **config-registered** hook must be named by a hook command in the target's own registry: `.claude/settings.json`, `.claude/settings.local.json` or a plugin manifest on Claude Code; `.codex/hooks.json` on Codex; plus either target's user-scoped file (`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`, `${CODEX_HOME:-~/.codex}/hooks.json`), resolved through the environment variable and never a hardcoded home. Every one of those files carries the same three-level `hooks` shape — event → matcher group → the group's own `hooks` array — so one reader covers all of them. Matching is as permissive as `rule_wired`'s, so a hook the user wired by hand counts; the one narrowing is a **user-scoped** registry, which is shared by every repo on the machine, so there a bare file name proves nothing and a path must match. A **native git hook** is registered by its name and its location instead: it must sit in the directory git actually runs hooks from (`core.hooksPath` when set, else `.git/hooks/`) under a real git hook name, so a hook written to `.git/hooks/` while `core.hooksPath` points elsewhere is a fail. It is a secondary, opt-in artifact on **either** target (`adapters/codex.md` §4.3), never a substitute for a hook. **There is no target on which a hook artifact fails by construction** — both targets have a full native hook system, Codex's with 12 events, regex matchers over tool names and a JSON `permissionDecision` protocol. Until 2026-09-05 this check hard-failed every hook whenever the manifest said `target: codex`, which told the model to remove a hook that was correctly written *and* correctly registered. A `.agentify` side-file written beside a hook that already existed is a warn — it is inert on purpose until the user merges it (`adapters/codex.md` §4.3 rule 2) | fail |
+| `hook_static_scan` | no network call in the hook script or its command line — `curl`, `wget`, `nc`, `ssh`, `/dev/tcp`, a python/node http client, a package install, a remote `git` or `gh` call. A hit names the offending line, and that hook is never executed. Text a hook **prints** is not a call a hook **makes**: a match inside a single-quoted `printf`/`echo` argument is downgraded to a warn, because the message a package-manager hook exists to print is, of course, *"Fix: run `bun install`"*. **A heredoc is judged by its CONSUMER, never by its quotes.** Quoting the delimiter (`<<'EOF'`) stops the *parent shell* expanding the body; it does nothing about the command the body is handed to. So the exemption applies only when the consumer is one of the genuinely inert readers — `cat`, `tee`, the line and character filters, `grep`, the digests and encoders, `cmp`/`diff`, each of which takes its whole program from argv and has no way to run what it reads — and a pipe after the opener (`cat <<'EOF' \| sh`) takes the exemption away again. Everything else is an interpreter for this purpose and its body is scanned as code: `sh`, `bash`, `python3`, `node`, `ruby`, `sed`, `awk` and `xargs` (all four of the last can take a program from stdin or shell out), a variable (`$RUNNER`), **and any command this checker does not recognise** — strict is the default, and defaulting to lenient is how this defect happened. Measured 2026-09-15: a `curl` inside `sh <<'EOF'` was a warn with the hook still cleared to execute, and a `python3 - <<'PY'` importing `urllib` produced zero hard hits | fail |
+| `hook_smoke` | the hook was executed and exited 0 inside the timeout, on the empty JSON object. Only runs with `--exec-hooks`, and only for a hook this run generated inside the repo. A hang is a fail; a non-zero exit is a warn (see §5.1); not being executed is a warn. It answers *does it run at all*; `hook_fixtures` answers *does it decide correctly* | fail |
+| `hook_fixtures` | the executed **fixture set**, not one empty object — the other half of `hook_smoke`, and it runs under exactly the same gate (`--exec-hooks`, generated by this run, inside the repo, static scan clean). Three assertions, each of which a hook can fail while looking perfectly healthy from the outside. **(1)** The **canonical** fixture and the older spelling get the **same verdict** on the same command: `"tool_name":"Bash"` and `"tool_name":"exec_command"` are fed the identical `tool_input.command`, and a hook that denies one and allows the other is a **fail** — `Bash` is what a current build dispatches under, so a hook that reacts only to the transcript spelling is inert (`adapters/codex.md` §4.3, §8). It is asserted as *agreement*, never as a particular verdict: this script cannot know what any given hook is for, and an expectation invented here would fail correct hooks. **(2)** A file-scoped hook gets the `apply_patch` fixture, with the patch on `tool_input.command` where `apply_patch` really puts it, and its **stderr must be empty** — the `no file path in tool_input … running the check UNFILTERED` line means the path filter fell open and the check ran against every path, so even a right-looking verdict is not one. **(3)** An unrelated tool is ignored in silence: exit 0, nothing on stdout, nothing on stderr. No registration means no event to build a fixture from, and the row is a warn pointing at `hook_wired` | fail |
+| `hook_event` | will that registration ever **select** the hook? `hook_wired` proves a command points at the script; this proves the event and matcher it is registered under can reach it, and the two came apart badly enough to need separate rows — a Codex shell matcher written from the transcript vocabulary (`^(exec\|exec_command\|shell_command\|run)$`) omits `Bash`, so the hook registers, loads cleanly, never fires, and every row was green. Four fail conditions, each silent in the user's session: an **event** outside the target's own list; a **tool-scoped matcher not anchored** at both ends where the target wants anchors (`Bash` as a search matches `Bashful`); a **shell** matcher carrying none of the target's canonical shell names; an **edit** matcher carrying none of its canonical edit names. **Every one of those rules comes out of the target profile, and the two targets disagree on three of them.** On **Codex** the twelve events are the whole list and a wrong name loads zero hooks with zero warnings and zero errors; the matcher must be `^(…)$`; the canonical names are `Bash` and `apply_patch`; and a tool-less event omits the `matcher` key rather than emitting `""` (a warn). On **Claude Code** the roster is 33 and open so no event is failed; the adapter says to emit the plain-list form (`Edit\|Write`) and *"never a character class or an anchor"*, so anchoring is not required; the canonical edit names are `Edit` / `Write`; and a tool-less event emits `"matcher": ""` rather than omitting it (a warn). Judging a Claude Code hook by Codex's rules would fail every correct one, which is this repo's recurring defect running the other way. A matcher that is a real pattern rather than a plain tool list gets a warn saying the name rule was not applied, never a fail | fail |
+| `hook_wired` | something actually registers the hook — the reverse of `settings_hook_command`, and the reason both exist. **Two** registrations exist, and the target profile in `verify_artifacts.py` says which files count on this build. A **config-registered** hook must be named by a hook command in the target's own registry: `.claude/settings.json`, `.claude/settings.local.json` or a plugin manifest on Claude Code; `.codex/hooks.json` on Codex; plus either target's user-scoped file (`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`, `${CODEX_HOME:-~/.codex}/hooks.json`), resolved through the environment variable and never a hardcoded home. Every one of those files carries the same three-level `hooks` shape — event → matcher group → the group's own `hooks` array — so one reader covers all of them. Matching is as permissive as `rule_wired`'s, so a hook the user wired by hand counts; the one narrowing is a **user-scoped** registry, which is shared by every repo on the machine, so there a bare file name proves nothing and a path must match. A **native git hook** is registered by its name and its location instead: it must sit in the directory git actually runs hooks from (`core.hooksPath` when set, else `.git/hooks/`) under a real git hook name, so a hook written to `.git/hooks/` while `core.hooksPath` points elsewhere is a fail. It is a secondary, opt-in artifact on **either** target (`adapters/codex.md` §4.3), never a substitute for a hook. **There is no target on which a hook artifact fails by construction** — both targets have a full native hook system, Codex's with 12 events, regex matchers over tool names and a JSON `permissionDecision` protocol. Until 2026-09-05 this check hard-failed every hook whenever the manifest said `target: codex`, which told the model to remove a hook that was correctly written *and* correctly registered. A `.agentify` side-file written beside a hook that already existed is a warn — it is inert on purpose until the user merges it (`adapters/codex.md` §4.3 rule 2). **The passing row now names the event and the matcher it matched under**, and hands both to `hook_event`: "a command points at the script" and "the registration can select the script" are different claims, and reporting only the first is what let a matcher excluding `Bash` pass | fail |
 | `settings_json` | the target's hook registry parses — `.claude/settings.json` on Claude Code, `.codex/hooks.json` on Codex — and, on a target whose registry rejects unknown top-level keys, carries none. Codex's accepts exactly `description` and `hooks`: one unknown key (an `_agentify` block, say) makes it reject the **whole file** and load **zero hooks**, surfaced only as a `hooks/list` warning nobody sees, so that is a fail here rather than a silent nothing later | fail |
 | `settings_hook_command` | every hook command in it resolves to an existing executable file, or a binary on `PATH` | fail |
-| `mcp_json` | the MCP config is valid **in its own format**. Claude Code: `.mcp.json`, valid JSON, `mcpServers`. Codex: `[mcp_servers.<name>]` TOML tables — at least one complete table, and no bare key/value pair above the first `[table]` header (measured: such a pair binds to whatever table precedes it once pasted into `config.toml`, the file loads without complaint, and the setting has no effect). The two are not interchangeable and writing `.mcp.json` for a Codex target configures nothing; until 2026-09-05 this ran `json.loads` on the TOML draft and failed a correct artifact with `invalid JSON: Expecting value: line 1 column 1` | fail |
+| `mcp_json` | the MCP config is valid **in its own format**. Claude Code: `.mcp.json`, valid JSON, `mcpServers`. Codex: the draft is **parsed** with `tomllib`, `mcp_servers` must be a table of tables, at least one complete `[mcp_servers.<name>]` block must be declared, and no bare key/value pair may sit above the first `[table]` header (measured: such a pair binds to whatever table precedes it once pasted into `config.toml`, the file loads without complaint, and the setting has no effect — a *layout* fact the parser cannot see, so it stays a hand check and stays a warn). A parse error is a fail: pasted into `config.toml` it breaks the file Codex reads at startup. **Same three outcomes as `subagent_frontmatter`** — on Python 3.9 / 3.10 there is no `tomllib`, so a draft with no other problem comes back **`unverified`** naming the version, never `pass`. Measured 2026-09-15: a draft with a duplicate key passed this check while `tomllib` rejected it. The two formats are not interchangeable and writing `.mcp.json` for a Codex target configures nothing; until 2026-09-05 this ran `json.loads` on the TOML draft and failed a correct artifact with `invalid JSON: Expecting value: line 1 column 1` | fail |
 | `mcp_secrets` | no literal-looking secret in it — `${VAR}` and placeholders are fine. Format-independent: it scans raw text as well as parsed structure, so it covers both shapes | fail |
 | `plugin_paths` | every path-valued key in a plugin manifest (Codex `skills`/`apps`, the Claude manifest's component directories) resolves on disk. Paths resolve against the **plugin root** — the manifest's grandparent when it sits in a `.*-plugin/` directory — not against the manifest's own directory and not against the repo root. The manifest is written *after* the copy step that populates those directories, so a skipped copy leaves a manifest that parses cleanly and points at nothing. Keys starting with `_` and non-relative values are ignored | fail |
 | `undo_committed_clean` | every path in `committed_paths` matches what the branch holds. `undo_partition` proves an artifact is in one of the two lists; this proves the CONTENT of a committed one, because the branch delete restores the committed bytes and silently discards an edit made after the commit — and the tree diff taken afterwards comes back empty, since the file is back to a version that once existed. agentify's own `report`/`manifest` are exempt at WARN: §9 writes them after this check runs | fail |
@@ -199,8 +201,8 @@ missing or unparseable.
 
 ```json
 {"schema_version":1,"tool":"verify_artifacts.py",
- "checks":[{"name":"","target":"","status":"pass|fail|warn","detail":""}],
- "summary":{"pass":0,"fail":0,"warn":0},"warnings":[],"timing_ms":0}
+ "checks":[{"name":"","target":"","status":"pass|fail|warn|unverified","detail":""}],
+ "summary":{"pass":0,"fail":0,"warn":0,"unverified":0},"warnings":[],"timing_ms":0}
 ```
 
 Those seven keys are the whole object — there are no others. The manifest that was read and the
@@ -214,6 +216,15 @@ keys.
 - `status: "fail"` → the artifact named in `target` is broken. Fix or remove it (§9).
 - `status: "warn"` → record it in the report's Detail column and move on. Warnings do not block
   the handoff.
+- **`status: "unverified"` → the check could not be performed on this interpreter.** It is not a
+  pass and it is not a fail: it never counts toward `summary.pass`, it never blocks the handoff,
+  and `summary.unverified` is its own column so a run cannot quietly report it as either. Today it
+  has exactly one source — TOML syntax on Python 3.9 / 3.10, where `tomllib` does not exist
+  (`subagent_frontmatter` and `mcp_json` on a Codex build). Copy it into the report as
+  `not verified` with the detail's own reason, and put the one-line re-check in the needs-you
+  section: `python3 -c "import tomllib,sys;tomllib.load(open(sys.argv[1],'rb'))" <file>` under any
+  Python 3.11+. **Never round it to `pass`** — reporting a partial scan as a parse success is the
+  defect this status exists to end.
 - **Read the `rule_contradiction` PASS row, do not skim it.** Its detail says whether conventions
   were compared at all: `…and none conflicts with the N discovered convention(s) in <path>` means
   both halves ran; `…conventions NOT checked` means `--discovery` was missing and half of PRD §7.9
@@ -302,6 +313,12 @@ a script it happens to find in a hooks directory, and a native git hook runs onl
 git actually reads (`core.hooksPath` when set, else `.git/hooks/`) under a name git knows. A fail
 there is settled before you spend a minute on behaviour: register it, or delete it.
 
+**Then read `hook_event`, which asks the question underneath it.** A registration can be perfectly
+well-formed and still never select the hook — a shell matcher that omits `Bash`, an event name off
+by one capital letter — and on Codex both of those load with zero hooks, zero warnings and zero
+errors. `hook_wired` says a command points at the script; `hook_event` says the harness can reach
+it. A fail there is settled the same way, and before behaviour: fix the event or the matcher.
+
 ### 5.1 Executing a hook needs the user's word first
 
 Hooks are the only generated artifact that is a *program*. Running one is the single place in the
@@ -362,7 +379,8 @@ A hook that fails `hook_static_scan` is never executed either, whatever the flag
 | the execute bit is set | that it terminates |
 | it starts with a shebang | that it exits 0 on ordinary work |
 | the registry points at a path that resolves | that it catches what it was built to catch |
-| something registers it, so it is reachable at all | that the event it is registered for is the right one |
+| something registers it, so it is reachable at all | that the event it is registered for is the right one *for this hook's job* |
+| the event is one the harness knows, and the matcher can select the canonical tool (`hook_event`) | — |
 | it contains no network call | that its exit codes match `hook_strictness` |
 | — | that the harness **loaded** it — and on a first run nothing can prove that (§5.3) |
 | — | on Codex, that the user has **trusted** it; on either target, that a session started since (§5.3) |
@@ -420,23 +438,62 @@ unstage. Never test a hook against the user's actual staged changes.
 | A **non-zero exit at all** | 2 blocks; other non-zero codes are a non-blocking error | **a fail.** Only 0 and 2 are specified, agentify's generated Codex scripts exit 0 always and express every decision in JSON (`adapters/codex.md` §4.3) |
 | Benign fixture | exit 0, silent | exit 0, **prints nothing** |
 
-The stdin fixtures, fed exactly as each harness feeds them — note that the tool names differ, and a
-hook ported across with `"tool_name":"Bash"` will never fire on Codex:
+**The stdin fixture SET, and the canonical fixture is the pass condition.** The canonical shell
+tool name is **`Bash`** and the canonical edit tool is **`apply_patch`** on *both* targets — that is
+what Codex's own hook documentation specifies and what a current build dispatches under. `exec`,
+`exec_command`, `shell_command`, `local_shell` and `run` are how a *transcript* spells the same
+step, which is not the same list; an earlier revision of this section conflated the two and said
+outright that `Bash` never fires on Codex, and agentify shipped shell matchers that excluded the one
+name a current Codex sends. Corrected 2026-09-15 (`adapters/codex.md` §4.3 "Matchers", §8).
+
+Run fixtures 1–4 for a shell-scoped hook. For a **file-scoped** hook — one with a path filter —
+fixtures 1–3 are replaced by 5 and 6.
 
 ```sh
-# Claude Code — benign, then blocking.
+# 1. Canonical + blocking — REQUIRED.  This is the pass condition.
 echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
-"tool_name":"Bash","tool_input":{"command":"git status"}}' | .claude/hooks/<name>.sh; echo "exit=$?"
-echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
-"tool_name":"Bash","tool_input":{"command":"npm install left-pad"}}' | .claude/hooks/<name>.sh; echo "exit=$?"
+"tool_name":"Bash","tool_input":{"command":"npm install left-pad"}}' | <hook>; echo "exit=$?"
 
-# Codex — benign, then blocking.  Tool names here are `exec` / `exec_command` /
-# `shell_command` / `apply_patch`, never `Bash` / `Edit` / `Write`.
+# 2. Canonical + benign — must exit 0 and print nothing.
 echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
-"tool_name":"exec","tool_input":{"command":"git status"}}' | .codex/hooks/<name>.sh; echo "exit=$?"
+"tool_name":"Bash","tool_input":{"command":"git status"}}' | <hook>; echo "exit=$?"
+
+# 3. Legacy spelling — the SAME verdict as 1, on an older build's tool name.
 echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
-"tool_name":"exec","tool_input":{"command":"npm install left-pad"}}' | .codex/hooks/<name>.sh; echo "exit=$?"
+"tool_name":"exec_command","tool_input":{"command":"npm install left-pad"}}' | <hook>; echo "exit=$?"
+
+# 4. Unrelated tool — must exit 0 and print nothing on stdout OR stderr.
+echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
+"tool_name":"update_plan","tool_input":{"plan":[]}}' | <hook>; echo "exit=$?"
+
+# 5. File-scoped, inside the guarded scope — must deny, stderr empty.
+printf '%s' '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
+"tool_name":"apply_patch","tool_input":{"command":"*** Begin Patch\n*** Update File: <guarded path>\n@@\n-a\n+b\n*** End Patch\n"}}' \
+  | <hook>; echo "exit=$?"
+
+# 6. File-scoped, outside it — must allow, stderr empty.
+printf '%s' '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
+"tool_name":"apply_patch","tool_input":{"command":"*** Begin Patch\n*** Update File: <unguarded path>\n@@\n-a\n+b\n*** End Patch\n"}}' \
+  | <hook>; echo "exit=$?"
 ```
+
+**Three things are part of the pass condition and are easy to skip.**
+
+- **1 and 3 must produce the same verdict.** A hook that denies `exec_command` and allows `Bash` is
+  inert on a current build and is a **fail**, not a nuance. This is the single check that catches a
+  matcher or a script filter written against the transcript vocabulary only.
+- **`apply_patch` is a freeform tool: its whole input is the patch text on `tool_input.command`**,
+  with no object of named path fields anywhere. A hook that looks for `tool_input.file_path` finds
+  nothing there.
+- **Stderr is part of the pass condition on 4, 5 and 6.** The `no file path in tool_input … running
+  the check UNFILTERED` line means the payload's paths were not extracted, so the filter fell open
+  and the check ran against everything. A deny that comes with that line is **not** a pass — it is
+  the filter failing, and it denies work outside the guarded scope too.
+
+`--exec-hooks` runs this set automatically and reports it as `hook_fixtures` (§2), with one
+narrowing: it asserts that 1 and 3 *agree*, not that either denies, because the static pass cannot
+know what a given hook is for. Fixtures 5 and 6's guarded-versus-unguarded verdicts are yours to
+judge — you know which paths the hook guards and the script does not.
 
 A hook that blocks the **benign** fixture is a build failure on either target, not a warning: it
 will block the user's ordinary work in their next session. Remove it, record it, continue.
@@ -449,7 +506,10 @@ fixture (does nothing); hangs; writes to or deletes a repo file; references an i
 binary not present (`discovery.commands` and `discovery.package_managers` are the source of truth
 for what exists); is not executable; the target's registry points at a path that does not exist; or
 nothing registers the script at all — the static pass catches the last three first (`hook_script`,
-`settings_hook_command`, `hook_wired`), and the last one makes the rest moot. On Codex, add one
+`settings_hook_command`, `hook_wired`), and the last one makes the rest moot. Add two that are the
+same failure seen from the other side: the registration's event or matcher cannot select the hook
+(`hook_event`), and the hook reacts to the legacy tool spelling but not the canonical one
+(`hook_fixtures`) — both are hooks that run flawlessly and are never called. On Codex, add one
 more: **any** non-zero exit, and a blocking reaction that is not the `permissionDecision` JSON.
 
 Run these only if the user agreed to hook execution in §5.1 — they execute the hook just as
@@ -477,10 +537,21 @@ Run these only if the user agreed to hook execution in §5.1 — they execute th
   usually the wrong shape rather than the wrong code: the script must exit 0 and print the
   `permissionDecision` JSON, and a script ported from Claude Code that exits 2 has to be rewritten.
 - Missing binary → rewrite the hook to use a command that exists, or remove it.
-- A Codex hook that never fires → check the matcher first. Codex's tool names are `exec`,
-  `exec_command`, `shell_command`, `run`, `apply_patch` — **not** `Bash` / `Edit` / `Write` — and a
-  wrong **event** name is worse: a `hooks.json` whose only event was `NotAnEvent` loaded with zero
-  hooks, zero warnings and zero errors. Emit only the 12 spelled events (`adapters/codex.md` §4.3).
+- A Codex hook that never fires → read the `hook_event` row first; it names the event and the
+  matcher the hook is registered under and fails on each way either can be silently wrong. The
+  canonical names are **`Bash`** for shell and **`apply_patch`** for edits, so emit one anchored
+  matcher that accepts both vocabularies, canonical name first —
+  `^(Bash|exec_command|shell_command|local_shell|exec|run)$` and `^(apply_patch|Edit|Write)$` — and
+  keep the script's own tool-name filter as the same alternation. A wrong **event** name is worse
+  still: a `hooks.json` whose only event was `NotAnEvent` loaded with zero hooks, zero warnings and
+  zero errors. Emit only the 12 spelled events (`adapters/codex.md` §4.3).
+- `hook_event` fail → fix the registration, not the script. Anchor the matcher, add the canonical
+  tool name beside the older spellings, or correct the event's CamelCase, then re-run the static
+  pass. Never widen the check to make the row green: each of its four conditions is a hook that
+  loads without a murmur and does nothing.
+- `hook_fixtures` fail on the canonical-versus-legacy comparison → the hook's own `tool_name` filter
+  disagrees with its matcher. Make the script's `case` pattern the same alternation the matcher
+  carries; a `case` pattern is whole-string, so the two stay equivalent.
 
 ### 5.3 Installed, loaded, armed — three claims, and only the first is checkable in the run that builds it
 
@@ -492,7 +563,7 @@ section's pass condition unreachable on every first run.
 
 | Claim | What proves it | Reachable in the run that built the hook? |
 |---|---|---|
-| **Installed correctly** — the script is executable, the registry entry is well-formed, the file the harness will parse does parse | the static pass (`hook_script`, `hook_wired`, `settings_hook_command`), the JSON + key-subset check, and §5.2's fixtures | **always.** This is the pass condition. |
+| **Installed correctly** — the script is executable, the registry entry is well-formed, the event and matcher can select the hook, the file the harness will parse does parse | the static pass (`hook_script`, `hook_wired`, `hook_event`, `settings_hook_command`), the JSON + key-subset check, and §5.2's fixture set (`hook_fixtures`) | **always.** This is the pass condition, and `hook_event` is the part of it that is easiest to mistake for satisfied: a registration can be well-formed and still name a tool the harness never sends. |
 | **Loaded** — this agent, in this repo, has the hook in its live registry | `hooks/list` on Codex; a new session on Claude Code | **only when the environment already allows it** — on Codex the project must already be trusted, on Claude Code the session must have started after the write. Neither is something agentify may arrange. For hooks specifically the answer on a first run is always no, on both targets. |
 | **Armed** — the harness will actually execute it | the user's `/hooks` approval on Codex | **never.** Trust is the user's decision, by design. |
 
