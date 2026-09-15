@@ -517,6 +517,17 @@ def _base64_padded_factory(hits: List[str]):
     return _sub
 
 
+#: A quoted value, escape aware.  `"he said \"hi\""` and `'C:\\path'` end at
+#: their real closing quote and not at the escaped one, so no tail of the value
+#: survives the redaction.  Shared by every rule that accepts a quoted value.
+#:
+#: ReDoS: the two alternatives start with disjoint characters (one is "not a
+#: backslash", the other IS a backslash), so there is nothing ambiguous for the
+#: engine to backtrack through, neither alternative is itself quantified, and
+#: the repetition is upper bounded -- see the note in the module docstring.
+_QUOTED_VALUE_SRC = r"\"(?:[^\"\\\n]|\\.){0,512}\"|'(?:[^'\\\n]|\\.){0,512}'"
+
+
 # Each rule: (kind, compiled regex, factory(hits) -> replacement callable)
 _RULES = [
     # 1. Private key blocks.  Whole-block first, stray header second.
@@ -597,14 +608,31 @@ _RULES = [
     # real-world env-var shape, and exactly what a pasted `.env` line looks
     # like.  Verified: with `\b` this rule left `DB_PASSWORD=hunter2trombone`
     # completely untouched.
+    #
+    # The key group ends in an optional `["']` because a QUOTED key puts its
+    # closing quote BETWEEN the key and the separator -- `{"password": "x"}`,
+    # `{'api_key': 'x'}`, `"api_key": x`.  Only the closing quote needs
+    # matching: the opening one is already allowed by the lookbehind, and
+    # leaving it out of the pattern is what keeps `{"DB_PASSWORD": "x"}`
+    # working, where the opening quote is nowhere near the credential word.
+    # The quote is captured WITH the key and handed straight back, so the
+    # scrubbed text keeps its original shape.  Verified: with the separator
+    # required directly after the bare key, every JSON and dict fixture in the
+    # selftest came back verbatim, with zero redactions.
     (
         "assignment",
         re.compile(
-            r"(?<![A-Za-z0-9])(passwords?|passwd|pwd|passphrase|client[_-]?secrets?|secrets?[_-]?keys?|secrets?|"
+            r"(?<![A-Za-z0-9])((?:passwords?|passwd|pwd|passphrase|client[_-]?secrets?|secrets?[_-]?keys?|secrets?|"
             r"api[_-]?keys?|apikeys?|access[_-]?keys?|access[_-]?tokens?|auth[_-]?tokens?|"
             r"refresh[_-]?tokens?|private[_-]?keys?|session[_-]?tokens?|tokens?|credentials?)"
+            r"[\"']?)"
             r"(\s*[:=]\s*)"
-            r"(\"[^\"\n]{1,512}\"|'[^'\n]{1,512}'|[^\s,;)\]}\n]{1,512})",
+            # `{` and `[` are excluded from the unquoted alternative: a value
+            # that opens a nested object or list is not a scalar secret, and
+            # consuming it would swallow the inner `"password":` key and leave
+            # the inner value exposed.  Failing here lets the engine find that
+            # inner assignment instead.
+            r"(" + _QUOTED_VALUE_SRC + r"|[^\s,;)\]}\[{\n]{1,512})",
             re.IGNORECASE,
         ),
         _assignment_factory,
@@ -616,7 +644,7 @@ _RULES = [
             r"--(passwords?|passwd|tokens?|secrets?|api[_-]?keys?|access[_-]?tokens?|"
             r"auth[_-]?tokens?|client[_-]?secrets?|credentials?|value)"
             r"([= ]\s{0,8})"
-            r"(\"[^\"\n]{1,512}\"|'[^'\n]{1,512}'|[^\s,;)\]}\n\"']{4,512})",
+            r"(" + _QUOTED_VALUE_SRC + r"|[^\s,;)\]}\n\"']{4,512})",
             re.IGNORECASE,
         ),
         _flag_value_factory,
@@ -633,7 +661,7 @@ _RULES = [
             # source lines in the blast-radius test.
             r"(?<![A-Za-z0-9_.\-/])([A-Z][A-Z0-9]{0,40}(?:_[A-Z0-9]{1,40}){1,8})"
             r"(=)"
-            r"(\"[^\"\n]{1,512}\"|'[^'\n]{1,512}'|[^\s,;)\]}\n\"']{1,512})"
+            r"(" + _QUOTED_VALUE_SRC + r"|[^\s,;)\]}\n\"']{1,512})"
         ),
         _env_assignment_factory,
     ),
@@ -994,6 +1022,70 @@ def _selftest() -> int:
             "flag_value",
             "ZZTOPsecret99value",
         ),
+        # --- regression: a QUOTED key puts its closing quote between the key
+        # and the `:` or `=`, so a matcher that expects the separator directly
+        # after the bare key never fired on JSON, on a Python dict, or on
+        # quoted YAML.  Every case below came back verbatim, zero hits.
+        (
+            "json quoted password key",
+            '{"password": "hunter2trombone"}',
+            "assignment",
+            "hunter2trombone",
+        ),
+        (
+            "json quoted api key",
+            '{"api_key": "sk-live-AbCdEf0123456789"}',
+            "assignment",
+            "sk-live-AbCdEf0123456789",
+        ),
+        (
+            "json quoted key carrying a prefix",
+            '{"DB_PASSWORD": "hunter2trombone"}',
+            "assignment",
+            "hunter2trombone",
+        ),
+        (
+            "python dict single-quoted key",
+            "{'password': 'hunter2trombone'}",
+            "assignment",
+            "hunter2trombone",
+        ),
+        (
+            "python dict, credential key among innocent ones",
+            "{'host': 'db.internal', 'api_key': 'swordfishvaluehere'}",
+            "assignment",
+            "swordfishvaluehere",
+        ),
+        (
+            "yaml credential key",
+            "database:\n  password: hunter2trombone\n  host: db.internal",
+            "assignment",
+            "hunter2trombone",
+        ),
+        (
+            "yaml quoted key and quoted value",
+            '"api_key": "swordfishvaluehere"',
+            "assignment",
+            "swordfishvaluehere",
+        ),
+        (
+            "quoted value containing an escaped quote",
+            '{"password": "hun\\"ter2trombone"}',
+            "assignment",
+            "ter2trombone",
+        ),
+        (
+            "quoted value containing an escaped backslash",
+            '{"client_secret": "abc\\\\def123ghijk"}',
+            "assignment",
+            "def123ghijk",
+        ),
+        (
+            "credential key nested inside an object value",
+            '{"credentials": {"password": "hunter2trombone"}}',
+            "assignment",
+            "hunter2trombone",
+        ),
     ]
 
     for label, text, kind, must_vanish in positives:
@@ -1031,6 +1123,18 @@ def _selftest() -> int:
         ("short human-readable value", "VITE_APP_TITLE=MyDashboard"),
         ("aws region", "AWS_REGION=us-east-1 terraform apply"),
         ("debug glob", "DEBUG=app:* npm start"),
+        # Quoted-key support must not widen the rule into "any line that says
+        # password": the key still has to BE a credential word, and there
+        # still has to be a value on the other side of a `:` or `=`.
+        ("prose about a password", "users forget their password and ask for a reset link"),
+        ("doc filename carrying a credential word", "see docs/password_policy.md for the rules"),
+        ("quoted key that merely contains a credential word",
+         '{"password_policy_doc": "see the wiki"}'),
+        ("credential key with no value", "password:"),
+        ("subscript read, not an assignment", 'const t = headers["token"] ?? ""'),
+        ("already-redacted value is left as it is",
+         '{"password": "[REDACTED:assignment]"}'),
+        ("json schema whose value is a type object", '{"password": {"type": "string"}}'),
     ]
 
     for label, text in negatives:
@@ -1040,6 +1144,17 @@ def _selftest() -> int:
             passes += 1
         else:
             failures += 1
+
+    # Scrubbing our own output is a no-op, quoted keys included.
+    once, _first_hits = scrub(
+        '{"password": "hunter2trombone", "api_key": "swordfishvaluehere"}'
+    )
+    twice, second_hits = scrub(once)
+    ok = twice == once and len(second_hits) == 0
+    if check("redaction of quoted keys is idempotent", ok, "%r -> %r" % (once, twice)):
+        passes += 1
+    else:
+        failures += 1
 
     # Home-path collapse is a normalization, counted separately.
     clean, hits = scrub("open /Users/x/agentify/PRD.md please")
