@@ -2,23 +2,25 @@
 
 The fixture set agentify is checked against before a release or a merged PR. Repos are **referenced by URL, never vendored** — clone them into a scratch directory, run against the clone, throw the clone away.
 
-The set exists to cover the cases that break things, not to be comprehensive: no history, one language, a real app, a non-JS stack, a workspace monorepo, an existing index doc, and a setup that is already good enough to leave alone.
+The set exists to cover the cases that break things, not to be comprehensive: no history, one language, a real app, a non-JS stack, a workspace monorepo, an existing index doc, and an existing agentic setup that a run must add to without touching.
 
-> **All expected artifact counts below are PROVISIONAL.** They are derived from the sizing caps (PRD §9) and from what the evidence in each repo plausibly supports, not from a measured run. The first contributor to run the full harness should replace each range with what was actually observed and delete this banner. Until then, treat a count outside the range as a prompt to investigate, not as a failure.
+> **Nothing here asserts a maximum.** The ranges this table used to carry were derived from the sizing caps in PRD §9, and **those caps were retired on 2026-09-07** — a run proposes the complete setup the evidence supports, and the user cuts at the phase 6 gate. What replaces them is a **floor plus a walk**: each row states the artifacts that repo's own structure licenses and which must therefore appear, and every row is additionally checked against the catalogue walk in step 4 below. A plan that produces *more* than its floor is not a finding. A plan that produces less than its floor, or that walks fewer rows than the catalogue has, is.
+>
+> **The floors below are DERIVED, not yet measured.** They are read off `blueprint.md` §1.3 — the core set and its licence fields — against what `discovery.json` reports for each repo, not off a completed run. The first contributor to run the full harness should record what was actually observed beside each floor, keep the floor where it held, correct it where the licence did not in fact fire, and delete this paragraph.
 
 ## The set
 
-| # | Repo | Why it is in the list | Expected size bucket | Expected counts (skills / subagents / rules / hooks) |
-|---|---|---|---|---|
-| 1 | *(synthesized locally — see [fixture 1](#fixture-1-fresh-repo) below)* | Fresh repo, no history, no transcripts. The degenerate case: the run must still reach a plan, and the plan must be nearly empty rather than invented. | small | 0–1 / 0 / 1–2 / 0–1 |
-| 2 | https://github.com/chalk/chalk | Small single-language JS library. Tiny surface, clear scripts, real conventions. Proves the small-bucket caps bind and that a thin repo does not get a fat setup. | small | 1–3 / 0–1 / 2–4 / 1–2 |
-| 3 | https://github.com/vercel/commerce | Medium JS/TS application (Next.js). Framework detection, external services from deps and env var names, folder zones (`components`, `lib`, `app`). The mainstream case. | medium | 2–5 / 1–3 / 3–7 / 1–4 |
-| 4 | https://github.com/pallets/flask | Python repo. Checks that discovery reads `pyproject.toml`, tox/pytest config, and a Makefile rather than assuming `package.json` exists. | medium | 2–5 / 1–3 / 3–8 / 1–4 |
-| 5 | https://github.com/calcom/cal.com | Large monorepo with workspaces (Turborepo, `apps/` + `packages/`). Checks the <10s discovery budget, large-bucket caps, and the monorepo prompt (root by default, offer per-package). | large | 4–8 / 2–5 / 6–12 / 2–6 |
-| 6 | https://github.com/mvanhorn/last30days-skill | Already ships a `CLAUDE.md` **and** an `AGENTS.md`, with no `.claude/` config. Checks the merge path: append a delimited section, never overwrite, and ask which target when both index docs exist. | small–medium (measure) | 1–4 / 0–2 / 2–6 / 1–3 |
-| 7 | https://github.com/vercel/vercel-plugin | Mature setup: `.claude/settings.json` plus 7 skills in `.claude/skills/`, over the 5-artifact maturity threshold. Must switch to **audit-only** mode and propose additions and fixes only. | small (audit-only) | 0–2 new / 0–1 / 0–3 / 0–1 |
+| # | Repo | Why it is in the list | Floor — must appear in the plan |
+|---|---|---|---|
+| 1 | *(synthesized locally — see [fixture 1](#fixture-1-fresh-repo) below)* | Fresh repo, no history, no transcripts. The degenerate case: the run must still reach a plan, and the plan must be derived rather than invented — **and it must not be empty**. | `setup-manager` (licence: always); `pr-reviewer` + `review-pr` (licence: `discovery.git.is_repo`, and `git init` satisfies it); a catalogue walk carrying a row and an outcome for every catalogue row |
+| 2 | https://github.com/chalk/chalk | Small single-language JS library. Tiny surface, clear scripts, real conventions. Proves a thin repo gets a setup fitted to it — neither padded out nor pre-cut. | the row-1 floor, plus permissions (`discovery.commands` has ≥ 2 populated slots) and the package-manager and destructive-command hooks |
+| 3 | https://github.com/vercel/commerce | Medium JS/TS application (Next.js). Framework detection, external services from deps and env var names, folder zones (`components`, `lib`, `app`). The mainstream case. | the row-2 floor, plus `qa` (it is a web app), `designer` + `new-component`, one zone rule per depth-1 zone discovery reports, and the env-leak hook (`.env*` present) |
+| 4 | https://github.com/pallets/flask | Python repo. Checks that discovery reads `pyproject.toml`, tox/pytest config, and a Makefile rather than assuming `package.json` exists. | the row-2 floor, with every generated command quoting the real Python toolchain — a plan naming `npm` or `bun` anywhere is a hard failure here |
+| 5 | https://github.com/calcom/cal.com | Large monorepo with workspaces (Turborepo, `apps/` + `packages/`). Checks the <10s discovery budget and the monorepo prompt (root by default, offer per-package). | the row-3 floor, plus `db-inspector` + `query-db` (it has a database), `security-auditor`, and a zone rule per workspace the interview scoped in |
+| 6 | https://github.com/mvanhorn/last30days-skill | Already ships a `CLAUDE.md` **and** an `AGENTS.md`, with no `.claude/` config. Checks the merge path: append a delimited section, never overwrite, and ask which target when both index docs exist. | the row-1 floor; the index-doc section appended inside markers with every pre-existing byte unchanged. **The existing index doc covers an index-doc line and nothing else** — a rule, hook, skill or subagent skipped as "already covered by `CLAUDE.md`" is a failure |
+| 7 | https://github.com/vercel/vercel-plugin | Mature setup: `.claude/settings.json` plus 7 skills in `.claude/skills/`. What this row now regresses is that maturity changes **nothing**: there is no audit-only mode, nothing existing is restructured, and the complete setup is still proposed. | the row-2 floor **in full**, proposed alongside the existing 7 skills. A candidate may be skipped only as covered by an artifact of the **same type, in this repo, doing the same job** — each such skip names that file, and `## Existing setup notes` says in writing that the existing setup did not limit what was proposed |
 
-Counts for row 7 are *additions*. Audit-only mode restructuring or rewriting an existing skill is a hard failure regardless of count.
+Row 7 is the one most likely to regress, so read its plan rather than counting it. Five things fail it outright: any sentence proposing audit-only or additions-only mode; anything restructuring, rewriting, moving or renaming an existing artifact; any skip citing `~/.claude/skills`, a vendored guide, an index-doc section or a document as coverage; any sentence arguing that this repo needs less than the catalogue (anti-pattern A17); and a missing `setup-manager`, whose inventory is the whole reason a repo with an existing setup gets one. The words *cap*, *limit* and *quota* must appear in no plan, on any fixture.
 
 ### Fixture 1: fresh repo
 
@@ -32,7 +34,11 @@ printf '{\n  "name": "fresh",\n  "version": "0.0.0",\n  "scripts": { "test": "no
 git add -A && git commit -qm "init"
 ```
 
-What matters here is what the plan does *not* contain. With one commit and zero sessions there is almost no evidence, so the plan should be close to empty and should say why. A plan that proposes six skills for this repo means the evidence requirement is not being enforced.
+This fixture is checked from both ends, and only reading the plan catches both.
+
+**The floor.** With one commit and zero sessions there is no behavioural evidence at all, so every transcript-gated candidate belongs under `Skipped (insufficient evidence)` with a count of `0`. That is *not* the same as an empty plan: structural facts are evidence too, so `setup-manager` is still built, the catalogue is still walked row by row with an outcome recorded for each, and the plan still says in its own words that it rests on code and git history alone (`plan-template.md` §1.1). **A plan here with no skills in it at all has failed**, and so has one whose catalogue walk is shorter than the catalogue.
+
+**The ceiling that is not a ceiling.** What must not appear is an artifact with no evidence behind it. A skill for a workflow this repo has one instance of is a fabrication whatever the total count is, and the fix is to trace each artifact's cited evidence back to the analyzer JSON rather than to compare a number against a range.
 
 ### Alternates
 
@@ -139,7 +145,7 @@ for name in ("discovery.json", "transcripts.json", "git.json"):
         if partial:
             print("%-18s NOTE partial clone: churn is 0 on every hotspot row" % "")
 size = os.path.getsize(os.path.join(out, "transcripts.json"))
-assert size <= 12288, "miner output over the ~3k-token cap: %d bytes" % size
+assert size <= 12288, "miner output over the ~3k-token context budget: %d bytes" % size
 PY
 ```
 
@@ -161,27 +167,31 @@ git -C "$REPO" branch --list 'agentic-setup/*'   # expect no output
 
 A build that starts without approval is the most serious failure this harness can catch. It invalidates the run: fix it before looking at anything else.
 
-### 4. Diff the plan against the expected counts
+### 4. Check the plan against the floor and the catalogue walk
 
-The plan's summary section carries the count by artifact type. Compare it with the row for that repo:
+Two checks, and neither is a count comparison.
+
+**4a. The floor held.** Read the plan's summary section and its catalogue walk:
 
 ```bash
 sed -n '1,60p' "$REPO/docs/agentic-setup/plan.md"
 ```
 
-Record actual against expected:
+Every artifact named in that repo's **Floor** column is present, under the catalogue's own name — `pr-reviewer` is never renamed to signal a nuance, and a skill + subagent pair counts as present only when both halves are. A floor item that is missing is a failure unless the walk row for it gives an outcome from the fixed vocabulary; "it would restate `CLAUDE.md`", "a vendored guide exists", "installed at user scope" and "the procedure is documented" are none of them outcomes. **The walk has one row per catalogue row on every fixture**, including fixture 1 — a short walk is the failure mode the walk was added to catch.
 
-| Repo | Skills | Subagents | Rules | Hooks | Within range? | Notes |
-|---|---|---|---|---|---|---|
-| fresh | | | | | | |
-| chalk | | | | | | |
-| commerce | | | | | | |
-| flask | | | | | | |
-| cal.com | | | | | | |
-| last30days-skill | | | | | | |
-| vercel-plugin | | | | | | |
+**4b. Nothing was fabricated, and nothing was pre-cut.** Record what was built against what the floor asked for, plus the two failure directions:
 
-Then read the plan, not just the numbers. The counts catch overgeneration; only reading catches the failure that matters more — an artifact whose stated evidence does not actually support it. Spot-check three artifacts per repo by tracing each one's cited evidence back to the analyzer JSON it came from. An artifact citing an evidence count that does not appear in `discovery.json`, `transcripts.json`, or `git.json` is a fabrication, and fabrication is a bug of a different class than a bad range.
+| Repo | Skills | Subagents | Rules | Hooks | Floor met? | Walk rows = catalogue rows? | Notes |
+|---|---|---|---|---|---|---|---|
+| fresh | | | | | | | |
+| chalk | | | | | | | |
+| commerce | | | | | | | |
+| flask | | | | | | | |
+| cal.com | | | | | | | |
+| last30days-skill | | | | | | | |
+| vercel-plugin | | | | | | | |
+
+The counts are recorded so the ranges can eventually be *described*; they are not an acceptance criterion and no run fails for being above one. Then read the plan, because only reading catches either real failure. **Fabrication:** spot-check three artifacts per repo by tracing each one's cited evidence back to the analyzer JSON it came from — an artifact citing a count that does not appear in `discovery.json`, `transcripts.json` or `git.json` is invented, and that is a release blocker. **Pre-cutting:** grep the plan for *cap*, *limit* and *quota*, which must not appear at all, and read the walk's outcomes for a sentence arguing that this repo needs less than the catalogue. The first failure makes the product untrustworthy; the second makes it useless. Both are found by reading.
 
 ### 5. Clean up
 
@@ -191,4 +201,4 @@ rm -rf /tmp/agentify-regression
 
 ## Recording results
 
-Update the counts table in [The set](#the-set) with measured ranges, note the date and the agentify version you measured with, and remove the provisional banner once every row has a real number behind it. Widen a range when a legitimate run falls outside it; tighten the mapping rules when an illegitimate one does.
+Update the **Floor** column in [The set](#the-set) with what a real run actually produced, note the date and the agentify version you measured with, and remove the derived-not-measured paragraph once every row has a run behind it. Correct a floor when a licence turns out not to fire on that repo — with the field and the value that says why, so the next contributor can tell a corrected floor from a lowered one. Never turn an observed count back into a maximum: an over-floor run is evidence about the repo, and the only thing that fails it is an artifact whose evidence does not hold up.

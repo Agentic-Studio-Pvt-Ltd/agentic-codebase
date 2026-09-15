@@ -55,7 +55,15 @@
 #>     required keys are present, that the filename stem equals `name`. adapters/codex.md §4.5
 #>     records that no read-only probe can prove a newly written agents file is loaded, so the
 #>     report's manual checklist must carry the live check: in a Codex session in this repo, ask
-#>     the model to spawn `{{SUBAGENT_NAME}}` by name.
+#>     the model to spawn `{{SUBAGENT_NAME}}` by name, then check the child rollout's `session_meta`
+#>     for `source.subagent.thread_spawn.agent_path` pointing at this file.
+#>     This is the whole of phase 8 for a Codex subagent and verification.md §7 says the same thing
+#>     in the same words — there is no dry-run half on this target, so nothing is being skipped and
+#>     nothing may be reported as if it had run. The verified row reads **"written and statically
+#>     valid — loading not tested"**, and "working", "live" or "verified" are all false of an agent
+#>     that has never been spawned. On Claude Code the same artifact type does get an automatic
+#>     `Task` dry-run when the agent is visible to the session; that difference is a fact about the
+#>     two targets, not a gap in this file.
 
 # agentify-id: {{AGENTIFY_ID}}
 # agentify-version: 1

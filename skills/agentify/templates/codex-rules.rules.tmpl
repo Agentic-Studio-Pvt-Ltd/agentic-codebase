@@ -70,8 +70,19 @@
 #>     fake `scope:` line or an `AGENTS.md` pointer — they would make the file no more loadable and
 #>     hide a real defect. If `rule_scope` or `rule_wired` ever appears against this artifact, the
 #>     verifier is wrong and this file is not: report it and change nothing (verification.md §9).
-#>  8. Target: 1-4 `prefix_rule` blocks. This is a policy file a human has to be able to read at a
-#>     glance when a command they expected to work is refused.
+#>  8. **One block per approved command-policy rule — as many as the plan approved, and no ceiling
+#>     on the number.** An earlier version of this line said "Target: 1-4 blocks", and that was an
+#>     artifact ceiling wearing a readability argument's clothes: rule 2 above makes each block a
+#>     separate numbered proposal in the plan, so capping blocks capped artifacts, which the
+#>     coverage contract forbids (PRD §9). There is no runtime budget here to trade against either
+#>     — a `.rules` file is an exec policy the binary evaluates, not context the model carries, so
+#>     block five costs a session nothing that block one did not.
+#>     What IS real is readability, and it is bought per block rather than by dropping blocks: this
+#>     is the file someone reads when a command they expected to work is refused. Keep each
+#>     `pattern` as short as its evidence justifies, keep each `justification` to one sentence that
+#>     states the fix, and order the blocks most-general-first so the reader finds theirs. **Never
+#>     drop or merge an approved rule to keep the file short** — that silently un-approves something
+#>     the user approved by number, and the plan, the manifest and the undo all still name it.
 
 # agentify-id: {{AGENTIFY_ID}}
 # agentify-version: 1
@@ -87,8 +98,9 @@
 # Check one command against this file:
 #   codex execpolicy check --pretty --rules .codex/rules/agentify.rules -- {{EXAMPLE_COMMAND}}
 
-#> repeat/trim: one block per command-policy rule, 1-4 blocks. Delete the whole block, comments
-#> included, for a rule that was not approved.
+#> repeat/trim: one block per approved command-policy rule, however many that is. Duplicate the
+#> block below for each one, renumbering the placeholders. Delete the whole block, comments
+#> included, for a rule that was not approved — and only for that reason.
 # rule: {{RULE_1_ID}}
 # evidence: {{RULE_1_EVIDENCE}}
 prefix_rule(

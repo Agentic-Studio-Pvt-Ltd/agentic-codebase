@@ -48,6 +48,16 @@ The documentation read is the current unversioned "latest", whose changelog alre
 and whose updater offers 0.153.4 — **both newer than the local 0.152.1**. Where docs and local
 behaviour disagree, this file records what the local build actually did.
 
+**Re-read 2026-09-15, not re-measured.** The launch audit checked this file's contract claims against
+the then-current official documentation and recorded the installed build as **`codex-cli`
+0.154.0-alpha.6.2**, two minor versions past the 0.152.1 every **VERIFIED** below was taken on. No
+probe was re-run on it: no generated agent was spawned through Codex and no generated hook was
+activated in a live Codex session, then or before. So every version number below stands as written —
+it says when a thing was true, not that it is still true — and nothing in this file has been promoted
+from **DOCUMENTED** or **UNVERIFIED** to **VERIFIED** on the strength of a newer binary being present.
+`adapters/capabilities.md` carries the same two dates and the same caveat, which is where phase 6
+reads them.
+
 ---
 
 ## 0. Three facts that govern everything below
@@ -564,9 +574,16 @@ Codex has a native `rules/` directory, and it is **not** the analogue of `.claud
 
 #### 4.2.1 Prose conventions — **Convention.** Inline in `AGENTS.md`, or a file it points at
 
-Codex has no prose-rules load path — nothing walks a directory of convention documents — but neither
-does Claude Code, so this is the same convention on both targets rather than a downgrade on this one.
-`capabilities.md` records it as **Convention** for both, and that is right.
+Codex has no prose-rules load path — nothing here walks a directory of convention documents
+(**VERIFIED**, `codex debug prompt-input`). **This is a real difference from Claude Code, and an
+earlier version of this paragraph got it backwards.** Claude Code walks `.claude/rules/` natively and
+recursively, loading an unscoped rule at session start and a `paths:`-scoped one the moment a
+matching file is read — proved there by two live headless sessions. `capabilities.md` records the
+Rules-prose row as **Native** for Claude Code and **Convention** for Codex, and that split is right.
+Do not describe this target's pointer mechanism as something both targets share: on Codex the
+`AGENTS.md` pointer is the load path, on Claude Code it is a nicety for humans, and a plan that tells
+a Claude Code user their rule only works because the index doc points at it is telling them something
+untrue.
 
 - **Short rules (≤ ~15 lines) and anything that must always apply:** inline them in the `AGENTS.md`
   agentify section under a `### Conventions` heading. The index doc is the only prose load path this
@@ -575,11 +592,13 @@ does Claude Code, so this is the same convention on both targets rather than a d
   agentify ID block in frontmatter, **plus** a pointer line in the `AGENTS.md` section:
   ``Before changing files under `src/db/**`, read `docs/agentic-setup/rules/db-access.md`.``
 
-Honest framing for the plan and the report: *neither* target auto-loads a rules directory. On Claude
-Code the index doc points at `.claude/rules/`; here it points at `<plan-dir>/rules/`. The mechanism
-is identical, the directory differs, and in both cases **an unreferenced rule file does nothing**.
-Verify the reference in phase 8. The reason is **not** "the format is unverified" — it is that
-Codex's rules system governs command permissions, not conventions.
+Honest framing for the plan and the report, **stated for this target only**: on Codex an
+unreferenced rule file does nothing at all, so the rule and its `AGENTS.md` pointer are one artifact
+— built in one step, and the reference verified in phase 8, where an unreferenced file is a fail.
+The reason is **not** "the format is unverified": it is that Codex's rules system governs command
+permissions, not conventions. Do not generalize this sentence to Claude Code, which loads its own
+rules directory without a pointer; `capabilities.md`'s Rules note carries both halves, already
+separated, and phase 6 pastes the one that matches the target.
 
 #### 4.2.2 Command policy — `<repo>/.codex/rules/<name>.rules` — **Native, and better than a git hook**
 
@@ -991,12 +1010,14 @@ appear in the published scope table and no repo on this machine uses it. **Prefe
 and write only there** — it is the documented, cross-tool path, and it is the one a Claude Code
 install can share.
 
-> **Two corrections owed to `adapters/capabilities.md`**, per the precedence rule at the top of §4.
-> (a) It says `.codex/skills/` "is not a load path" — wrong on the mechanics; the honest phrasing is
-> *"not the path agentify writes"*. The build behaviour is unchanged either way, but the reason
-> stated to the user must be true. (b) It marks *"whether `<repo>/.agents/skills` is subject to the
-> `.codex/` project-trust gate"* as UNVERIFIED — it is now verified, and the answer is **no**: repo
-> skills loaded under `trusted`, `untrusted`, and with no `[projects]` entry at all.
+> **Two corrections to `adapters/capabilities.md`, applied 2026-09-15** under the precedence rule at
+> the top of §4. (a) It said `.codex/skills/` "is not a load path" — wrong on the mechanics; the
+> Skills row now says *not the path agentify writes*, and gives the real reason (undocumented, unused
+> in the wild). The build behaviour is unchanged either way, but the reason stated to the user has to
+> be true. (b) It marked *"whether `<repo>/.agents/skills` is subject to the `.codex/` project-trust
+> gate"* as UNVERIFIED — it is verified, and the answer is **no**: repo skills loaded under
+> `trusted`, under `untrusted`, and with no `[projects]` entry at all. Its trust note now states that
+> exception instead of saying the repo-scoped layer is gated "together".
 
 **Frontmatter — exactly two required fields:**
 
@@ -1027,10 +1048,42 @@ installed skill, under a budget (`skills.max_context_tokens`, **DOCUMENTED** as 
 window capped at 10,000). The body loads only when the skill is selected — which is exactly why
 **description authoring is the deliverable**.
 
-**Description authoring is identical to `adapters/claude-code.md` §4.4.1** — same formula, same
-rules, same evidence requirement (trigger phrases must trace to a request shape with `count >= 2`, or
-the skill is not built). Do not re-derive it here; read that section. Codex uses the same
-name+description progressive-disclosure loading, so it transfers unchanged.
+**Description authoring — the formula, in full, because phase 7 opens exactly one adapter.** It is
+identical on both targets (Codex uses the same name+description progressive-disclosure loading), but
+**do not go and read `adapters/claude-code.md` §4.4.1 to get it.** That file is 1,280 lines; opening
+it here doubles the adapter cost of the build phase for a formula that fits in a paragraph, and the
+one-adapter rule is what the whole progressive-disclosure layout exists to protect.
+
+```
+<What it does: concrete verb + concrete object, naming this repo's real nouns>.
+Use when <trigger condition>, or when the user says "<exact phrase>", "<exact phrase>", "<exact phrase>".
+Not for <the nearest adjacent task that must NOT trigger this>.
+```
+
+1. **Third person, one paragraph, under 1024 chars.** No "I", no "you", no "this skill".
+2. **Use the user's literal words**, pulled from `signals.json` — `request_shapes[].skeleton` and
+   `.examples`, plus `slash_commands[].name` and `commands_requested[].command`.
+3. **Name this repo's nouns.** "Adds an endpoint" is generic; "adds a route under `src/api/` with a
+   Zod schema, a service call and a Vitest integration test" is specific enough that the model can
+   tell whether the user's request is this or something else.
+4. **Include a negative boundary** whenever another skill, subagent or plain editing is adjacent.
+   "Not for X; that is Y." Mis-fires between two similar skills are the commonest failure mode.
+5. **State the trigger conditions, not the implementation.** The body explains how; the description
+   explains when. Never restate the name, and avoid "helps you", "assists with", "utility for".
+
+**Naming:** kebab-case, verb-object (`add-api-endpoint`, `run-migration`, `review-pr`). Directory
+name, `name` and `agentify-id` are all the same string.
+
+**The evidence requirement is the size test, not a transcript test.** A skill is licensed by any one
+of the four things `blueprint.md` §1.4 lists: `>= 3` existing instances of the thing it produces, a
+`request_shapes[]` row with **`count >= 3`** (`mapping-rules.md` row 1, which also wants
+`sessions >= 2` and a skeleton implying `>= 2` steps), a service the repo extends over time through a
+module, or a guide the developer wrote. **Structural evidence licenses a skill on its own** — a repo
+with no transcript history still gets its integration skills and `setup-manager` — and the licence,
+whichever it is, ends the shortlist row as a number. Two earlier readings of this paragraph were both
+wrong and are both retired: that a skill needs transcript repetition at all, and that the bar is
+`count >= 2`. Two is the **rule** and **hook** bar (`mapping-rules.md` rows 4 and 5); for a skill it
+is three.
 
 **Two Codex-specific notes:**
 
@@ -1054,7 +1107,7 @@ when the skill is written, rather than pointing at a file the user does not have
 | Rules — prose | `<plan-dir>/rules/<name>.md` + an `AGENTS.md` pointer | markdown. Nothing walks a prose rules directory on this target, so the pointer **is** the mechanism (§4.2.1) |
 | Rules — command policy / permissions | `.codex/rules/agentify.rules` | Starlark `prefix_rule(...)`. **Validate with `codex execpolicy check` before writing — a malformed file bricks Codex in this repo** (§4.2.2) |
 | Hooks | `.codex/hooks/<name>.sh` + `.codex/hooks.json` | shell; JSON decision on stdout, **always exit 0**. `hooks.json` accepts only `description` and `hooks` — one unknown top-level key loads zero hooks (§4.3) |
-| Skills | `.agents/skills/<name>/SKILL.md` (+ `references/`) | markdown + frontmatter. **Not** `.codex/skills/` (§4.4) |
+| Skills | `.agents/skills/<name>/SKILL.md` (+ `references/`) | markdown + frontmatter. `.codex/skills/` loads too but is undocumented, so it is **not the path agentify writes** (§4.4) |
 | Subagents | `.codex/agents/<name>.toml` | TOML; `name`, `description`, `developer_instructions` required (§4.5) |
 | MCP | `.codex/config.toml` `[mcp_servers.<name>]` | TOML; `bearer_token_env_var` / `env_http_headers` / `env_vars`, never `${VAR}` (§4.6) |
 
@@ -1101,7 +1154,7 @@ You are a code reviewer for this repository.
 | Key | Required | Notes |
 |---|---|---|
 | `name` | yes | The agent's identity. **DOCUMENTED** as required; **VERIFIED** present in all 8 real files. |
-| `description` | yes | Drives delegation — same authoring rule as §4.4.1, with the trigger being "when should the main agent hand this off", and it must state **what the subagent returns**. |
+| `description` | yes | Drives delegation — the same authoring formula spelled out in §4.4, with the trigger being "when should the main agent hand this off", and it must state **what the subagent returns**. |
 | `developer_instructions` | yes | The system prompt. Use a `'''` multi-line literal string so nothing needs escaping. |
 | `model` | no | **VERIFIED in the wild.** Agentify **omits it** — a pinned model goes stale and silently changes the user's session. |
 | `model_reasoning_effort` | no | **VERIFIED in the wild** (`high` observed). Emit only if the interview asked for it. |
@@ -1363,7 +1416,7 @@ binary resolves** — say in the report which mode ran.
 | MCP (draft) | `test -f "<plan-dir>/codex-mcp.toml"`; scan with `lib/scrub.py` patterns; every env-var name appears in the report's needs-you list | file exists; **zero scrub hits**; every variable documented. **Never connect, never authenticate.** |
 | MCP / any TOML agentify wrote — syntax | parse it with `python3 -c "import tomllib,sys;tomllib.load(open(sys.argv[1],'rb'))" <file>` | parses ⇒ pass. **Always reachable, and on a first run it is the only TOML check that is** — so it is the pass condition. A parse failure ⇒ restore the pre-write bytes from `pre_existing_sha256` and record a needs-you item. |
 | MCP / any TOML agentify wrote — field names — **trust-gated** | start `"$CODEX" --strict-config app-server` from the repo (the same process the probe below already starts) and send `initialize` | **VERIFIED** on a trusted project: with a valid config it stays alive and answers `initialize`; with an unknown field it exits 1 and prints `Error: <file>:<line>:<col>: unknown configuration field …` on stderr. It makes no model call and needs no auth. **But the repo-scoped `<repo>/.codex/config.toml` is behind the same trust gate as everything else** — measured: with no `[projects]` entry, an unknown field in it does **not** stop the server. So on an untrusted project a clean start proves nothing about the file agentify just wrote: record `not tested — project not trusted` and do **not** report it as validated. A failure in a trusted project ⇒ restore `pre_existing_sha256` and record a needs-you item. |
-| Plugin manifest | `python3 -m json.tool .codex-plugin/plugin.json > /dev/null`; `name` present; the `skills` path exists on disk | valid JSON, required field present, no dangling path |
+| Plugin manifest | **never runs** — agentify emits no plugin manifest on either target (§4.7), so no run produces one to check. The row is kept only so that a repo where the *user* already has a `.codex-plugin/plugin.json` is not mistaken for agentify's output: that file belongs to them and phase 8 leaves it alone | n/a — the artifact type does not exist in a build manifest |
 | `${CODEX_HOME}/config.toml` not modified **by agentify** | hash it before and after the build; **on a mismatch, diff the section headers and key names** (never the values) | the set of section headers and keys is unchanged. **A plain hash comparison is not a valid check on its own**: the ChatGPT desktop app and a background `codex app-server` daemon write to this file on their own — its mtime changed twice during verification with no write from here. A structural mismatch is a build failure (§4.6 rule 1); an mtime or hash change with identical structure is the desktop app, not agentify. |
 
 **Hook stdin fixtures** — feed the event JSON exactly as Codex does. **The canonical fixture is the

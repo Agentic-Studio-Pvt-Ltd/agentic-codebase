@@ -82,7 +82,7 @@ Rules for the shortlist:
    `blueprint.md` §1.4 failure — fix the candidate, not the row. A pair appears as two rows that
    name each other.
 2. **Numbers are the plan's numbers.** Assign them here, in build order (rules → hooks →
-   permissions → skills → subagents → MCP → index doc), and never renumber after an edit: a dropped
+   permissions → skills → subagents → MCP → index doc last), and never renumber after an edit: a dropped
    item leaves a gap, an added item takes the next number. The plan, the gate and the report use
    these.
 3. **"Fired but not built" lists only rows that fired** — skipped or covered — never the
@@ -174,17 +174,26 @@ a lie; `you declined` is a different lie.
 > **Results improve after a week of normal use** — rerun me then and the candidates below in
 > "Skipped (insufficient evidence)" will finally have a count to be judged on.
 
-4. Change nothing else. The evidence rule still binds: a candidate whose `mapping-rules.md`
-   threshold needs a transcript count cannot meet it on repo evidence, so it goes under **Skipped
-   (insufficient evidence)** with `COUNT_FOUND` of `0` — never promoted, never softened into a
-   "best practice" artifact. Two rules and nothing else is a correct plan for this run.
+4. Change nothing else, and **do not shorten the catalogue walk**. The evidence rule still binds,
+   in one direction only: a candidate whose `mapping-rules.md` threshold needs a *transcript* count
+   cannot meet it on repo evidence, so it goes under **Skipped (insufficient evidence)** with
+   `COUNT_FOUND` of `0` — never promoted, never softened into a "best practice" artifact. What does
+   **not** follow is that the plan is two items long. A structural fact is evidence and carries its
+   own number (`blueprint.md` §2), so this run still proposes everything the repo itself licenses:
+   the zone rules, the guardrail hooks, permissions, the integration skills, and `setup-manager`,
+   whose licence never depended on history at all (`blueprint.md` §1.3). Walk every catalogue row
+   exactly as a run with history does, and record an outcome for each (`blueprint.md` §10). A
+   no-history plan is **smaller**, not truncated — and one that reaches zero skills has almost
+   certainly failed rather than succeeded.
 
 ### Where the capability table comes from
 
 Read `adapters/capabilities.md` — a single short table, and the only file phase 6 needs for this.
-**Do not open `adapters/claude-code.md` or `adapters/codex.md` in phase 6.** They are ~700 and ~580
-lines of emit detail, they cost roughly 9.6k tokens for a table you already have, and phase 7 opens
-exactly one of them exactly once.
+**Do not open `adapters/claude-code.md` or `adapters/codex.md` in phase 6.** They are 1,280 and
+1,534 lines of emit detail — 88 KB and 109 KB, measured 2026-09-15, together roughly 50k tokens for
+a table you already have — and phase 7 opens exactly one of them exactly once. `capabilities.md`
+carries each verdict's basis and version alongside it precisely so that nothing here needs the
+adapter; a verdict missing from it is a bug to report, not a reason to open one.
 
 ### Estimating build time
 
@@ -517,13 +526,21 @@ below it — the final file list goes in `PLAN_DIR/report.md` after the build.
 
 ---
 
-**Conditional sections.** `## Audit findings` is written **only** when
-`discovery.existing_agentic_config.maturity == "mature"`; in every other run delete the heading and
-its whole body. Any of the four `### Skipped (...)` headings whose table would be empty is deleted
-with its table — never left with a placeholder row, and never folded into another heading.
+**Conditional sections.** There is **no `## Audit findings` section, and no section of this plan is
+conditional on maturity.** There is no audit-only mode (PRD §9), so an existing setup — however
+mature — changes nothing about what gets proposed. Defects in what the user already has are
+*proposals* under `## Existing setup notes`, written on any run that found one and deleted whole on
+any run that found none; `discovery.existing_agentic_config.maturity` never gates it, and a run that
+reads that field as permission to build less has committed anti-pattern A17. Any of the **three**
+`### Skipped (...)` headings whose table would be empty is deleted with its table — never left with
+a placeholder row, and never folded into another heading. There is no fourth heading (§1 rule 8).
 
-Ordering: list artifacts in **build order** — index doc, rules, hooks, skills, subagents, MCP
-drafts, plugin manifest — and number them sequentially so `approved except 4` is unambiguous.
+Ordering: list artifacts in **build order** — rules, hooks, permissions, skills (each with its
+`references/`), subagents, MCP drafts, **index doc last** — and number them sequentially so
+`approved except 4` is unambiguous. This is the same order as §0 rule 2 and the same order phase 7
+builds in; the index doc comes last because its tables enumerate what was actually written. **No
+plugin manifest is built on either target**, so no such item appears anywhere in the ordering
+(`adapters/capabilities.md`, row "Plugin manifest").
 
 ---
 

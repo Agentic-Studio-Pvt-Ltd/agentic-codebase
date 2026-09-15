@@ -250,8 +250,9 @@ Re-run the static pass after any fix, so the reported numbers describe the final
 ## 3. Live tests — general shape
 
 For each artifact type below: run the test, classify pass / warn / fail, and record one row.
-Test artifacts in build order (index doc, rules, hooks, skills, subagents, MCP drafts, plugin
-manifest) so a broken dependency surfaces before the thing that depends on it.
+Test artifacts in build order (rules, hooks, permissions, skills, subagents, MCP drafts, index
+doc last) so a broken dependency surfaces before the thing that depends on it. There is no plugin
+manifest step — the type is not emitted on either target (`adapters/capabilities.md`).
 
 ---
 
@@ -804,20 +805,45 @@ optional, and **no per-agent tool allowlist at all**. The static pass reads whic
 subagent); when you judge one by hand, judge it as the format it is. On Codex the static contract
 is: it parses as TOML, the three required keys are present, and the filename stem equals `name`.
 
-**Test.** Dry-run each generated subagent with one trivial prompt that requires no tools and no
-repo mutation — for example `Reply with your name and the one kind of task you handle.` The point
-is to confirm it loads, its identity block parses, its tool list resolves (Claude Code) or its
-`sandbox_mode` is honest (Codex), and its description does not collide with another agent's.
+**Test — and which half of it runs automatically is a fact about the target, not a preference.**
+Two passes, always in this order.
 
-**Pass.** It loads, responds in the persona and scope the file defines, and names the same
-responsibility the plan claimed for it.
+1. **The static contract, on both targets, always, with no user action.** The identity block parses
+   in the format the file actually is; the three required keys are present (Codex) or the YAML
+   frontmatter is well-formed (Claude Code); the filename stem equals `name`; the tool list resolves
+   to tools that exist in this environment (Claude Code) or `sandbox_mode` is honest and is not
+   `danger-full-access` (Codex); and no description sits so close to another agent's that dispatch
+   would be ambiguous. The static pass catches exact name duplicates; the near-duplicate description
+   check is this pass's own.
+2. **The live dry-run, where one is reachable.** One trivial prompt that requires no tools and no
+   repo mutation — for example `Reply with your name and the one kind of task you handle.`
+   - **Claude Code — automatic when the agent is visible to this session.** Run a `Task` dry-run with
+     `subagent_type: <name>` and require only that it loads and returns (`adapters/claude-code.md`
+     §5). A subagent written during this run is often *not* yet visible; when it is not, this is a
+     manual check in the report, not a fail.
+   - **Codex — never automatic, and the reason is structural.** Subagents are exposed through a spawn
+     tool at turn time rather than in the base prompt, so no read-only probe can confirm that a newly
+     written `.codex/agents/*.toml` is picked up: `codex debug prompt-input` does not mention it and
+     there is no agents-list RPC (`adapters/codex.md` §4.5, recorded there as UNVERIFIED). Phase 8
+     validates a Codex subagent **statically only**. The live check is a numbered step in the
+     report's needs-you list: in a Codex session in this repo, ask the model to spawn the agent by
+     name, then check the child rollout's `session_meta` for `source.subagent.thread_spawn.agent_path`
+     pointing at the generated file.
 
-**Fail.** It does not load; its frontmatter is malformed; it requests a tool that does not exist
-in this environment; its description is so close to another agent's that dispatch is ambiguous
-(the static pass catches exact name duplicates; this catches near-duplicates in description);
-it answers as a generic assistant with no evidence of its instructions.
+**Pass.** Pass 1 holds. Where pass 2 ran, it also loads, responds in the persona and scope the file
+defines, and names the same responsibility the plan claimed for it. Where pass 2 could not run, the
+row passes as **`written and statically valid — loading not tested`**, with the manual step recorded
+against it. That phrasing is the claim, and stretching it to "working", "live" or "verified" for an
+agent nothing has spawned is the failure this split exists to prevent — say what was exercised, and
+say plainly what was not.
 
-**Warn.** It loads but the response is generic — usually a description that is too broad.
+**Fail.** Pass 1 fails: the identity block is malformed, a required key is missing, the stem does not
+match `name`, it requests a tool that does not exist in this environment, or its description is
+ambiguous against another agent's. Or pass 2 ran and the agent did not load, or answered as a generic
+assistant with no evidence of its instructions. **A subagent is never failed for being untestable** —
+an unreachable pass 2 is a reporting obligation, not a defect in the file.
+
+**Warn.** Pass 2 ran, it loads, and the response is generic — usually a description that is too broad.
 
 **Remediation.**
 - Malformed frontmatter → fix and re-test once.

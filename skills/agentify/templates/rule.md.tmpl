@@ -59,7 +59,9 @@ paths:
   - {{PATHS_GLOB_1}}
 {{!-- repeat/trim: one line per glob, 1-4 entries. For a genuinely repo-wide rule, delete the
      `paths:` key and both entries entirely rather than writing `**` — and remember it then counts
-     against the cap of 2 unscoped rules. --}}
+     against the context budget of 2 unscoped rules: a constraint on this one rule *form*, because
+     an unscoped rule is carried in every session's context, not a limit on how many rules the run
+     produces. Never describe it to the user as a cap. --}}
   - {{PATHS_GLOB_2}}
 agentify-id: {{AGENTIFY_ID}}
 agentify-version: 1

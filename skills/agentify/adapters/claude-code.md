@@ -346,7 +346,11 @@ with a generated artifact is one report line, never a skip (`coverage.md` §6.1)
 
 Build order is dependency order and is not negotiable:
 
-**index doc → rules → hooks → skills → subagents → MCP drafts → plugin manifest.**
+**rules → hooks → permissions → skills → subagents → MCP drafts → index doc last.**
+
+The index doc is last because its tables enumerate what was actually written; an earlier order
+produced rows linking to files that did not exist yet. There is no plugin manifest step — the type
+is not emitted on either target (`adapters/capabilities.md`).
 
 Checkpoint after each type. Nothing in this section runs before the phase-6 plan is approved in
 writing.
@@ -354,6 +358,11 @@ writing.
 > **What the 2026-09-05 verification round changed outside this file.** Recorded here because the
 > rule above says a verdict change in §4 must move `capabilities.md` in the same edit, and
 > `capabilities.md` has a different owner.
+>
+> **APPLIED 2026-09-15.** Every item below has now landed: items 1 and 2 in `capabilities.md`
+> (which also gained a per-cell basis tag and a provenance table), items 3 and 4 in this file's own
+> build order and sizing prose, and item 5 in the analyzers. The list is kept as the record of what
+> was owed and when it was paid — it is no longer a list of outstanding work.
 >
 > 1. **`Rules — prose` row, Claude Code column: `Convention` → `Native`.** It currently reads
 >    "*Convention* — `.claude/rules/<name>.md`, wired into `CLAUDE.md`. `paths:` frontmatter
@@ -871,8 +880,13 @@ Not for <the nearest adjacent task that must NOT trigger this>.
 2. **Use the user's literal words.** Pull the trigger phrases from `signals.json` —
    `request_shapes[].skeleton` and `request_shapes[].examples`, plus `slash_commands[].name` and
    `commands_requested[].command`. If the phrases are not traceable to a request shape with
-   `count >= 2`, **the skill fails the evidence requirement and must not be built.** This is the
-   link between the mining phase and invocation accuracy; it is not decoration.
+   `count >= 3`, **the skill fails the evidence requirement and must not be built** — three is the
+   skill bar (`mapping-rules.md` row 1, `blueprint.md` §1.4); `count >= 2` is the rule and hook bar
+   (rows 5 and 4) and was mistakenly applied here. This gate is about *phrasing*, not about whether
+   the skill is licensed at all: structural evidence licenses a skill on its own, so a repo with no
+   transcript history is not thereby a repo with no skills — it is a repo whose skill descriptions
+   are built from its code rather than from quoted requests. This is the link between the mining
+   phase and invocation accuracy; it is not decoration.
 3. **Name this repo's nouns.** "Adds an endpoint" is generic. "Adds a route under `src/api/` with a
    Zod schema, a service call and a Vitest integration test" is specific enough that the model can
    tell whether the user's request is this or something else.

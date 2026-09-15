@@ -1296,7 +1296,8 @@ file. If you cannot carry the string all the way through, the candidate was neve
 
 ### 7.5 Worked negative — `stripe-mcp-draft`, the candidate that scored highest and was wrong
 
-Real run, 2026-09-04: a payments-heavy monorepo, 918k LOC, 81 sessions, audit-only mode. This
+Real run, 2026-09-04: a payments-heavy monorepo, 918k LOC, 81 sessions, in what was then
+audit-only mode (since retired — PRD §9; this is a record of a past run, not an instruction). This
 candidate scored **15 of a possible 16 — the top score in the run** — and should never have been
 proposed. It is the reason this file has tiers.
 

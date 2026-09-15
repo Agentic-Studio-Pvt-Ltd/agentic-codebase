@@ -1,8 +1,11 @@
 ---
 #> ─── agentify template: skill.md.tmpl ─────────────────────────────────────────
 #> Emits: .claude/skills/{{SKILL_NAME}}/SKILL.md        (Claude Code)
-#>        .agents/skills/{{SKILL_NAME}}/SKILL.md          (Codex — committable; NOT `.codex/skills/`,
-#>        which is not a load path). Same format and same `name` + `description` progressive
+#>        .agents/skills/{{SKILL_NAME}}/SKILL.md          (Codex — committable). Write `.agents/skills/`
+#>        and never `.codex/skills/`: the latter DOES load (measured, scope "repo", codex-cli 0.152.1)
+#>        but it is undocumented and unused in the wild, so it is not the path agentify writes —
+#>        which is a choice about which path is supportable, not a claim that the other one is dead.
+#>        Same format and same `name` + `description` progressive
 #>        disclosure on both, so this one template serves both targets and the body is identical.
 #>        With both targets selected, write both files rather than symlinking, and never write a
 #>        skill into a tree the user already has it in — `discovery` reports shared entries by
