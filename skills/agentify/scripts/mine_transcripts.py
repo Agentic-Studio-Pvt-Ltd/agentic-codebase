@@ -4308,6 +4308,58 @@ def selftest():
             % ("s3cr3t" in f12_out, "s3cr3t" in f12_err, "svcuser" in f12_err),
         )
 
+        # F03's second gate, which the scrubber-level tests do not reach: a
+        # QUOTED credential key planted in a real transcript must be absent
+        # from BOTH streams of a real miner run.
+        #
+        # Two things make this check load-bearing, and both were missing from
+        # the two pre-existing end-to-end secret checks:
+        #   1. The planted value is caught ONLY by the quoted-key repair.  The
+        #      others plant `sk-ant-api03-...`, which the dedicated vendor rule
+        #      already caught BEFORE that repair -- so they passed with the
+        #      defect fully present and would still pass if it were reverted.
+        #   2. The turn repeats enough to clear the request-shape threshold, so
+        #      the text is actually EMITTED in `request_shapes[].examples`.  A
+        #      single turn is analyzed but echoed nowhere, which makes any
+        #      assertion about it vacuous no matter what the scrubber does.
+        # Verified by swapping in the pre-repair scrubber: the canary reaches
+        # stdout there and is redacted here.
+        _QK = "QUOTEDKEYCANARY" + "-8f3a1c"
+        f03_home = os.path.join(sandbox, "f03-home")
+        f03_repo = os.path.join(sandbox, "f03-repo")
+        os.makedirs(f03_repo)
+        os.makedirs(os.path.join(f03_home, "archived_sessions"))
+        for _sid, _day in (("f03a", "14"), ("f03b", "15"), ("f03c", "16")):
+            _dir = os.path.join(f03_home, "sessions", "2026", "09", _day)
+            os.makedirs(_dir)
+            _rows = [meta(f03_repo, id=_sid)]
+            for _i in range(2):
+                _rows.append(uturn(
+                    'deploy the api and fix the config {"password": "%s"} '
+                    "then rerun tests" % _QK,
+                    "2026-09-%sT10:0%d:00.000Z" % (_day, _i)))
+            with open(os.path.join(_dir, "rollout-%s.jsonl" % _sid), "w") as handle:
+                handle.write("\n".join(_rows) + "\n")
+        os.environ["CODEX_HOME"] = f03_home
+        for _label, _argv in (
+            ("plain", ["--repo", f03_repo, "--target", "codex"]),
+            ("debug", ["--repo", f03_repo, "--target", "codex", "--debug"]),
+        ):
+            _c, f03_out, f03_err, f03_json = run(_argv)
+            _shapes = f03_json.get("request_shapes") or []
+            _examples = [ex for row in _shapes for ex in (row.get("examples") or [])]
+            add(
+                "a quoted-key transcript secret reaches neither stream (%s run)" % _label,
+                _QK not in f03_out and _QK not in f03_err
+                # the guard against a vacuous pass: the text must really have
+                # been emitted, redacted, rather than dropped before it got here
+                and any("REDACTED" in ex for ex in _examples),
+                # report booleans, never the value itself
+                "in_stdout=%s in_stderr=%s examples_emitted=%d redacted=%s exit=%s"
+                % (_QK in f03_out, _QK in f03_err, len(_examples),
+                   any("REDACTED" in ex for ex in _examples), _c),
+            )
+
     finally:
         if saved_env is None:
             os.environ.pop("CLAUDE_CONFIG_DIR", None)
