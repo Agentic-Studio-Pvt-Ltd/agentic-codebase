@@ -739,6 +739,22 @@ MERGE_PR_SQUASH_RE = re.compile(r"\(#\d{1,7}\)\s*$")
 #: `src/{old => new}/file.ts` and `old.ts => new.ts`
 RENAME_BRACE_RE = re.compile(r"^(.*)\{(.*) => (.*)\}(.*)$")
 
+# Path quoting.  `QUOTED_PATH_RE` is one fully quoted path -- the closing quote
+# is the last character, so a ` => ` inside it belongs to the NAME, not to a
+# rename.  `RENAME_QUOTED_PAIR_RE` is the rename shape git emits once either
+# side needs quoting: `"old" => "new"`, each side quoted on its own.  The
+# escapes are C-style, and the octal ones are BYTES; see `_unquote_path`.
+QUOTED_PATH_RE = re.compile(r'^"(?:[^"\\]|\\.)*"$')
+RENAME_QUOTED_PAIR_RE = re.compile(
+    r'^(?P<old>"(?:[^"\\]|\\.)*"|[^"]*?) => (?P<new>"(?:[^"\\]|\\.)*"|[^"]*)$'
+)
+C_ESCAPES = {
+    "a": 0x07, "b": 0x08, "f": 0x0C, "n": 0x0A, "r": 0x0D, "t": 0x09, "v": 0x0B,
+    "\\": 0x5C, '"': 0x22,
+}
+OCTAL_DIGITS = "01234567"
+HEX_DIGITS = "0123456789abcdefABCDEF"
+
 PR_HEADING_RE = re.compile(r"^\s{0,3}#{1,4}\s+(.{1,80}?)\s*$", re.MULTILINE)
 PR_BOLD_HEADING_RE = re.compile(r"^\s{0,3}\*\*(.{1,60}?)\*\*:?\s*$", re.MULTILINE)
 
@@ -1080,16 +1096,106 @@ def _warn_path_only(warnings: List[str], clone: Dict[str, Any], trigger: str) ->
 
 
 def _unquote_path(path: str) -> str:
-    """git quotes paths containing unusual bytes; strip the wrapper."""
-    if len(path) >= 2 and path[0] == '"' and path[-1] == '"':
-        inner = path[1:-1]
-        try:
-            return inner.encode("utf-8", "surrogateescape").decode(
-                "unicode_escape", "replace"
-            )
-        except Exception:
-            return inner
-    return path
+    """
+    One git-quoted path -> the name it has in the working tree.
+
+    git quotes a path whose name carries an unusual byte, and what it puts
+    between the quotes are BYTES in octal: `src/café.py` comes back as
+    `"src/caf\\303\\251.py"`, where `\\303\\251` is ONE UTF-8 code point, not two
+    characters.  So every escape is accumulated into a byte buffer and the
+    buffer is decoded once, at the end.  Decoding escape-by-escape -- which is
+    what `unicode_escape` does, latin-1 style -- yields `src/cafÃ©.py`: a path
+    that is not on disk, and therefore a live file reported `still_exists:
+    false`.  That was the defect this docstring replaces.
+
+    `errors="replace"` and not `surrogateescape`: a name whose bytes are not
+    UTF-8 at all (a latin-1 filename on Linux) has no faithful str form, and
+    the surrogates that `surrogateescape` produces cannot be written to stdout
+    -- `emit` serializes with `ensure_ascii=False`, so a lone surrogate raises
+    UnicodeEncodeError and takes the whole run down.  U+FFFD costs that one
+    row's `still_exists`; a crash costs the run.  It is also what every other
+    decode in this file already does.
+
+    A no-op on a path that arrives unquoted, which is what `core.quotepath=false`
+    produces for anything but a quote or a backslash in the name.
+    """
+    if not (len(path) >= 2 and path[0] == '"' and path[-1] == '"'):
+        return path
+    inner = path[1:-1]
+    out = bytearray()
+    index = 0
+    end = len(inner)
+    while index < end:
+        char = inner[index]
+        if char != "\\":
+            out.extend(char.encode("utf-8", "replace"))
+            index += 1
+            continue
+        if index + 1 >= end:  # a trailing backslash: keep it literally
+            out.extend(b"\\")
+            break
+        marker = inner[index + 1]
+        if marker in C_ESCAPES:
+            out.append(C_ESCAPES[marker])
+            index += 2
+            continue
+        if marker in OCTAL_DIGITS:
+            digits = ""
+            cursor = index + 1
+            while cursor < end and len(digits) < 3 and inner[cursor] in OCTAL_DIGITS:
+                digits += inner[cursor]
+                cursor += 1
+            value = int(digits, 8)
+            if value <= 0xFF:
+                out.append(value)
+                index = cursor
+                continue
+            out.extend(inner[index:cursor].encode("utf-8", "replace"))
+            index = cursor
+            continue
+        if marker in ("x", "X"):  # git does not emit \xNN; read it if it does
+            digits = ""
+            cursor = index + 2
+            while cursor < end and len(digits) < 2 and inner[cursor] in HEX_DIGITS:
+                digits += inner[cursor]
+                cursor += 1
+            if digits:
+                out.append(int(digits, 16))
+                index = cursor
+                continue
+        # An escape git has no meaning for: drop the backslash, keep the char.
+        out.extend(marker.encode("utf-8", "replace"))
+        index += 2
+    return out.decode("utf-8", "replace")
+
+
+def _decode_path_field(field: str) -> str:
+    """
+    One path field from a `git log` line -> one working-tree path.
+
+    Four shapes reach here, and the rename ones are why this is not just
+    `_resolve_rename(_unquote_path(field))`:
+
+        plain                    src/api.py
+        quoted                   "src/caf\\303\\251.py"
+        rename, quoted sides     "src/caf\\303\\251.py" => src/api.py
+        rename, brace-compressed src/{api.py => core.py}
+
+    With quoting on, a rename arrives as `old => new` with each SIDE quoted on
+    its own -- measured on git 2.49; the brace form appears only when NEITHER
+    side needs quoting.  Stripping one pair of quotes off the whole field, as
+    this used to, left `src/caf\\303\\251.py" => "src/api.py` and then split
+    THAT on `=>`.  A fully quoted field is never a rename, because git's ` => `
+    separator sits outside the quotes.
+    """
+    field = field.strip()
+    if '"' in field:
+        pair = RENAME_QUOTED_PAIR_RE.match(field)
+        if pair:
+            return _unquote_path(pair.group("new").strip())
+        if QUOTED_PATH_RE.match(field):
+            return _unquote_path(field)
+    return _resolve_rename(_unquote_path(field))
 
 
 def _resolve_rename(path: str) -> str:
@@ -1110,7 +1216,7 @@ def _parse_numstat_line(line: str) -> Optional[Tuple[int, int, str]]:
     if len(parts) < 3:
         return None
     added_raw, deleted_raw = parts[0].strip(), parts[1].strip()
-    path = _resolve_rename(_unquote_path("\t".join(parts[2:]).strip()))
+    path = _decode_path_field("\t".join(parts[2:]))
     if not path:
         return None
     added = 0 if added_raw in ("-", "") else _safe_int(added_raw)
@@ -1146,10 +1252,10 @@ def _parse_path_only_line(line: str) -> Optional[Tuple[int, int, str]]:
     version of this docstring claimed.  See the PARTIAL CLONES section of the
     module docstring for what it measured out at.
     """
-    path = _unquote_path(line.strip())
+    path = _decode_path_field(line)
     if not path or "\t" in path:
         return None
-    return (0, 0, _resolve_rename(path))
+    return (0, 0, path)
 
 
 def _parse_log(text: str, path_only: bool = False) -> List[Dict[str, Any]]:
@@ -2584,6 +2690,7 @@ def selftest() -> int:
     import io
     import tempfile
     import time as _time
+    import unicodedata
 
     started = int(_time.time() * 1000)
     checks = []  # type: List[Tuple[str, bool, str]]
@@ -2591,10 +2698,71 @@ def selftest() -> int:
     def add(name, ok, detail=""):
         checks.append((name, bool(ok), str(detail)))
 
+    def _nfc(text):
+        """A normalizing filesystem stores NFD; git reports NFC.  Compare one."""
+        return unicodedata.normalize("NFC", text)
+
     add("imports resolve", hasattr(emit_lib, "emit") and hasattr(emit_lib, "selftest_report"), "lib.emit")
 
     ok, detail = emit_lib.check_regexes(sys.modules[__name__])
     add("regexes compile and match", ok, detail)
+
+    # Path decoding.  git quotes any path carrying an unusual byte, and quotes
+    # it as OCTAL BYTES: `src/café.py` leaves git as `"src/caf\303\251.py"` --
+    # two escapes that are ONE UTF-8 code point, not two characters.  Decoding
+    # them one chr() at a time yields `src/cafÃ©.py`, a path that is not on
+    # disk, which then reports `still_exists: false` for a live file.
+    #
+    # A rename is the second shape, and it is not the brace form: with quoting
+    # on, git emits `"old" => "new"` with each SIDE quoted independently (the
+    # `src/{a => b}` form appears only when NEITHER side needs quoting).  The
+    # last row is the `core.quotepath=false` case -- an already-plain path must
+    # come through untouched.
+    numstat_path_cases = [
+        (r'"src/caf\303\251.py"', "src/café.py"),
+        (r'"src/\346\227\245\346\234\254\350\252\236.py"', "src/日本語.py"),
+        (r'"src/emoji\360\237\230\200.py"', "src/emoji😀.py"),
+        (r'"src/we\"ird.py"', 'src/we"ird.py'),
+        (r'"src/back\\slash.py"', "src/back\\slash.py"),
+        (r'"src/tab\there.py"', "src/tab\there.py"),
+        (r'"src/new\nline.py"', "src/new\nline.py"),
+        (r'"src/bell\a\b\f\v\r.py"', "src/bell\a\b\f\v\r.py"),
+        (r'"src/caf\303\251.py" => "src/na\303\257ve.py"', "src/naïve.py"),
+        (r'src/plain.py => "src/caf\303\251-new.py"', "src/café-new.py"),
+        (r'"src/caf\303\251.py" => src/one-plain.py', "src/one-plain.py"),
+        ("src/{a.py => b.py}", "src/b.py"),
+        ("{src => lib}/日本語.py", "lib/日本語.py"),
+        ("old.ts => new.ts", "new.ts"),
+        ("src/plain.py", "src/plain.py"),
+    ]
+    wrong_paths = []
+    for field, expected in numstat_path_cases:
+        row = _parse_numstat_line("1\t0\t" + field)
+        got = row[2] if row else None
+        if got != expected:
+            wrong_paths.append("%r -> %r (want %r)" % (field, got, expected))
+    add(
+        "quoted paths decode from git's octal BYTES, not one chr() per escape",
+        not wrong_paths,
+        "; ".join(wrong_paths) or "%d cases" % len(numstat_path_cases),
+    )
+
+    # The same decoder, on the `--name-only --no-renames` line shape used for
+    # partial clones.  A path holding a tab or a newline is excluded here on
+    # purpose: that line shape cannot carry one unambiguously.
+    wrong_name_only = []
+    for field, expected in numstat_path_cases:
+        if "\t" in expected or "\n" in expected:
+            continue
+        got = _parse_path_only_line(field)
+        got_path = got[2] if got else None
+        if got_path != expected:
+            wrong_name_only.append("%r -> %r (want %r)" % (field, got_path, expected))
+    add(
+        "the path-only line shape decodes the same way",
+        not wrong_name_only,
+        "; ".join(wrong_name_only) or "%d cases" % (len(numstat_path_cases) - 2),
+    )
 
     # Bot classification, decided without touching git.  The two rows that
     # matter most are the last two: a human on a `users.noreply.github.com`
@@ -2678,6 +2846,7 @@ def selftest() -> int:
         add("synthetic repo mined end to end", True, "git not on PATH; fixture skipped")
     else:
         fixture = tempfile.mkdtemp(prefix="agentify-minegit-selftest-")
+        unicode_fixture = tempfile.mkdtemp(prefix="agentify-minegit-unicode-")
         try:
             env = dict(os.environ)
             env.update(
@@ -2694,7 +2863,7 @@ def selftest() -> int:
             def run(*argv_, **kw):
                 subprocess.run(
                     ["git"] + list(argv_),
-                    cwd=fixture,
+                    cwd=kw.get("cwd", fixture),
                     env=kw.get("env", env),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -2921,8 +3090,85 @@ def selftest() -> int:
                 "41898282" not in adaptive_raw and "@" not in adaptive_raw,
                 "domain only",
             )
+
+            # -- unicode paths, mined end to end ------------------------------
+            # Its own repository, so every count asserted above stays what it
+            # is.  Three names git has to quote, one ASCII control, and a
+            # rename of a quoted path -- the shape that arrives as
+            # `"old" => "new"`, each side quoted on its own, never the brace
+            # form.  Nothing here is ever deleted, so EVERY row must come back
+            # `still_exists: true`; a row that decoded to mojibake cannot,
+            # which is what makes this a test and not a restatement.  Compared
+            # NFC-normalized because a normalizing filesystem (HFS+) stores
+            # the name decomposed while git reports it precomposed.
+            uni_src = os.path.join(unicode_fixture, "src")
+            os.makedirs(uni_src)
+            created = []
+            for name in ("café.py", "日本語.py", "emoji😀.py", "plain.py"):
+                try:
+                    with open(os.path.join(uni_src, name), "w") as handle:
+                        handle.write("# %s\n" % name)
+                except (OSError, UnicodeError):  # a filesystem that refuses it
+                    continue
+                created.append(name)
+            run("init", "-q", "-b", "main", cwd=unicode_fixture)
+            run("add", "-A", cwd=unicode_fixture)
+            run("commit", "-q", "-m", "feat(i18n): add unicode modules", cwd=unicode_fixture)
+            renamed = ""
+            if "日本語.py" in created:
+                renamed = "src/漢字.py"
+                run("mv", "src/日本語.py", renamed, cwd=unicode_fixture)
+            with open(os.path.join(uni_src, "plain.py"), "a") as handle:
+                handle.write("# touched\n")
+            run("add", "-A", cwd=unicode_fixture)
+            run("commit", "-q", "-m", "refactor(i18n): rename the module", cwd=unicode_fixture)
+
+            _uni_code, uni, uni_raw = run_main(
+                ["--repo", unicode_fixture, "--no-gh", "--days", "3650"]
+            )
+            uni_rows = dict((_nfc(row["path"]), row) for row in uni.get("hotspots", []))
+            on_disk = set(_nfc("src/" + n) for n in os.listdir(uni_src))
+            add(
+                "a unicode filename is mined under the name it has on disk",
+                bool(uni_rows) and on_disk <= set(uni_rows),
+                "mined=%s on_disk=%s" % (sorted(uni_rows), sorted(on_disk)),
+            )
+            add(
+                "still_exists tracks the working tree for a unicode name too",
+                bool(uni_rows)
+                and on_disk <= set(uni_rows)
+                and all(
+                    row.get("still_exists") is (path in on_disk)
+                    for path, row in uni_rows.items()
+                ),
+                str(sorted((p, r.get("still_exists"), p in on_disk) for p, r in uni_rows.items())),
+            )
+            # The old name keeps the one commit it was born in -- that is real
+            # history, and it is correctly marked dead above.  What must NOT
+            # happen is the rename commit landing on it (2 commits) or on a
+            # mangled third path: `"old" => "new"` resolves to the destination.
+            source = _nfc("src/日本語.py")
+            destination = _nfc(renamed)
+            add(
+                "a renamed unicode path folds onto its destination",
+                not renamed
+                or (
+                    destination in uni_rows
+                    and uni_rows[destination].get("still_exists") is True
+                    and uni_rows.get(source, {}).get("commits") == 1
+                ),
+                "destination=%s source=%s" % (uni_rows.get(destination), uni_rows.get(source)),
+            )
+            add(
+                "no mojibake and no escape survives into the output",
+                "Ã" not in uni_raw
+                and "æ" not in uni_raw
+                and "\\3" not in uni_raw,
+                "%d chars scanned" % len(uni_raw),
+            )
         finally:
             shutil.rmtree(fixture, ignore_errors=True)
+            shutil.rmtree(unicode_fixture, ignore_errors=True)
 
     # -- degraded paths ------------------------------------------------------
     degraded_ok = True
