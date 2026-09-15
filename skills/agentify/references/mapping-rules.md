@@ -654,7 +654,7 @@ names the template separately for each target instead of assuming one file serve
 
 | Artifact | Template — Claude Code | Written to (Claude Code) | Template — Codex | Written to (Codex) |
 |---|---|---|---|---|
-| Skill | `skill.md.tmpl` | `.claude/skills/<name>/SKILL.md` | `skill.md.tmpl` — same file, same body | `.agents/skills/<name>/SKILL.md` (**not** `.codex/skills/`, which is not a load path) |
+| Skill | `skill.md.tmpl` | `.claude/skills/<name>/SKILL.md` | `skill.md.tmpl` — same file, same body | `.agents/skills/<name>/SKILL.md` — **not** `.codex/skills/`. The reason is *documentation, not mechanics*: `.codex/skills/` **does** load, with `scope: "repo"` (measured, codex-cli 0.152.1), but it is undocumented and unused in the wild, while `.agents/skills` is the documented cross-tool path a Claude Code install can share. Earlier wording here said `.codex/skills/` "is not a load path"; that was wrong and is retracted. The build behaviour is unchanged — still write only `.agents/skills` |
 | Subagent | `subagent.md.tmpl` | `.claude/agents/<name>.md` | `codex-agent.toml.tmpl` — TOML, not markdown-with-frontmatter | `.codex/agents/<name>.toml` |
 | Rule — prose convention | `rule.md.tmpl` | `.claude/rules/<name>.md` **plus** its row in the index-doc section | `rule.md.tmpl` — same file, same body | `<plan-dir>/rules/<name>.md` **plus** an `AGENTS.md` pointer; a rule of ≤ ~15 lines is inlined in the `AGENTS.md` section instead, with no file |
 | Rule — command policy ("never run X") | `hook.sh.tmpl` + `settings-hooks.json.tmpl` — a `PreToolUse` hook on `Bash`; there is no policy file on this target | `.claude/hooks/<name>.sh` + a merge into `.claude/settings.json` | `codex-rules.rules.tmpl` — native Starlark policy, preferred over a hook | `.codex/rules/agentify.rules`, one agentify-owned file for the whole run. **Validate with `codex execpolicy check` before writing; a malformed file bricks Codex in that repo.** No Codex binary ⇒ draft to `<plan-dir>/` |
@@ -676,6 +676,12 @@ Codex has twelve hook events, a regex matcher and a JSON `permissionDecision` pr
 downgrade a candidate, and do not spend a plan line apologising for a loss that does not exist. The
 one honest loss on this target is the **per-agent `tools` allowlist** on subagents (§4.5); say that,
 and only that.
+
+That loss is about which **tools** the agent may call, and it is not the same question as whether a
+**remote** service is read-only. Neither a `tools` allowlist nor Codex's `sandbox_mode` reaches the
+far end of a connection string, so a candidate that promises read-only access to a hosted database
+or API carries the service-side obligation in `blueprint.md` §3.1 on **both** targets — it is not a
+Codex downgrade, and it must not be written up as one.
 
 **The two rule rows are different artifacts, not two spellings of one.** A finding of the form "the
 agent keeps running `npm` here and gets corrected" is a *command policy*: on Codex it is a

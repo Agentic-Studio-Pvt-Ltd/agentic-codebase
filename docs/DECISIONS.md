@@ -50,11 +50,17 @@ a number out of the build contract, which has now been stale on selftest counts 
 for two rounds after `hook_wired`, `undo_partition` and `undo_created_dirs` landed — the same stale
 number the build contract carried. Do not cite these seven as stable: cite the exit code.)
 
-**Re-measured 2026-09-15**, after the launch-audit repairs, which added checks to all four
-entrypoints and to `scrub.py`: `discover.py` **81/0**, `mine_git.py` **32/0**,
-`mine_transcripts.py` **46/0**, `verify_artifacts.py` **115/0**, `scrub.py` **76/0**. `textnorm.py`
-and `emit.py` are unchanged. That is the fifth time these numbers have moved, which is the whole
-argument of this entry — **cite the exit code, not the count.**
+**Re-measured 2026-09-16**, after the launch-audit repairs and the completeness pass that followed
+them: `discover.py` **84/0**, `mine_git.py` **32/0**, `mine_transcripts.py` **46/0**,
+`verify_artifacts.py` **119/0**, `scrub.py` **76/0**. `textnorm.py` and `emit.py` are unchanged.
+
+**Measured on BOTH supported interpreters** — `/usr/bin/python3` (3.9.6, the documented floor) and
+3.14 — because the round that produced these numbers also produced the defect that proves why:
+`verify_artifacts.py` was green on 3.11+ and exited **1** on 3.9, since checks written for the new
+`tomllib` path asserted 3.11-only outcomes. A count measured on one interpreter says nothing about
+the other. This entry was itself stale within a day of being written (it said 81 while the tree said
+83), which is the sixth time these numbers have moved and the whole argument of this entry —
+**cite the exit code, not the count, and run it on the floor.**
 
 ---
 

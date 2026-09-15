@@ -8,7 +8,14 @@ Date: 4 September 2026
 
 ## 1. Summary
 
-A free, open-source skill that a developer installs globally or in a repo. When invoked inside Claude Code (v1) or Codex (v1.1), it analyzes the codebase and the developer's local chat history with the agent, identifies repetitive work and missing guardrails, proposes a customized agentic setup (skills, subagents, hooks, rules, MCP recommendations, plugin packaging), gets the developer's approval on a written plan, builds it, verifies it, and hands off with a report.
+A free, open-source skill that a developer installs globally or in a repo. When invoked inside Claude Code or Codex — **both ship in v1** — it analyzes the codebase and the developer's local chat history with the agent, identifies repetitive work and missing guardrails, proposes a customized agentic setup (rules, hooks, permissions, skills, subagents, MCP config drafts, and the index-doc section that ties them together), gets the developer's approval on a written plan, builds it, verifies it, and hands off with a report.
+
+**Revised 2026-09-15.** Two claims were removed from the sentence above, both of which this document
+contradicted elsewhere. *Plugin packaging* stood inside the enumeration of what the setup contains,
+which reinstated a retired artifact type: no run emits a plugin manifest on either target (§7.6's
+banned question, §7.8's build order, §8's 2026-09-07 note removing the row, §11.1). *Codex (v1.1)*
+placed Codex after v1.0; the Codex adapter ships **in v1**, fully supported, with nothing substituted
+on it (§11.2, §15).
 
 It is the self-serve entry point to Agentic Studio's "Claude Engineering System" service. The tool does a credible 20-minute version of what the agency does in 2 to 3 weeks, and every run ends with attribution and a link.
 
@@ -27,7 +34,7 @@ Most developers using Claude Code or Codex have a thin or empty CLAUDE.md / AGEN
 ## 4. Non-goals (v1)
 
 - Auto-configuring MCP servers that need credentials. The tool recommends and drafts config; the user authenticates.
-- Cursor, Windsurf, Gemini CLI, or other targets. Claude Code first, Codex second.
+- Cursor, Windsurf, Gemini CLI, or other targets. Claude Code and Codex both ship in v1 (§11); nothing else does.
 - Hosted or web version. Runs entirely locally inside the agent.
 - Ongoing monitoring or drift detection ("doctor" mode). Roadmap.
 - Telemetry. None by default.
@@ -55,7 +62,7 @@ The skill forces the model through eight phases. Each phase has a defined input,
 | 5. Interview | Ask the user numbered questions only where evidence is ambiguous. Sensible defaults, "accept all defaults" option. | Answers |
 | 6. Plan | Write `docs/agentic-setup/plan.md`. User approves, edits, or rejects items. Hard gate. | Approved plan |
 | 7. Build | Generate artifacts in dependency order on a branch. Checkpoint after each group. | Files on branch |
-| 8. Verify and hand off | Smoke test each artifact, write the report, show attribution and upsell. | `docs/agentic-setup/report.md`, PR or staged diff |
+| 8. Verify and hand off | Smoke test each artifact, write the report, show attribution and upsell. | `docs/agentic-setup/report.md`, plus the branch or the staged diff — **never a pull request** (§7.6, §7.9) |
 
 ## 7. Detailed requirements by phase
 
@@ -153,9 +160,12 @@ User reviews. Accepts, removes items, or edits. Build does not start without app
 - Write `docs/agentic-setup/report.md`: built, skipped, needs-you (MCP auth steps), first three things to try tomorrow, and how to remove everything (delete branch or listed files).
 - Leave the branch and print the summary. **agentify never pushes and never opens a pull request**
   (§7.6 bans offering to, and §3 makes it an invariant). **Revised 2026-09-15:** this line previously
-  said to open a PR when `gh` was available and the user agreed, which contradicted both. `gh` is
-  used read-only, and the one push-related question it answers — whether you *can* push to the
-  remote — exists so the report knows whether to mention a PR as something **you** may want to do.
+  said to open a PR when `gh` was available and the user agreed, which contradicted both. Phase 8 has
+  no PR step and `open_pr` is not a field. **Corrected again, same day:** the first repair kept a
+  "push-access question" that no longer exists — the ladder behind it (`gh auth status`,
+  `gh repo view --json viewerPermission`) went with Q2, and `mine_git.py` contains no push-access
+  check; `gh` survives read-only in exactly one opt-in place, `pr_patterns`' `gh pr list`, which
+  phase 2 disables with `--no-gh` (`docs/DECISIONS.md` §2.27, `references/interview.md` §Q2).
 - Attribution and upsell (section 10).
 
 ## 8. Mapping rules (finding → artifact)
@@ -222,7 +232,7 @@ Optional, off by default: a "share your setup" prompt that prints a stats card (
 
 ## 11. Target support
 
-### 11.1 Claude Code (v1)
+### 11.1 Claude Code
 
 Emits: `.claude/rules/` (`paths:`-scoped), hooks in `.claude/hooks/` registered in `.claude/settings.json`, a `permissions` allow / ask / deny block in the same file, `.claude/skills/` (each with its own `references/`), `.claude/agents/`, an MCP draft in `.mcp.json`, and last a delimited section appended to `CLAUDE.md` that tabulates all of it. **No plugin manifest** (§9).
 
@@ -238,7 +248,7 @@ Every target implements: detect, locate transcripts, list existing config, emit 
 
 ## 12. Distribution
 
-- GitHub repo, also registered as a Claude Code plugin marketplace. (agentify is distributed *as* a plugin; it does not *produce* one — §9.)
+- GitHub repo, also registered as a Claude Code plugin marketplace. (agentify is distributed *as* a plugin; it does not *produce* one — §9.) On Codex the install is a file copy, and the reason is about agentify rather than about Codex: Codex has its own plugins and marketplaces — `[marketplaces.*]` and `[plugins."<plugin>@<marketplace>"]` in `${CODEX_HOME}/config.toml`, installs cached under `${CODEX_HOME}/plugins/cache/<marketplace>/<plugin>/<version>/`, and a real `.codex-plugin/plugin.json` manifest schema, all three **VERIFIED** in `adapters/codex.md` (§3's paths table and §4.7) — but this repo ships only the Claude Code manifest (`.claude-plugin/plugin.json`) and no Codex one, so that route has nothing to install yet.
 - `npx agentify` (or chosen name) installer: installs the skill globally or into the current repo, for the chosen target.
 - Landing page: one page, SEO focused, Hostshare case study numbers as proof, install command above the fold, link to Agentic Studio services.
 - Shared template repo with the agentic boilerplate generator over time: the boilerplate injects a setup for a known stack; this tool derives one for an unknown stack.
@@ -265,8 +275,7 @@ Targets for first 90 days after launch: 1,000 installs, 40% completion rate, 10 
 
 ## 15. Roadmap
 
-v1.0: Claude Code, all eight phases, three analyzers, the setup catalogue with its core set and catalogue walk, plan gate, verification, report.
-v1.1: Codex adapter.
+v1.0: **Claude Code and Codex**, all eight phases, three analyzers, the setup catalogue with its core set and catalogue walk, plan gate, verification, report.
 v1.2: `doctor` mode, rerun monthly to detect drift and new repetition; interactive plan editing.
 v1.3: Team mode, reads transcripts from multiple contributors' machines via exported summaries.
 Later: Cursor and Gemini CLI adapters, boilerplate integration, community analyzer plugins.

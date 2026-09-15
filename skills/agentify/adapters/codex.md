@@ -2,7 +2,10 @@
 adapter: codex
 adapter-version: 2
 target-id: codex
-status: v1.1 — ships after the Claude Code adapter (PRD §15)
+status: v1 — a supported target, shipping alongside the Claude Code adapter. Nothing is
+  substituted on this target and the only capability genuinely lost is the per-agent tool
+  allowlist (§4.5, §4.5.1), so it is not a later release. The previous "v1.1 — ships after the
+  Claude Code adapter" line was stale.
 verified-against: 2026-09-05 — `codex-cli 0.152.1` at
   `/Applications/ChatGPT.app/Contents/Resources/codex` on macOS 26.5.2 (arm64), plus the current
   unversioned Codex documentation at `learn.chatgpt.com/docs/*`. See the **Verified against** block
@@ -1158,7 +1161,7 @@ You are a code reviewer for this repository.
 | `developer_instructions` | yes | The system prompt. Use a `'''` multi-line literal string so nothing needs escaping. |
 | `model` | no | **VERIFIED in the wild.** Agentify **omits it** — a pinned model goes stale and silently changes the user's session. |
 | `model_reasoning_effort` | no | **VERIFIED in the wild** (`high` observed). Emit only if the interview asked for it. |
-| `sandbox_mode` | no | **VERIFIED in the wild**: `read-only`, `workspace-write` observed; the binary's enum also has `danger-full-access` and `external-sandbox`. **Emit `read-only` for any review/analysis agent** — it is the closest thing Codex has to Claude Code's `tools` restriction. Never emit `danger-full-access`. |
+| `sandbox_mode` | no | **VERIFIED in the wild**: `read-only`, `workspace-write` observed; the binary's enum also has `danger-full-access` and `external-sandbox`. **Emit `read-only` for any review/analysis agent** — it is the nearest thing Codex has and it is worth emitting. It is **not** an equivalent of Claude Code's `tools` restriction, and it is **not** evidence that a remote database or API is being read read-only: it governs the local filesystem and process sandbox only (§4.5.1). Never emit `danger-full-access`. |
 
 Mapping from a Claude Code subagent is near-direct: frontmatter `name` → `name`, `description` →
 `description`, markdown body → `developer_instructions`, `model` → `model`.
@@ -1168,8 +1171,10 @@ whole-file artifact agentify owns; a rerun rewrites it, and a file of that name 
 is never touched (write `<name>.toml.proposed` and record a needs-you item).
 
 **One honest caveat, and it is the only thing genuinely lost versus Claude Code: there is no
-per-agent tool allowlist.** `sandbox_mode` and `mcp_servers` are the nearest equivalents. State that
-in the plan. Everything the previous version of this adapter listed as lost — isolated context
+per-agent tool allowlist.** `sandbox_mode` and `mcp_servers` are the nearest things on this target,
+and "nearest" is not "equivalent" — neither one restricts which tools the agent may call, and
+`sandbox_mode` does not reach the network at all (§4.5.1). State the loss in the plan, in those
+terms. Everything the previous version of this adapter listed as lost — isolated context
 window, automatic delegation, parallelism — is in fact **present**: Codex subagents run as separate
 threads (60% of the rollout files on this machine *are* subagent threads), gated by
 `[features] multi_agent`, which is enabled here. **A candidate whose value is context isolation no
@@ -1187,6 +1192,50 @@ longer fails the evidence test on this target.**
 > that live check. Also unconfirmed: whether `${CODEX_HOME}/agents/` is read as a user-scoped
 > location (the directory does not exist here), and whether `config_file` and `nickname_candidates`
 > — names present in the binary's agent struct — are accepted in this same TOML.
+
+#### 4.5.1 `sandbox_mode` is a local sandbox, not a read-only guarantee
+
+Three different things get called "read-only" here, and the confusion ends up written into an
+artifact that is pointed at a production database. Keep them apart.
+
+| Mechanism | What it actually constrains | What it does not |
+|---|---|---|
+| `sandbox_mode = "read-only"` | the **local** filesystem and process sandbox — this checkout and the commands run against it. The value is **VERIFIED** in eight real agent files and the sandbox layer is Codex's own seatbelt (§1.1 — `CODEX_SANDBOX=seatbelt` is exported into sandboxed commands). That this key *takes effect for a newly written agent* inherits the **UNVERIFIED** status above: nothing here has spawned one | **anything reached over the network.** A remote Postgres, a REST API, an analytics endpoint or an MCP server is not on the local filesystem, so the local sandbox has no say in whether the agent writes to it. A `read-only` agent holding a read-write `DATABASE_URL` can still issue `UPDATE`. Network reachability is a **separate** knob (`CODEX_SANDBOX_NETWORK_DISABLED`), which agentify does not set |
+| `developer_instructions` prose ("you never write") | the model's default behaviour, strongly | nothing mechanically. These are instructions to a custom agent, **not** an unrestricted replacement for Codex's own higher-priority instructions. Current Codex documentation says an active parent runtime override can be reapplied to a child, so the parent's instructions can outrank this file's at spawn time |
+| a read-only database role, a read-scoped API key, a replica connection string | the service itself, for every client that presents that credential | nothing else — and it is the only one of the three that is an actual guarantee |
+
+**The rule.** Where a generated skill or subagent promises read-only access to a real service —
+`db-inspector`, `query-db`, `ask-product`, `product-analyst` — **the enforcement is service-side.**
+`sandbox_mode` and the prose refusals are defense in depth and are described that way; the read-only
+role or scoped key is the guarantee. Keep emitting `sandbox_mode = "read-only"` — it is worth having
+— just never offer it as the proof. Concretely, for any such candidate:
+
+1. The plan's capability note says **what is enforced and by what**, in those words. Never "the
+   subagent is restricted to read-only" when the only mechanisms present are a sandbox line and
+   prose.
+2. agentify never provisions a credential. If no read-only credential exists for the service, the
+   report's manual checklist carries **"create a read-only role/credential for `<service>` and point
+   `<ENV_VAR_NAME>` at it"**, and the generated artifact names the credential it expects.
+3. **Verify effective permissions**, do not infer them — `SELECT current_user` plus the provider's
+   own role listing, or a deliberate failing write against a scratch table. The TOML file's own
+   `sandbox_mode` line proves nothing about the far end of a connection string.
+
+**This is not a Codex-only caveat.** On Claude Code a `tools:` allowlist really does stop the agent
+calling a tool, so the mechanism there is stronger — but a permitted `Bash` or an MCP server holding
+a read-write credential still reaches the service, so rules 1–3 above apply on **both** targets.
+`blueprint.md` §3.1 is the target-neutral statement phases 3–6 read; this section is the Codex
+mechanics behind it.
+
+> **UNVERIFIED — parent-override precedence.** That an active parent runtime override can be
+> reapplied to a child comes from current Codex documentation, not from a probe on this machine. No
+> test here spawned a generated subagent under a runtime override and inspected the child's
+> effective instruction stack, so the precedence order is stated as documented behaviour and not as
+> something exercised. The service-side rule above holds either way, which is why nothing in this
+> adapter is built on the unverified half. **What would confirm it:** in a live Codex session, set a
+> runtime instruction override, spawn the generated agent by name, and read the child rollout's
+> instruction payload for whether the override was reapplied ahead of `developer_instructions`.
+
+---
 
 ### 4.6 MCP servers — TOML, and this is where stdlib-only Python runs out of road
 

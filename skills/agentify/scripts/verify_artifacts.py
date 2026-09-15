@@ -295,8 +295,13 @@ WHAT IS CHECKED  (one `checks[]` entry each)
                         `danger-full-access` (FAIL)
     rule_scope          PROSE rules only -- scope present, globs valid
     rule_body           PROSE rules only -- body is not empty
-    rule_wired          PROSE rules only -- the rule is referenced from an
-                        index doc, so something actually loads it
+    rule_wired          PROSE rules only -- something actually loads the rule,
+                        answered PER TARGET.  On Claude Code `.claude/rules/`
+                        is walked natively and recursively, so a rule there is
+                        wired by living there and a missing index-doc pointer
+                        is a WARN; on Codex, and for a rule outside a native
+                        directory on either target, the index-doc pointer IS
+                        the load path and its absence is a FAIL
     rule_policy_syntax  COMMAND POLICIES only -- `.codex/rules/*.rules` parses
                         as Starlark and declares at least one policy rule
     rule_policy_decision    every `decision` is allow/prompt/forbidden (FAIL:
@@ -377,16 +382,26 @@ Severity rules worth knowing before reading the output:
     it is no longer the artifact the user approved.  The one softened case is
     truncation: when one side is a prefix of the other and both are at least 20
     characters, it is the same claim cut short, and that WARNs.
-  * `rule_wired` is a FAIL.  A rules directory is a repo convention, not a
-    load path -- Claude Code reads `CLAUDE.md`, Codex reads `AGENTS.md`, and
-    neither walks a rules directory -- so a rule the index doc does not point
-    at does nothing at all.  Both adapters say so (`adapters/claude-code.md` 4.2,
-    `adapters/codex.md` 4.2) and both make it a fail.  The search is a plain
-    `grep -F "<name>.md"` over the whole index doc, exactly as the adapters
-    spell it: a rule the user wired by hand in their own prose is wired, and
-    failing that would delete a good rule.  It applies to PROSE rules only:
-    `.codex/rules/*.rules` is a native load path Codex reads on its own, and
-    demanding a pointer for one failed a correct artifact.
+  * `rule_wired` is PER TARGET, and the two targets genuinely differ.  On
+    **Claude Code** `.claude/rules/` IS a load path: the harness walks it
+    natively and recursively, loading an unscoped rule at session start and a
+    `paths:`-scoped one the moment a matching file is read (VERIFIED by two
+    live headless sessions in a scratch repo with no `CLAUDE.md` at all --
+    `adapters/claude-code.md` 4.2).  A rule there is wired by living there, an
+    index-doc reference is discoverability for a human, and its absence is a
+    WARN -- never a FAIL, because SKILL.md phase 8 step 3 reads a FAIL as an
+    instruction to delete the artifact, and until 2026-09-16 that is exactly
+    what this row told it to do to a correctly-loading rule.  On **Codex**
+    nothing walks a directory of prose convention documents (VERIFIED, `codex
+    debug prompt-input` -- `adapters/codex.md` 4.2.1), so the `AGENTS.md`
+    pointer IS the mechanism and an unreferenced rule is a FAIL.  Same for a
+    rule written outside the native directory on either target: the verdict
+    keys on where the file sits, not on the target alone.  The search is a
+    plain `grep -F "<name>.md"` over the whole index doc, exactly as the
+    adapters spell it: a rule the user wired by hand in their own prose is
+    wired, and failing that would delete a good rule.  It applies to PROSE
+    rules only: `.codex/rules/*.rules` is a native load path Codex reads on its
+    own, and demanding a pointer for one failed a correct artifact.
   * ONE TYPE, TWO FILE SHAPES -- read the shape, never the type name.  Three
     manifest types mean different formats on the two targets, and applying one
     target's reader to the other's file FAILS a correct artifact.  A false FAIL
@@ -783,7 +798,23 @@ TARGET_PROFILES = {
         "registry_allowed_keys": None,
         "registry_doc": "adapters/claude-code.md 4.3 merge rule",
         "hook_dir": ".claude/hooks",
+        #: Where the catalogue WRITES this target's rules.  Not the basis of
+        #: any verdict -- `prose_rules_native_dir` below is what `rule_wired`
+        #: reads, and on Codex the two are deliberately different things.
         "rules_dir": ".claude/rules",
+        #: The directory THIS TARGET walks by itself for PROSE rules, or None
+        #: when it walks none.  VERIFIED (adapters/claude-code.md 4.2, two live
+        #: headless sessions in a scratch repo built with NO `CLAUDE.md` at
+        #: all): Claude Code 2.1.260 walks `.claude/rules/` natively and
+        #: RECURSIVELY -- a rule with no `paths:` loads at session start, a
+        #: `paths:`-scoped one the moment the model reads a matching file.  So
+        #: a rule that lives here is wired BY LIVING HERE, and an index-doc
+        #: pointer is discoverability for a human reading the repo, never the
+        #: thing that loads it.  Until 2026-09-16 `rule_wired` hard-FAILED an
+        #: unreferenced rule on this target -- phase 8's fix-or-remove loop
+        #: then read that as an instruction to delete a CORRECT artifact.
+        "prose_rules_native_dir": ".claude/rules",
+        "prose_rules_doc": "adapters/claude-code.md 4.2",
         "index_doc": "CLAUDE.md",
         #: Variables that mean "the repo root" in a hook command on this
         #: target, expanded by `expand_command` and set for real by the smoke
@@ -842,7 +873,18 @@ TARGET_PROFILES = {
         "registry_allowed_keys": frozenset(["description", "hooks"]),
         "registry_doc": "adapters/codex.md 4.3 merge rule",
         "hook_dir": ".codex/hooks",
+        #: The COMMAND POLICY directory on this target, and not the analogue of
+        #: `.claude/rules/`.  Prose rules here go to `<plan-dir>/rules/`.
         "rules_dir": ".codex/rules",
+        #: None, and this is the real difference from Claude Code.  Codex walks
+        #: NO directory of prose convention documents (VERIFIED, `codex debug
+        #: prompt-input`; adapters/codex.md 4.2.1), so on this target the
+        #: `AGENTS.md` pointer IS the load path and an unreferenced prose rule
+        #: really is a dead file.  `.codex/rules/` is NOT the analogue: it is
+        #: the Starlark COMMAND POLICY directory, native, and exempted above by
+        #: subtype rather than by this key.
+        "prose_rules_native_dir": None,
+        "prose_rules_doc": "adapters/codex.md 4.2.1",
         "index_doc": "AGENTS.md",
         #: No documented repo-root variable exists on Codex.  Inventing one
         #: (`$CODEX_PROJECT_DIR`) would let a broken command resolve here and
@@ -6295,8 +6337,9 @@ class Verifier(object):
 
     def _check_rule_wired(self) -> None:
         """
-        A generated PROSE rule must be referenced from the index doc, or
-        nothing loads it.
+        Does anything actually LOAD this prose rule?  **Per target**, exactly
+        as the hook checks are, because the two targets answer it differently
+        and one answer applied to the other fails a correct artifact.
 
         NOT a Codex command policy.  `.codex/rules/*.rules` IS a native load
         path -- Codex reads the directory itself, gated only on the project
@@ -6304,22 +6347,35 @@ class Verifier(object):
         correct artifact on the 2026-09-05 dogfood and told phase 8 to delete
         it.  Subtype first, then the prose check.
 
-        A PROSE rules directory is a repo convention, not a load path: Claude Code
-        reads `CLAUDE.md` and does not walk `.claude/rules/`, and Codex reads
-        `AGENTS.md` and does not walk its rules directory either.  Same shape,
-        different paths -- which is why the directory named in the message is
-        the rule's OWN directory, taken from the artifact, and never a
-        hardcoded `.claude/rules/`.  Both adapters say so in as many words and
-        both make an unreferenced rule a FAIL --
-        `adapters/claude-code.md` section 4.2 calls it "a dead file that cost
-        the user context budget and bought nothing", and both spell the check
-        as `grep -F "<name>.md" "$REPO/CLAUDE.md"`.  This is that grep, run for
-        real: the file's basename must appear somewhere in an index doc.
+        **Claude Code walks `.claude/rules/` natively and recursively**
+        (`prose_rules_native_dir`; VERIFIED in adapters/claude-code.md 4.2 by
+        two live headless sessions in a scratch repo with no `CLAUDE.md` at
+        all: an unscoped rule loaded at session start, a `paths:`-scoped one
+        the moment a matching file was read).  A rule that lives there is wired
+        by living there.  An index-doc reference is discoverability for a human
+        -- a bonus, never the load path -- so its absence is a WARN and can
+        never be a fail.  Until 2026-09-16 this check returned FAIL on exactly
+        that file, with the message "`.claude/rules/` is a repo convention, not
+        a Claude Code load path", and SKILL.md phase 8 step 3's fix-or-remove
+        loop reads a FAIL as an instruction to delete the artifact.  A check
+        documented to fail on a correct artifact is not a check; it is a trap.
 
-        Deliberately a plain whole-file search rather than a search inside the
-        agentify marker block.  A rule the user wired by hand, in their own
-        prose, is wired -- failing it would be a false positive, and a false
-        positive here gets a good rule deleted.
+        **Codex walks nothing of the kind** (`prose_rules_native_dir: None`;
+        VERIFIED, adapters/codex.md 4.2.1 -- `codex debug prompt-input`).  There
+        the `AGENTS.md` pointer IS the mechanism, an unreferenced prose rule is
+        inert, and the FAIL is right and stays.
+
+        The same split governs a Claude Code rule written OUTSIDE
+        `.claude/rules/` -- `<plan-dir>/rules/<name>.md`, say.  Nothing walks
+        that directory on either target, so the pointer is the load path there
+        too and its absence is still a fail.  The verdict keys on where the
+        file actually sits, never on the target alone.
+
+        The search itself is unchanged: the adapters' own
+        `grep -F "<name>.md" "$REPO/CLAUDE.md"`, run for real over the whole
+        index doc rather than inside the agentify marker block.  A rule the
+        user wired by hand, in their own prose, is wired -- failing it would be
+        a false positive, and a false positive here gets a good rule deleted.
         """
         for policy in self.artifacts:
             if policy.get("rule_subtype") != RULE_SUBTYPE_POLICY or not policy.get("abs"):
@@ -6346,12 +6402,45 @@ class Verifier(object):
             return
 
         docs, unreadable = self._index_doc_texts()
+        native_dir = self.profile.get("prose_rules_native_dir")
+        doc_ref = self.profile.get("prose_rules_doc", "the target adapter 4.2")
 
         for rule in rules:
             label = self.rel(rule["abs"])
             relative = self.rel(rule["abs"]).replace(os.sep, "/")
             needle = os.path.basename(relative)
-            holder = os.path.dirname(relative) or self.profile["rules_dir"]
+            holder = os.path.dirname(relative)
+            # Bounded: `_short` cuts the END of a detail, so an unbounded path
+            # here would cost the reader the actionable clause that follows.
+            holder_label = ("`%s/`" % _short(holder, 48)) if holder else "the repo root"
+
+            # Is the file somewhere THIS TARGET walks by itself?  Keyed on the
+            # path, never on the target alone: a Claude Code rule written to
+            # `<plan-dir>/rules/` is no more loaded than a Codex one.  The
+            # prefix test covers subdirectories because the walk recurses
+            # (VERIFIED, adapters/claude-code.md 4.2).
+            native = bool(native_dir) and relative.startswith(native_dir.rstrip("/") + "/")
+
+            # Every detail below is capped at DETAIL_MAX (300) before it is
+            # emitted, and a truncated verdict is a verdict the user cannot
+            # act on -- so these stay short enough to arrive whole.
+            #
+            # Why an unreferenced rule is inert HERE, phrased for this target.
+            if native_dir:
+                why = (
+                    "%s is not a %s load path -- only `%s/` is walked natively (%s)"
+                    % (holder_label, self.profile["label"], native_dir, doc_ref)
+                )
+            else:
+                why = (
+                    "nothing on %s walks a prose rules directory, so the index-doc pointer IS "
+                    "the load path (%s)" % (self.profile["label"], doc_ref)
+                )
+
+            native_note = (
+                "loaded natively: %s walks `%s/` recursively and this rule is in it (VERIFIED, "
+                "%s)" % (self.profile["label"], native_dir, doc_ref)
+            )
 
             if not docs:
                 # An index doc that is on disk but unreadable (too large, bad
@@ -6359,13 +6448,30 @@ class Verifier(object):
                 # deleting a good rule on that basis would be worse than the
                 # gap.  Say what could not be read instead.
                 if unreadable:
+                    names = ", ".join(unreadable[:3])
+                    if native:
+                        detail = (
+                            "%s. Could not read %s, so the pointer went unchecked -- that is "
+                            "discoverability, not loading" % (native_note, names)
+                        )
+                    else:
+                        detail = (
+                            "could not read %s, so the wiring could not be checked; confirm by "
+                            "hand that the index doc points at this rule" % names
+                        )
+                    self.add("rule_wired", label, WARN, detail)
+                    continue
+                if native:
+                    # The probe that settled this ran in a scratch repo with NO
+                    # `CLAUDE.md` at all, and the rule still loaded.  "No index
+                    # doc" therefore says nothing about whether this file works.
                     self.add(
                         "rule_wired",
                         label,
                         WARN,
-                        "could not read %s, so the wiring could not be checked; confirm by "
-                        "hand that the index doc points at this rule"
-                        % ", ".join(unreadable[:3]),
+                        "%s. No index doc was built or found; it loads anyway -- the probe "
+                        "behind this ran in a repo with no CLAUDE.md at all -- so this is a "
+                        "discoverability note, never a fail" % native_note,
                     )
                     continue
                 self.add(
@@ -6373,9 +6479,7 @@ class Verifier(object):
                     label,
                     FAIL,
                     "no index doc (CLAUDE.md / AGENTS.md) was built or found, so nothing "
-                    "points at this rule; `%s/` is a repo convention, not a load "
-                    "path, and an unreferenced rule is a dead file (adapters section 4.2)"
-                    % holder,
+                    "points at this rule; %s, and an unreferenced rule is a dead file" % why,
                 )
                 continue
 
@@ -6392,20 +6496,38 @@ class Verifier(object):
                         break
                 break
 
+            searched = _short(" or ".join(doc_label for doc_label, _ in docs[:3]), 60)
+
             if not found:
+                if native:
+                    self.add(
+                        "rule_wired",
+                        label,
+                        WARN,
+                        "%s. Not in %s: a pointer there makes it discoverable to a human "
+                        "reading the repo, but it is not what loads the rule, so its absence "
+                        "is a note and never a fail"
+                        % (native_note, searched),
+                    )
+                    continue
                 self.add(
                     "rule_wired",
                     label,
                     FAIL,
-                    "not referenced from %s; `%s/` is a repo convention, not a "
-                    "%s load path, so an unreferenced rule is a dead file that costs "
-                    "nothing to read and does nothing (adapters section 4.2). Add a row for it "
-                    "to the index doc's Rules table, or remove the rule"
-                    % (
-                        " or ".join(doc_label for doc_label, _ in docs[:3]),
-                        holder,
-                        self.profile["label"],
-                    ),
+                    "not referenced from %s; %s, and an unreferenced rule is a dead file. Add "
+                    "a row for it to the index doc's Rules table, or remove the rule"
+                    % (searched, why),
+                )
+                continue
+
+            if native:
+                self.add(
+                    "rule_wired",
+                    label,
+                    PASS,
+                    "%s. Also in %s (%s) -- discoverability for a human, not the load path"
+                    % (native_note, found,
+                       "eager @import" if eager else "index table / link"),
                 )
                 continue
 
@@ -6413,8 +6535,9 @@ class Verifier(object):
                 "rule_wired",
                 label,
                 PASS,
-                "referenced from %s (%s)"
-                % (found, "eager @import" if eager else "index table / link"),
+                "referenced from %s (%s), which on %s is what loads it"
+                % (found, "eager @import" if eager else "index table / link",
+                   self.profile["label"]),
             )
 
     # -- hooks, the other direction ---------------------------------------
@@ -9124,9 +9247,11 @@ url = "https://mcp.linear.app/mcp"
 bearer_token_env_var = "LINEAR_API_KEY"
 """
 
-#: A rule no index doc points at.  `.claude/rules/` is not a load path, so this
-#: file is inert -- the 2026-09-04 probe that deleted both rule rows from the
-#: generated CLAUDE.md and still verified 34/0/0.
+#: A rule no index doc points at.  What that MEANS depends on where the file
+#: sits: under `.claude/rules/` Claude Code walks it natively and the missing
+#: pointer is only a discoverability note, while under `<plan-dir>/rules/` --
+#: or anywhere on Codex -- nothing walks the directory and the file really is
+#: inert.  The same bytes are used for both halves of that split below.
 _SELFTEST_RULE_ORPHAN = """---
 scope: "src/**"
 agentify-id: orphan
@@ -9903,29 +10028,96 @@ def selftest() -> int:
             ),
         )
 
-        # -- probe 1: a rule the index doc does not point at ------------------
-        # `.claude/rules/` is a repo convention, not a load path.  Deleting the
-        # rule's row from the generated CLAUDE.md leaves a file nothing reads,
-        # and the 2026-09-04 probe that did exactly that verified 34/0/0.
+        # -- probe 1: does anything LOAD the rule?  PER TARGET, per path ------
+        # MEASURED 2026-09-16, and the reason this block was rewritten: over a
+        # `target: claude-code` manifest with an unreferenced `paths:`-scoped
+        # `.claude/rules/db-access.md`, this row came back FAIL with
+        # "`.claude/rules/` is a repo convention, not a Claude Code load path".
+        # It is one -- walked natively AND recursively, VERIFIED by two live
+        # headless sessions in a scratch repo with no `CLAUDE.md` at all
+        # (adapters/claude-code.md 4.2).  SKILL.md phase 8 step 3 reads a FAIL
+        # as "fix or remove", so the check was telling the model to delete a
+        # correctly-loading artifact.
+        orphan_entry = {
+            "id": "orphan", "type": "rule", "path": ".claude/rules/orphan.md",
+            "action": "created",
+            "evidence": "corrections: 'stop importing from the barrel file' x2",
+        }
         with open(os.path.join(rules_dir, "orphan.md"), "w") as handle:
             handle.write(_SELFTEST_RULE_ORPHAN)
-        code, result, _raw = verify(
-            "orphan-manifest.json",
-            [{"id": "orphan", "type": "rule", "path": ".claude/rules/orphan.md",
-              "action": "created",
-              "evidence": "corrections: 'stop importing from the barrel file' x2"}],
-        )
+        code, result, _raw = verify("orphan-manifest.json", [orphan_entry])
         status, detail = worst(result, "rule_wired")
         add(
-            "a rule no index doc references FAILS as a dead file",
-            status == FAIL,
-            "%s: %s" % (status, detail[:110]),
+            "an unreferenced `.claude/rules/` rule WARNS -- Claude Code loads it anyway",
+            # The last clause matters as much as the verdict: details are cut
+            # at DETAIL_MAX, and a row truncated before "never a fail" reads to
+            # phase 8 exactly like the FAIL this used to be.
+            status == WARN
+            and "loaded natively" in detail
+            and "never a fail" in detail
+            and not detail.endswith("..."),
+            "%s (%d chars): %s" % (status, len(detail), detail[:130]),
+        )
+        add(
+            "...and leaves phase 8 no failure to act on",
+            result.get("summary", {}).get("fail", -1) == 0,
+            str(result.get("summary")),
         )
         status, detail = worst(result, "rule_contradiction")
         add(
             "the unwired rule is otherwise clean (no false contradiction)",
             status == PASS,
             "%s: %s" % (status, detail[:90]),
+        )
+
+        # The native walk RECURSES, so `.claude/rules/api/<name>.md` is loaded
+        # exactly like a top-level rule and gets the same verdict.
+        nested_rules = os.path.join(rules_dir, "api")
+        if not os.path.isdir(nested_rules):
+            os.makedirs(nested_rules)
+        with open(os.path.join(nested_rules, "orphan.md"), "w") as handle:
+            handle.write(_SELFTEST_RULE_ORPHAN)
+        code, result, _raw = verify(
+            "nested-orphan-manifest.json",
+            [dict(orphan_entry, path=".claude/rules/api/orphan.md")],
+        )
+        status, detail = worst(result, "rule_wired")
+        add(
+            "the native walk recurses: a rule in `.claude/rules/api/` warns, not fails",
+            status == WARN and result.get("summary", {}).get("fail", -1) == 0,
+            "%s: %s" % (status, detail[:110]),
+        )
+
+        # ...and the verdict keys on WHERE THE FILE SITS, never on the target
+        # alone.  Nothing walks `<plan-dir>/rules/` on either target, so an
+        # unreferenced rule there is genuinely inert and stays a FAIL.
+        plan_rules = os.path.join(fixture, "docs", "agentic-setup", "rules")
+        if not os.path.isdir(plan_rules):
+            os.makedirs(plan_rules)
+        with open(os.path.join(plan_rules, "orphan.md"), "w") as handle:
+            handle.write(_SELFTEST_RULE_ORPHAN)
+        offpath_entry = dict(orphan_entry, path="docs/agentic-setup/rules/orphan.md")
+        code, result, _raw = verify("offpath-orphan-manifest.json", [offpath_entry])
+        status, detail = worst(result, "rule_wired")
+        add(
+            "a Claude Code rule OUTSIDE `.claude/rules/` is still a dead file (FAIL)",
+            status == FAIL and ".claude/rules/" in detail,
+            "%s: %s" % (status, detail[:130]),
+        )
+
+        # On CODEX nothing walks a directory of prose convention documents at
+        # all (VERIFIED, adapters/codex.md 4.2.1), so there the `AGENTS.md`
+        # pointer IS the load path and its absence is right to fail.
+        code, result, _raw = verify(
+            "codex-orphan-manifest.json", [offpath_entry], top={"target": "codex"}
+        )
+        status, detail = worst(result, "rule_wired")
+        add(
+            "on Codex an unreferenced prose rule still FAILS: the pointer is the load path",
+            status == FAIL
+            and "nothing on Codex walks a prose rules directory" in detail
+            and not detail.endswith("..."),
+            "%s (%d chars): %s" % (status, len(detail), detail[:130]),
         )
 
         code, result, _raw = verify("wired-manifest.json", [rule_bun])

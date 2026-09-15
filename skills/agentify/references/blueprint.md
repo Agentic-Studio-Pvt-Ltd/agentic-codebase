@@ -171,11 +171,11 @@ subagent; this table is what to look for, and what each one must contain to pass
 
 | Subagent | Fires on | Must contain, from this repo |
 |---|---|---|
-| **db-inspector** / **db-manager** | a database service in `external_services[]` (`postgres`, `neon`, `supabase`, `planetscale`, `mongodb`, `redis`) or an ORM in `frameworks[]` (`Prisma`, `Drizzle ORM`, `SQLAlchemy`, `TypeORM`) | the schema directory, the migration directory and command, the ORM's own query idiom, and a **read-only tool allowlist** when the agent supports one. Name the tables or schema files it may read |
+| **db-inspector** / **db-manager** | a database service in `external_services[]` (`postgres`, `neon`, `supabase`, `planetscale`, `mongodb`, `redis`) or an ORM in `frameworks[]` (`Prisma`, `Drizzle ORM`, `SQLAlchemy`, `TypeORM`) | the schema directory, the migration directory and command, the ORM's own query idiom, and a **read-only tool allowlist** where the target has one (Claude Code `tools:`; Codex has none). Name the tables or schema files it may read. **The read-only promise itself is enforced service-side** — §3.1 |
 | **pr-reviewer** | `>= 2` non-bot rows in `signals.git.contributors[]`, or a `contributing`/`pr-template` doc in `docs[]`, or `pain_signals[]` about review. **Fires on a `solo` repo too** — reviewing your own diff before it lands is the commonest use; `team_size` changes its wording, never its eligibility | the repo's own rules as the review checklist — every rule file this run builds, by path — plus the commit convention and the test command it must confirm ran |
 | **security-auditor** | any of: `.env*` files present, an auth service in `external_services[]` (`better-auth`, `clerk`, `auth0`, `next-auth`), a payments service (`stripe`, `revenuecat`), or `env_var_names` naming secrets | the actual env var names (names only, never values), the auth entry points, and the specific classes of leak this stack allows |
 | **designer** / **ui-reviewer** | a design system in `frameworks[]` (`Tailwind CSS`, `styled-components`, `Storybook`, `shadcn/ui`) plus a components zone in `folders[]`, or a `docs[]` row of kind `design` | the component directory and its `subdirs` split, the design tokens file, the existing component conventions read off the repo, and the design doc's own rules — including its banned list, which is also a §4.1 doc-stated check. An existing `design` skill that routes design work covers neither this nor `new-component` (§2.1) |
-| **product-analyst** | an analytics service (`posthog`, `mixpanel`, `amplitude`, `segment`) | the event names already in the codebase, the analytics client module, and read-only query access. A user-scope analytics plugin covers nothing (§2.1) |
+| **product-analyst** | an analytics service (`posthog`, `mixpanel`, `amplitude`, `segment`) | the event names already in the codebase, the analytics client module, and read-only query access — which means a read-scoped analytics key, not a sentence in the prompt (§3.1). A user-scope analytics plugin covers nothing (§2.1) |
 | **test-runner** / **qa** | `commands.test` non-empty **and** `test_discipline.commits_touching_tests_pct` low, or `pain_signals[]` about failing tests | the exact test command, the test directory layout, and how to read this repo's failures |
 | **codebase-explorer** | `repo.size_bucket == "large"`, or `folders[]` spanning `>= 5` zones | the zone map — which directory holds what — so it does not rediscover it every time |
 
@@ -184,12 +184,49 @@ Two disciplines:
 - **Tool restriction is the point, when the target supports it.** A read-only db subagent with
   write tools is a db subagent with a bug. Claude Code has a per-agent `tools` allowlist; Codex has
   `sandbox_mode` and `mcp_servers` and no direct equivalent — say so in the plan
-  (`adapters/capabilities.md`).
+  (`adapters/capabilities.md`). It restricts what the agent may *call*; §3.1 covers what it does
+  **not** restrict.
 - **A subagent that duplicates a skill is one artifact too many.** §2.1 of `mapping-rules.md`
   decides; do not build two artifacts that each do the whole job. A **pair** — an entry-point skill
   delegating to a tool-restricted subagent — is one proposal, not a duplicate (§1.3).
 - **Use the catalogue name** (§1.3). `pr-reviewer`, not `diff-reviewer`; `db-inspector`, not
   `database-helper`.
+
+---
+
+### 3.1 "Read-only" against a real service is enforced service-side
+
+Four of the catalogue's artifacts — `db-inspector`, `query-db`, `ask-product`, `product-analyst` —
+promise read-only access to something that is **not on this disk**: a hosted Postgres, an analytics
+API. Four different things get called "read-only" in that promise. **Only the last is a guarantee**;
+the first three are worth building and are not proof of anything.
+
+| Mechanism | Constrains | Does **not** constrain |
+|---|---|---|
+| a tool allowlist (Claude Code `tools:`) | which tools the agent may call. Real, and the strongest thing either target has | the far end of a connection string. A permitted `Bash`, or an MCP server holding a read-write credential, still reaches the service |
+| a local sandbox (Codex `sandbox_mode = "read-only"`) | the local filesystem and the processes run against this checkout | **anything reached over the network** — so it says nothing at all about a remote database or API, which is exactly this case |
+| prose in the skill or the subagent's system prompt ("you never write") | the model's default behaviour, strongly | nothing mechanically. It is an instruction to a custom agent, not an unrestricted replacement for the host's own higher-priority instructions, and an active parent runtime override may be reapplied to a child — documented behaviour, not something agentify has exercised (`adapters/codex.md` §4.5.1) |
+| **a read-only database role, a read-scoped API key, a replica connection string** | **the service itself, for every client presenting that credential** | — this is the one that actually holds |
+
+So: keep the allowlist, keep `sandbox_mode = "read-only"`, keep the refusals. They are worth having
+and they are what the artifact is built with. **Just never offer them to the user as the proof.**
+Three obligations follow, and they apply on both targets:
+
+1. **The plan says what is enforced and by what.** "`query-db` is restricted to read-only" is a
+   false claim when the only mechanisms present are a sandbox line and a paragraph. Write which
+   mechanism does which job, and which one is the guarantee.
+2. **agentify never provisions a credential**, so where no read-only credential exists the report's
+   needs-you section carries **"create a read-only role/credential for `<service>` and point
+   `<ENV_VAR_NAME>` at it"** as a numbered step, and the generated artifact names the credential it
+   expects. This is the same discipline as the trust gate: state the gap, do not work around it.
+3. **Verify effective permissions; never infer them.** `SELECT current_user` plus the provider's own
+   role listing, or a deliberate failing write against a scratch table — not what the frontmatter or
+   the TOML says.
+
+The Codex mechanics behind this are `adapters/codex.md` §4.5.1; phases 3–6 do not open an adapter,
+so this section is the statement they use. It is also **not** a reason to drop any of the four
+artifacts: a `query-db` skill against a read-write credential is still the right artifact, described
+honestly, with step 2 on the checklist.
 
 ---
 
@@ -314,9 +351,9 @@ want at the phase 6 gate, by number.
 |---|---|---|
 | `linear`, `jira` | **create-issue** — turn a description into a properly-formed ticket | the team's label and project names where discoverable, the ticket template, the repo's own definition-of-done, and a context-gathering step that reads the codebase before writing the issue |
 | `posthog`, `mixpanel`, `amplitude`, `segment` | **add-product-analytics** — instrument a feature | the analytics client module in this repo, the existing event-naming convention read off the code, and the product's own KPIs where a doc states them |
-| same | **ask-product** — answer a question with a **read-only** query | the project's real event names, and a hard read-only constraint |
+| same | **ask-product** — answer a question with a **read-only** query | the project's real event names, and a read-only constraint that names its own mechanism — the read-scoped analytics key is the guarantee, the prompt's refusal is defense in depth (§3.1) |
 | same | **build-dashboard** — assemble a view from events already in the code | the events this repo emits, by name |
-| `neon`, `postgres`, `supabase`, `planetscale` | **query-db** — answer a data question, read-only, delegating to the db subagent (§3) | the schema, the connection env var **name**, and a read-only tool restriction |
+| `neon`, `postgres`, `supabase`, `planetscale` | **query-db** — answer a data question, read-only, delegating to the db subagent (§3) | the schema, the connection env var **name**, and the target's own tool restriction where it has one — plus, because the database is remote, the read-only role or replica that env var should point at, stated as the actual guarantee (§3.1) |
 | `stripe`, `revenuecat` | **billing-change** — add or change a plan, price or entitlement | the pricing model in the code, the webhook handler path, the test-mode workflow |
 | `resend`, `sendgrid`, `twilio` | **send-notification** — add a transactional message | the template directory, the sending module, the existing message tone |
 | `sentry`, `datadog` | **triage-error** — take an error and produce a diagnosis | the release/environment tagging this repo uses, and the source-map or symbol setup |

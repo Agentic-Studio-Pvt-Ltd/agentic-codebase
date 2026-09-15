@@ -1,6 +1,6 @@
 # agentify
 
-**agentify reads your repo and your own Claude Code transcripts, works out what you keep doing by hand, and builds the agentic setup that fits — after you approve a written plan.**
+**agentify reads your repo and your own Claude Code or Codex transcripts, works out what you keep doing by hand, and builds the agentic setup that fits — after you approve a written plan.**
 
 ```
 /plugin marketplace add PLACEHOLDER-ORG/agentify
@@ -41,7 +41,7 @@ Eight phases. Each has a defined input, output, and stop condition, so a run can
 | 7 | **Build** | The tree has to be clean or you override it explicitly. Artifacts are generated on a branch, in dependency order, with a checkpoint after each type, and committed to that branch — an empty branch deletes without undoing anything. |
 | 8 | **Verify and hand off** | Every artifact goes through deterministic checks — it exists, it parses, its frontmatter is right, its evidence matches the plan, its ID is unique, no secret is in an MCP draft, no rule contradicts what the repo actually does. The report is written, and you get a branch or a staged diff. Generated hooks are scanned statically; agentify **asks** before it runs one. |
 
-Phases 1 and 2 are deterministic scripts; 3 through 6 are model reasoning. The model never scrapes your transcripts directly — the miner pre-aggregates them to a compact report first, so a year of history costs the same context as a week of it.
+Phases 1 and 2 are deterministic scripts; 3 through 8 are model reasoning. Phases 3 through 6 reason from the scripts' JSON and nothing else — the model never scrapes your repo or your transcripts directly, because the miner pre-aggregates them to a compact report first, so a year of history costs the same context as a week of it. Phase 7 may open files, but only the ones an artifact's own evidence names, and phase 8 adds a deterministic verifier pass (`verify_artifacts.py`) underneath the model's checks.
 
 **The rule that makes the output worth keeping:** every generated artifact traces to a concrete signal — a transcript pattern with a count, a package script, a dependency, a commit convention. This is not a template with your repo name substituted in. If there is no evidence, nothing gets built.
 
@@ -77,11 +77,11 @@ What replaced them:
 - **A personalization test on every file.** Five checks, and the sharp one is: *name a repo this file would be false in.* A file that would read identically in an unrelated project is a template, and it gets rewritten rather than shipped.
 - **De-duplication, unconditionally — against the right thing.** A candidate is skipped as "already covered" only by an artifact of the same type, inside your repo, that does the same job — your own, and checked against your actual commands and paths rather than trusted. A third-party library guide you installed is generic by construction, so it becomes a reference the generated skill links to, not a reason to skip it. Your `CLAUDE.md` stating a convention is the reason to scope a rule to that zone, not the reason to skip the rule. Nothing existing is ever restructured, rewritten or moved.
 
-**Only what is in the repo counts as the repo's setup.** Skills in `~/.claude/skills` or `~/.codex/skills` load everywhere on your machine and in nobody else's clone; they say nothing about this project and never stand in for an artifact here. If a generated skill shares a name with one of them, the report says so and both load.
+**Only what is in the repo counts as the repo's setup.** Skills in `~/.claude/skills`, or in Codex's user-scope skills directory (`${CODEX_HOME}/skills` — resolved through `CODEX_HOME`, never assumed to be under `~/.codex`), load everywhere on your machine and in nobody else's clone; they say nothing about this project and never stand in for an artifact here. If a generated skill shares a name with one of them, the report says so and both load.
 
 ## Safety and privacy
 
-- **Local only, with two named exceptions and no others.** The analyzer scripts open no sockets, and the default run makes no network call at all. There are exactly two paths that can, both read-only, both through your own already-authenticated GitHub CLI, and both disclosed here rather than buried: `mine_git.py` can run `gh pr list` to learn your PR conventions — a default run passes `--no-gh` and skips it, giving that evidence up on purpose — and `mine_git.py` can ask `gh` whether you can push to the remote, which is how the report knows whether to tell you a PR is even an option for you. **agentify itself never pushes and never opens a pull request** — it leaves the branch and tells you what your own options are. Neither call sends any repo content. Nothing else, anywhere in the tool, opens a connection.
+- **Local only, with one named exception and no others.** The analyzer scripts open no sockets, and the default run makes no network call at all. There is exactly one path that can, read-only, through your own already-authenticated GitHub CLI, and disclosed here rather than buried: `mine_git.py` can run `gh pr list` to learn your PR conventions, gated behind a `gh auth status` probe. **A default run passes `--no-gh`, which skips the probe and the listing alike**, giving that evidence up on purpose, which is why a default run makes no network call at all. The call sends no repo content — `gh` only reads. Nothing else, anywhere in the tool, opens a connection. **agentify itself never pushes and never opens a pull request**; it leaves the branch for you. It does not check whether you *can* push either — the push-access ladder that used to (`gh auth status`, `gh repo view --json viewerPermission`) was removed with the PR question, and `mine_git.py` carries no trace of it (`docs/DECISIONS.md` §2.27).
 - **Python standard library only.** No dependencies to audit, nothing to `pip install`.
 - **No telemetry.** None, by default or otherwise. There is nothing to opt out of.
 - **Consent every run.** Transcript access is asked for each time: yes, no, or yes but only the last N days. Answering no still produces a setup, derived from code and git alone, and the plan says so.
@@ -101,7 +101,7 @@ What replaced them:
 From the v1 non-goals, stated plainly so you know what you are getting:
 
 - **It will not auto-configure MCP servers that need credentials.** It recommends servers and drafts the config; you authenticate.
-- **It does not support Cursor, Windsurf, or Gemini CLI.** Claude Code first, Codex second. The adapter layer exists so those can be contributed.
+- **It does not support Cursor, Windsurf, or Gemini CLI.** Claude Code and Codex are both supported in v1 — nothing is substituted on either. The adapter layer exists so the others can be contributed.
 - **There is no hosted or web version.** It runs entirely inside your agent, on your machine.
 - **It does not monitor or detect drift.** A `doctor` mode that reruns monthly is on the roadmap, not in v1.
 - **It collects no telemetry.**
@@ -154,7 +154,9 @@ Verify any route with `python3 ~/.claude/skills/agentify/scripts/discover.py --h
 
 ### Codex
 
-Codex has no plugin marketplace, so it is a file copy either way. Codex reads skills from `<repo>/.agents/skills/` and from its user-scoped skills directory; **resolve that one through `CODEX_HOME`, never a hardcoded `~/.codex`** — Codex sets `CODEX_HOME` in the environment of the commands it spawns, and it is not always your home directory.
+**It is a file copy on Codex, and the reason is about agentify rather than about Codex.** Codex does have a plugin route: it ships `codex plugin` and `codex plugin marketplace` commands, it keeps marketplace and plugin state in `${CODEX_HOME}/config.toml` (`[marketplaces.*]`, `[plugins."<plugin>@<marketplace>"]`), it caches installs under `${CODEX_HOME}/plugins/cache/<marketplace>/<plugin>/<version>/`, and `.codex-plugin/plugin.json` is a real manifest schema — those last three are recorded as **VERIFIED** in [`skills/agentify/adapters/codex.md`](skills/agentify/adapters/codex.md) (§3's paths table and §4.7). What is missing is on our side: **agentify ships no `.codex-plugin/plugin.json` of its own yet.** This repo carries only the Claude Code manifest (`.claude-plugin/plugin.json`), so route 1 above has no Codex counterpart and there is nothing for `codex plugin` to install. Copy the files until that manifest exists. (Earlier versions of this README said Codex has no plugin marketplace. That was wrong.)
+
+Codex reads skills from `<repo>/.agents/skills/` and from its user-scoped skills directory; **resolve that one through `CODEX_HOME`, never a hardcoded `~/.codex`** — Codex sets `CODEX_HOME` in the environment of the commands it spawns, and it is not always your home directory.
 
 #### 1. Per-repo (recommended)
 

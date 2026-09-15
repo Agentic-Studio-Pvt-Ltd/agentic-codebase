@@ -102,9 +102,13 @@ execpolicy check --pretty --rules <f> -- <cmd>` validates one.
 **Subagents → Codex.** Near-direct: `name`→`name`, `description`→`description`, markdown
 body→`developer_instructions`, `model`→`model` (**[D+M 0.152.1]**, cross-checked against eight
 production files). They are real separate threads, so isolated context, delegation and parallelism
-are all present. **One loss:** no found equivalent of Claude Code's per-agent `tools` allowlist
-(nearest: `sandbox_mode`, `mcp_servers`) — say so when a candidate's value depended on tool
-restriction. **[U] that a newly written `.codex/agents/*.toml` is actually loaded**: subagents are
+are all present. **One loss:** no per-agent `tools` allowlist. `sandbox_mode` and `mcp_servers` are
+the nearest things, **not equivalents** — neither restricts which tools the agent may call, and
+`sandbox_mode` governs the local filesystem and process sandbox only, so it constrains **no remote
+database or API**. Say so when a candidate's value depended on tool restriction. Where a candidate
+promises read-only access to a real service, the enforcement is **service-side on both targets** —
+a read-only role or credential — with the sandbox and the agent's own instructions as defence in
+depth, never as the guarantee (`blueprint.md` §3.1; Codex mechanics in `adapters/codex.md` §4.5.1). **[U] that a newly written `.codex/agents/*.toml` is actually loaded**: subagents are
 exposed through a spawn tool at turn time rather than in the base prompt, so no read-only probe can
 confirm it (`adapters/codex.md` §4.5). Phase 8 therefore validates a Codex subagent **statically
 only**, and the live check is a numbered manual step in the report — say "written and statically

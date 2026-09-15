@@ -180,13 +180,16 @@ AGENTIFY_MARKER = "agentify:begin"
 #: `scan_agentic_dirs` WITH symlinks followed -- see that function for why and
 #: for the bounds that keep it safe.
 #
-#: Codex note (verified 2026-09-05 against codex-cli 0.152.1): the repo-level
-#: skills root is `.agents/skills`, NOT `.codex/skills`.  `.codex/skills` is
-#: kept here anyway -- it is not a load path, but a directory a user created
-#: by following the old guidance is still an artifact that must be
-#: de-duplicated against, and a warning tells them it is inert.  Codex's real
-#: repo-scoped homes are `.codex/agents/*.toml`, `.codex/rules/*.rules`,
-#: `.codex/hooks.json` and `.codex/hooks/`.
+#: Codex note (measured 2026-09-05 against codex-cli 0.152.1): the repo-level
+#: skills root agentify WRITES is `.agents/skills` -- the documented,
+#: cross-tool one.  `.codex/skills` is scanned too, and it is not dead: a
+#: `<repo>/.codex/skills/<name>/SKILL.md` also came back from `skills/list`
+#: with `scope: "repo"` in the same measured probe.  It is undocumented and
+#: unused in the wild, which is why agentify does not write there; skills
+#: found there are real artifacts that must be de-duplicated against, and the
+#: warning says which path agentify uses and why rather than calling theirs
+#: dead.  Codex's other repo-scoped homes are `.codex/agents/*.toml`,
+#: `.codex/rules/*.rules`, `.codex/hooks.json` and `.codex/hooks/`.
 AGENTIC_CONFIG_DIRS = (
     ".claude/skills", ".claude/agents", ".claude/rules", ".claude/commands",
     ".claude/hooks",
@@ -3781,8 +3784,11 @@ def parse_codex_mcp_servers(text):
 # warning text they produce, never asserted.
 #
 #   repo scope      `<repo>/AGENTS.md`, `AGENTS.override.md`  index doc
-#                   `<repo>/.agents/skills/<name>/SKILL.md`   skills  (NOT
-#                                                             `.codex/skills`)
+#                   `<repo>/.agents/skills/<name>/SKILL.md`   skills  (the
+#                                                             path agentify
+#                                                             writes;
+#                                                             `.codex/skills`
+#                                                             also loads)
 #                   `<repo>/.codex/agents/<name>.toml`        subagents
 #                   `<repo>/.codex/rules/<name>.rules`        command policy
 #                   `<repo>/.codex/hooks.json` + `.codex/hooks/`   hooks
@@ -3823,11 +3829,15 @@ def claude_home_dir():
 
 
 #: Repo-scoped Codex artifact homes, and what each one is.  `.codex/skills` is
-#: deliberately absent: it is NOT a Codex skills root (the roots table Codex
-#: 0.152.1 wrote into a live session lists `$CODEX_HOME/skills`,
-#: `$HOME/.agents/skills`, `$CODEX_HOME/skills/.system` and the plugin caches;
-#: the docs' repo row is `.agents/skills`).  A directory found there is still
-#: counted as an existing artifact for de-duplication and warned about.
+#: deliberately absent from this constant -- not because it is dead, but
+#: because it is not the path agentify WRITES.  The roots table Codex 0.152.1
+#: wrote into a live session lists `$CODEX_HOME/skills`, `$HOME/.agents/skills`,
+#: `$CODEX_HOME/skills/.system` and the plugin caches, and the docs' repo row is
+#: `.agents/skills`; `<repo>/.codex/skills/<name>/SKILL.md` nonetheless ALSO
+#: loaded, with `scope: "repo"`, in the measured probe (codex-cli 0.152.1) --
+#: it is undocumented and unused in the wild, not unloaded.  A skill found
+#: there is counted as an existing artifact for de-duplication, and the warning
+#: names the path agentify writes and the reason.
 CODEX_REPO_SKILL_DIR = ".agents/skills"
 CODEX_REPO_AGENT_DIR = ".codex/agents"
 CODEX_REPO_RULES_DIR = ".codex/rules"
@@ -4842,7 +4852,7 @@ def _artifact_stem(name):
 #: same table, and they have to stay that way -- where it drifted, a linked
 #: artifact was counted and then missing from `symlinked`, which is the list
 #: the plan reads to know what it must never edit.  Three roots were wrong:
-#: `.agents/skills/` (Codex's verified repo skills root) had no row at all,
+#: `.agents/skills/` (the repo skills root agentify writes) had no row at all,
 #: `.codex/agents/<name>.toml` had `.md` stripped so a linked `qa.toml`
 #: reported as `qa.toml` against a counted `qa`, and `.codex/rules/` had no
 #: row either.
@@ -5051,9 +5061,10 @@ def detect_agentic_config(root, state, reader, warnings):
         _resolved_seen[resolved] = rel_dir
         return False
 
-    #: `.codex/skills/` is NOT a Codex load path (§ the roots table Codex
-    #: 0.152.1 wrote into a live session).  Anything found there is counted for
-    #: de-duplication and the user is told it is inert.
+    #: `.codex/skills/` DOES load -- measured on codex-cli 0.152.1, with
+    #: `scope: "repo"` -- it is simply undocumented, so it is not the path
+    #: agentify writes.  Anything found there is counted for de-duplication
+    #: and the user is told which path agentify uses and why.
     _codex_skills_dir_used = False
 
     for rel in sorted(paths):
@@ -5077,11 +5088,13 @@ def detect_agentic_config(root, state, reader, warnings):
             rules.append(rel)
             _add_row("rules", rel, "cursor", rel)
         # -- Codex, repo scope ---------------------------------------------
-        # `.agents/skills/<name>/SKILL.md` is the VERIFIED repo-level Codex
+        # `.agents/skills/<name>/SKILL.md` is the DOCUMENTED repo-level Codex
         # skills root (the docs' scope table; `$REPO/.agents/skills` and
-        # `$CWD/.agents/skills`).  It is `.agents/`, not `.codex/`, and it is
-        # also the shared store `.claude/skills` is commonly symlinked into --
-        # hence target `shared` and the resolved-path de-duplication.
+        # `$CWD/.agents/skills`) and the one agentify writes.  It is not the
+        # only one that loads -- `.codex/skills/` does too, see its branch
+        # below -- it is the one that is documented and cross-tool: the shared
+        # store `.claude/skills` is commonly symlinked into, hence target
+        # `shared` and the resolved-path de-duplication.
         elif rel.startswith(".agents/skills/") and len(parts) >= 3:
             if parts[-1].upper() == SKILL_ENTRYPOINT:
                 name = parts[2]
@@ -5130,9 +5143,12 @@ def detect_agentic_config(root, state, reader, warnings):
     hooks = []
     #: Codex-specific facts phase 6 and phase 8 need and cannot get anywhere
     #: else.  `repo_trust_level` is the big one: `[projects."<abs path>"]
-    #: trust_level` gates AGENTS.md, `.codex/config.toml`, `.codex/hooks.json`
-    #: and `.codex/rules/` all at once, so an untrusted repo makes every
-    #: repo-scoped Codex artifact agentify writes inert.  That is the most
+    #: trust_level` gates `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json`
+    #: and `.codex/rules/` all at once, so an untrusted repo silently loses the
+    #: index doc, the hooks and the command policy.  Repo-scoped SKILLS are the
+    #: measured exception: `.agents/skills/**` loaded under `trusted`, under
+    #: `untrusted`, and with no `[projects]` entry at all (codex-cli 0.152.1),
+    #: so the gate is not "every repo-scoped artifact".  It is still the most
     #: likely silent failure of a generated Codex setup.
     codex_block = {
         "repo_trust_level": "",
@@ -5378,11 +5394,15 @@ def detect_agentic_config(root, state, reader, warnings):
         if _codex_skills_dir_used:
             emitlib.warn(
                 warnings,
-                ".codex/skills/ holds skill directories, but it is NOT a Codex "
-                "skills root -- the repo-level root is .agents/skills/ "
-                "(verified 2026-09-05, codex-cli 0.152.1).  They are counted "
-                "for de-duplication; say in the plan that they are inert where "
-                "they are, and never write a new skill to .codex/skills/",
+                ".codex/skills/ holds skill directories.  That path DOES load "
+                "-- measured 2026-09-05 on codex-cli 0.152.1, a skill there "
+                "came back from skills/list with scope: \"repo\" -- but it is "
+                "undocumented and unused in the wild, so agentify writes "
+                "repo-level skills to .agents/skills/ instead: the documented "
+                "cross-tool root a Claude Code install can share.  That is a "
+                "choice about which path agentify supports, not a verdict on "
+                "theirs.  Count them for de-duplication, leave them exactly "
+                "where they are, and never write a NEW skill to .codex/skills/",
             )
         # hook scripts sitting beside a hooks.json
         for rel in sorted(paths):
@@ -5471,7 +5491,10 @@ def detect_agentic_config(root, state, reader, warnings):
     # was read reported every trusted repo as untrusted.  This is the single
     # most likely silent failure of a generated Codex setup: one key gates
     # AGENTS.md, .codex/config.toml, .codex/hooks.json and .codex/rules/ at
-    # once.
+    # once.  It does NOT gate repo-scoped skills: `.agents/skills/**` loaded
+    # trusted, untrusted, and with no [projects] entry at all (measured,
+    # codex-cli 0.152.1), so the warning names those four and never "every
+    # repo-scoped artifact".
     if ("codex" in targets or any(row["target"] in ("codex", "shared")
                                   for row in artifact_rows)):
         if codex_block["repo_trust_level"] not in ("trusted", "verified"):
@@ -5479,11 +5502,20 @@ def detect_agentic_config(root, state, reader, warnings):
                 warnings,
                 "Codex project trust for this repo is %s.  "
                 "[projects.\"<abs path>\"] trust_level gates AGENTS.md, "
-                ".codex/config.toml, .codex/hooks.json and .codex/rules/ "
-                "together -- every repo-scoped Codex artifact is inert without "
-                "it.  Put trusting the project in the plan's capability notes "
-                "and in the report's manual checklist; agentify never edits "
-                "the user's config.toml to set it"
+                ".codex/config.toml, .codex/hooks.json and .codex/rules/ -- "
+                "without it those four are silently absent.  Repo-scoped "
+                "SKILLS are the measured exception: .agents/skills/** loaded "
+                "trusted, untrusted, and with no [projects] entry at all "
+                "(measured 2026-09-05, codex-cli 0.152.1), so never report a "
+                "skill as blocked by trust.  Note also that no [projects] "
+                "entry is not the same state as an explicit untrusted -- a "
+                "first-seen project still rendered the AGENTS.md section "
+                "(measured, codex-cli 0.153.1), though a real interactive "
+                "session prompts to trust a new directory and whether that "
+                "prompt gates the same content is UNVERIFIED.  Put trusting "
+                "the project in the plan's capability notes and in the "
+                "report's manual checklist; agentify never edits the user's "
+                "config.toml to set it"
                 % (("declared %s" % codex_block["repo_trust_level"])
                    if codex_block["repo_trust_level"]
                    else "not declared in any config.toml this scan read"),
@@ -6517,12 +6549,21 @@ def selftest():
                      for r in rows4)),
             str([(r["kind"], r["target"], r["count"]) for r in rows4][:6]),
         )
+        _codex_skills_warns = [
+            w for w in (result4.get("warnings") or [])
+            if w.startswith(".codex/skills/ holds")]
         add(
-            ".agents/skills is the repo skills root and .codex/skills is inert",
+            ".codex/skills counts for de-duplication and the warning names "
+            ".agents/skills as the path agentify writes",
             (codex4.get("skills_root") == ".agents/skills"
              and "stale-skill" in (config4.get("skills") or [])
-             and "NOT a Codex skills root" in warn4),
-            "%s %s" % (codex4.get("skills_root"), config4.get("skills")),
+             and len(_codex_skills_warns) == 1
+             and "DOES load" in _codex_skills_warns[0]
+             and "0.152.1" in _codex_skills_warns[0]
+             and "agentify writes" in _codex_skills_warns[0]
+             and ".agents/skills/" in _codex_skills_warns[0]),
+            "%s %s | %s" % (codex4.get("skills_root"), config4.get("skills"),
+                            (_codex_skills_warns or [""])[0][:120]),
         )
         add(
             "project trust and the hooks feature flag are reported",
@@ -6533,10 +6574,59 @@ def selftest():
             emitlib.serialize(codex4)[:200],
         )
         add(
-            "an untrusted repo is warned about, because every artifact is inert",
-            ("trust_level gates AGENTS.md" in warn4
+            "an untrusted repo is warned about, naming the four artifacts trust "
+            "gates and skills as the measured exception",
+            (("trust_level gates AGENTS.md" in warn4
+              and ".codex/hooks.json and .codex/rules/" in warn4
+              and "SKILLS are the measured exception" in warn4
+              and ".agents/skills/** loaded" in warn4)
              or codex4.get("repo_trust_level") in ("trusted", "verified")),
             warn4[:160],
+        )
+        #: F17 residual.  Two claims this analyzer used to emit were RETRACTED
+        #: on 2026-09-15 in `adapters/capabilities.md` and `adapters/codex.md`,
+        #: and phase 6 reads these warning strings verbatim into the plan:
+        #:
+        #:   * "`.codex/skills/` is NOT a Codex skills root ... they are inert"
+        #:     -- false.  `<repo>/.codex/skills/<name>/SKILL.md` loads with
+        #:     `scope: "repo"` (measured, codex-cli 0.152.1).  agentify writing
+        #:     `.agents/skills/` is a choice about which path is supportable,
+        #:     not a claim that the other one is dead.
+        #:   * "trust ... gates ... together -- every repo-scoped Codex artifact
+        #:     is inert without it" -- false.  Repo-scoped SKILLS are the
+        #:     measured exception: `.agents/skills/**` loaded trusted,
+        #:     untrusted, and with no `[projects]` entry at all.  Trust gates
+        #:     `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json` and
+        #:     `.codex/rules/`, and those four only.
+        #:
+        #: Assert the retracted wording is GONE rather than trusting a reviewer
+        #: to notice it come back -- the adapters were corrected a round before
+        #: this script was, which is how the two drifted apart in the first
+        #: place.  The phrase list is global over every warning; the bare word
+        #: `inert` is banned only in the two warnings this check owns, because
+        #: it is a fair word for, say, an unreferenced Codex rule file.
+        _retracted_phrases = (
+            "not a codex skills root",
+            "is not a codex load path",
+            "is not a load path",
+            "every repo-scoped codex artifact is inert",
+            "artifact is inert without it",
+            "inert where they are",
+            "they are inert",
+        )
+        _owned_warns = [w for w in (result4.get("warnings") or [])
+                        if w.startswith(".codex/skills/ holds")
+                        or "trust_level gates" in w]
+        _hits = [p for p in _retracted_phrases if p in warn4.lower()]
+        _hits += ["inert" for w in _owned_warns if "inert" in w.lower()]
+        add(
+            "the RETRACTED .codex/skills-is-inert and trust-gates-everything "
+            "sentences appear in no warning",
+            not _hits,
+            ("retracted wording still emitted: %s" % ", ".join(sorted(set(_hits))))
+            if _hits else
+            ("clean across %d warning(s), %d of them owned"
+             % (len(result4.get("warnings") or []), len(_owned_warns))),
         )
         add(
             "user-scope Codex config is reported but never fed into maturity",

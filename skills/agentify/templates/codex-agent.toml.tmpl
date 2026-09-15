@@ -30,9 +30,30 @@
 #>     files on the research machine are subagent threads), so a candidate whose value is
 #>     context isolation passes the evidence test on this target — it is not a substitution.
 #>  6. **The one honest loss versus Claude Code: there is no per-agent tool allowlist.** If the
-#>     Claude Code candidate carried `tools:`, do not invent an equivalent here. Emit
-#>     `sandbox_mode = "read-only"` for any review/analysis agent — the nearest thing Codex has —
-#>     and state the loss in the plan's capability notes. Never emit `danger-full-access`.
+#>     Claude Code candidate carried `tools:`, do not invent an equivalent here. Still emit
+#>     `sandbox_mode = "read-only"` for any review/analysis agent — it is the nearest thing Codex
+#>     has and it is worth emitting — but do not describe it as the restriction. State the loss in
+#>     the plan's capability notes. Never emit `danger-full-access`.
+#> 6a. **Never advertise this file as proof that anything is read-only.** Two separate gaps, both
+#>     real, and adapters/codex.md §4.5.1 is the authority on them:
+#>     (a) `sandbox_mode` governs the **local** filesystem and process sandbox — this checkout and
+#>     the commands run against it. It does not constrain a remote database, a remote API, or any
+#>     other network endpoint the agent reaches. That is exactly the `db-inspector` / `query-db` /
+#>     `ask-product` case, where the thing being read is not on disk: a "read-only" agent holding a
+#>     read-write `DATABASE_URL` can still issue writes to that database.
+#>     (b) `developer_instructions` are instructions to a custom agent, **not** an unrestricted
+#>     replacement for Codex's own higher-priority instructions. Current Codex documentation says
+#>     an active parent runtime override can be reapplied to a child, so the refusals below are a
+#>     strong default, not an enforced boundary.
+#>     **Where read-only access to a real service is promised, the enforcement has to be
+#>     service-side** — a read-only database role, a read-scoped API key, a replica connection
+#>     string — with `sandbox_mode` and the prose refusals as defense in depth rather than the
+#>     guarantee. agentify never provisions a credential, so when the candidate promises read-only
+#>     against a live service: say in the plan's capability notes what is enforced and by what,
+#>     name the credential this agent expects in `developer_instructions`, and put "create a
+#>     read-only role/credential for <service> and point <ENV_VAR_NAME> at it" on the report's
+#>     manual checklist. Verify the **effective** permissions of the credential the agent will
+#>     actually use; never infer them from what this file says.
 #>  7. Target length for developer_instructions after filling: 40-120 lines, the same budget as
 #>     the markdown body it is built from.
 #>  8. No attribution inside `developer_instructions`. The one comment line below is the only
@@ -99,6 +120,11 @@ model_reasoning_effort = "{{MODEL_REASONING_EFFORT}}"
 #> binary's enum also carries "danger-full-access" and "external-sandbox"; never emit the former.
 #> Emit "read-only" for any agent that only reads and reports. Delete the line if the agent must
 #> write and the interview approved that.
+#> What it restricts: the LOCAL filesystem and process sandbox. What it does NOT restrict: anything
+#> reached over the network — a remote database, an HTTP API, an MCP server. Emitting this line is
+#> still worth doing; describing it to the user as the reason a remote query is read-only is not
+#> (rule 6a). Note that network access is a separate knob (CODEX_SANDBOX_NETWORK_DISABLED), which
+#> agentify does not set.
 sandbox_mode = "{{SANDBOX_MODE}}"
 
 #> developer_instructions — the agent's whole system prompt, and the TOML counterpart of the
@@ -123,7 +149,9 @@ You must refuse and hand back to the caller when:
 
 #> repeat/trim: 3-6 bullets. Each is a concrete refusal, not a value statement. These exist to
 #> stop scope creep in a context the main thread cannot see. On this target they carry extra
-#> weight: there is no `tools` allowlist to enforce the boundary mechanically.
+#> weight: there is no `tools` allowlist to enforce the boundary mechanically. They are also only
+#> a default the model follows — not a boundary the runtime enforces — so a refusal that protects
+#> a real service (a database, a billing API) needs a service-side counterpart as well (rule 6a).
 - {{REFUSE_1}}
 - {{REFUSE_2}}
 - {{REFUSE_3}}

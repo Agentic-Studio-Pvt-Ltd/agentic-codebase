@@ -171,7 +171,7 @@ table to read a row; the name goes into the report's Check column unchanged.
 | `subagent_tools` | Claude Code: the declared tools look like real tool names (warn). Codex: there is **no per-agent tool allowlist**, so the check is that none was invented (warn if a `tools` key appears, because the restriction is silently lost) and that `sandbox_mode` is not `danger-full-access` (**fail** — a generated agent is never granted it). A pinned `model` is a warn: it goes stale and silently changes the user's session | fail |
 | `rule_scope` | **prose rules only** — `scope` is present and its globs parse | fail |
 | `rule_body` | **prose rules only** — the rule body is not empty | fail |
-| `rule_wired` | **prose rules only** — the rule is referenced from an index doc, so something actually loads it. A **prose** rules directory is a repo convention, not a load path on either target — Claude Code reads `CLAUDE.md`, Codex reads `AGENTS.md`, and neither walks one — so an unreferenced rule is a dead file (`adapters/claude-code.md` §4.2, `adapters/codex.md` §4.2). The search is the adapters' own `grep -F "<name>.md"` over the whole index doc, so a rule the user wired by hand in their own prose counts. Falls back to `CLAUDE.md` / `AGENTS.md` on disk when the manifest names no index doc (the rerun case); an index doc that exists but cannot be read is a warn, never a fail. **A Codex command policy is exempt and passes with a note:** `.codex/rules/*.rules` *is* a native load path — Codex reads the directory itself, gated only on the project being trusted — so nothing needs to point at it | fail |
+| `rule_wired` | **prose rules only** — does anything actually **load** this rule, answered **per target and per path**, the way the hook rows are. **On Claude Code `.claude/rules/` *is* a load path**: the harness walks it natively and **recursively**, loading a rule with no `paths:` at session start and a `paths:`-scoped one the moment the model reads a matching file — VERIFIED by two live headless sessions in a scratch repo built with **no `CLAUDE.md` at all** (`adapters/claude-code.md` §4.2). So a rule there is wired by living there, an index-doc reference is discoverability for a human and **not** the mechanism, and its absence is a **warn — never a fail**. Until 2026-09-16 it was a fail, and §9's fix-or-remove loop reads a fail as an instruction to delete the artifact, so this row was telling the model to destroy a correctly-loading rule (measured on a `target: claude-code` manifest with an unreferenced `paths:`-scoped `.claude/rules/db-access.md`). **On Codex nothing walks a directory of prose convention documents** (VERIFIED, `codex debug prompt-input` — `adapters/codex.md` §4.2.1), so there the `AGENTS.md` pointer **is** the load path and an unreferenced rule is a dead file: still a fail. The same fail holds for a rule written **outside** the native directory on either target (`<plan-dir>/rules/<name>.md`) — the verdict keys on where the file sits, not on the target alone. The search is unchanged: the adapters' own `grep -F "<name>.md"` over the whole index doc, so a rule the user wired by hand in their own prose counts. Falls back to `CLAUDE.md` / `AGENTS.md` on disk when the manifest names no index doc (the rerun case); an index doc that exists but cannot be read is a warn, never a fail. **A Codex command policy is exempt and passes with a note:** `.codex/rules/*.rules` *is* a native load path — Codex reads the directory itself, gated only on the project being trusted — so nothing needs to point at it | fail (warn inside a native rules directory) |
 | `rule_contradiction` | three kinds. `opposing-polarity` (one rule asserts what another forbids) and `exclusive-choice` (two rules pick different members of one exclusive category — bun/npm, jest/vitest, tabs/spaces) are **warn**: they read one piece of generated prose against another. `contradicts-convention` (a rule asserts something `discovery.json` says the repo does not do — **only with `--discovery`**) is a **fail** when the convention is a hard fact, from `discovery.package_managers` or a `discovery.commands.*` line, and a warn when it is soft, from the `frameworks` / `languages` name scans. A rule worded as intent (`we are moving to X`) is exempt entirely. Rules are read clause by clause, so "Always use bun, never npm" counts as two directives; scopes must overlap, and a narrower rule that calls itself the exception is exempt | fail |
 | `rule_policy_syntax` | **command policies only** — `.codex/rules/*.rules` parses as Starlark and declares at least one policy rule. Starlark is a Python dialect and a rules file is top-level keyword-only calls, so `ast` reaches the same verdict Codex's loader does on the thing that matters. An unrecognised policy function is a **warn**, never a fail: the language is documented as experimental and subject to change | fail |
 | `rule_policy_decision` | every block's `decision` is exactly one of `allow` / `prompt` / `forbidden`. Anything else is a **fail**, and it is the most consequential row in the table: measured, `decision = "ask"` produces `Error loading rules: … invalid decision: ask` and `codex exec` then **refuses to start in that repo at all**. A malformed `.rules` file is a fatal startup error, not a skipped file | fail |
@@ -652,7 +652,7 @@ numbered step each, never a silent `pass`.
 | Where | `.claude/rules/<name>.md`; on Codex `<plan-dir>/rules/<name>.md` plus an `AGENTS.md` pointer, or inlined into the section | `<repo>/.codex/rules/<name>.rules` — **Codex only**, no Claude Code equivalent |
 | What | markdown with `scope:` frontmatter | Starlark `prefix_rule(pattern=[…], decision=…)` — an execution policy, the analogue of Claude Code's permissions allowlist |
 | Says | "handlers return `Result`, not exceptions" | "never run `npm`" |
-| Loaded by | the index doc pointing at it | Codex reading `.codex/rules/` itself, once the project is trusted |
+| Loaded by | **Claude Code:** the harness walking `.claude/rules/` itself, recursively — no pointer needed. **Codex, and anywhere outside that directory:** the index doc pointing at it | Codex reading `.codex/rules/` itself, once the project is trusted |
 | Checked by | `rule_scope`, `rule_body`, `rule_wired`, `rule_contradiction` | `rule_policy_syntax`, `rule_policy_decision`, `rule_policy_pattern`, `rule_policy_examples`, `rule_policy_execpolicy` |
 
 The static pass decides which is which from the file itself and runs only that column. **Do not
@@ -702,9 +702,11 @@ Two of its rows are already verdicts, not hints, and both are fails you act on r
 - `rule_contradiction` → `contradicts-convention` against a hard fact (`package_managers`, a
   `commands.*` line) is this section's Fail case, mechanically detected. Apply the Remediation
   below — the repo wins — rather than re-deriving it by hand.
-- `rule_wired` is the other half of "does this rule do anything at all". A rule the index doc does
-  not point at is never loaded, so its content is beside the point: wire it or drop it, before you
-  spend a paragraph judging what it says.
+- `rule_wired` is the other half of "does this rule do anything at all", and it is **per target**.
+  A **fail** there means nothing loads the file — wire it or drop it before you spend a paragraph
+  judging what it says. A **warn** means the opposite: the rule loads natively out of
+  `.claude/rules/` and only the human-facing pointer is missing, so add the row if an index doc was
+  written and never delete the rule over it.
 
 **Test.** Two passes.
 
@@ -721,13 +723,18 @@ Two of its rows are already verdicts, not hints, and both are fails you act on r
    does is wrong even if the user's prompts asked for it — in that case the rule is aspirational,
    and it must be worded as the intent (`we are moving to X`) rather than as a description.
 
-3. **That anything loads it.** Every **prose** rule must be referenced from the index doc — a
-   prose rules directory is a repo convention, not a load path, and neither Claude Code nor Codex
-   walks one. The static pass's `rule_wired` row is this check; read it rather than re-running the
-   grep. A rule with no reference is not a weak rule, it is an inert one. **A Codex command policy
-   is the exception**, and the static pass says so in its row: `.codex/rules/` *is* a native load
-   path, so nothing needs to point at it. Never add a pointer to `AGENTS.md`, or a fake `scope:`
-   line, to make a check go green.
+3. **That anything loads it** — and the answer differs by target, so read the target's own row
+   rather than applying one rule to both. **On Claude Code a rule under `.claude/rules/` is already
+   loaded**: the harness walks that directory itself, recursively, with no index-doc reference of
+   any kind (VERIFIED, `adapters/claude-code.md` §4.2). A missing pointer there is a
+   discoverability gap, not an inert file, and deleting the rule over it destroys a working
+   artifact. **On Codex, and for a rule written anywhere outside a native directory on either
+   target**, nothing walks a directory of prose convention documents, so the index-doc pointer is
+   the load path and a rule with no reference is not a weak rule, it is an inert one. **A Codex
+   command policy is a further exception**, and the static pass says so in its row:
+   `.codex/rules/` *is* a native load path, so nothing needs to point at it. The static pass's
+   `rule_wired` row already carries all three verdicts; read it rather than re-running the grep,
+   and never add a pointer to `AGENTS.md`, or a fake `scope:` line, to make a check go green.
 
 Also check that each rule still carries its evidence line and its `agentify-id`, and that no rule
 duplicates a statement already present in the pre-existing index doc — duplication is what makes
@@ -736,16 +743,19 @@ the rule's `agentify-evidence` is no longer the string the manifest carries, whi
 has been regenerated from something other than the approved plan.
 
 **Pass.** No key asserted two ways; every rule consistent with, or explicitly framed as a
-correction to, discovered convention; every rule referenced from the index doc; no duplicate of
-existing documentation.
+correction to, discovered convention; every rule loaded by something — a native rules directory on
+Claude Code, an index-doc reference everywhere else; no duplicate of existing documentation.
 
 **Fail.** A direct contradiction between two generated rules, or between a rule and a hard
 discovered fact (a rule saying "use npm" in a repo with `bun.lockb` and `packageManager: bun` —
 `rule_contradiction` catches this one for you, but only when the run passed `--discovery`). A rule
-no index doc references is also a fail, for a different reason: nothing loads it.
+nothing loads is also a fail, for a different reason — a Codex prose rule with no `AGENTS.md`
+pointer, or a rule on either target written outside a native rules directory and referenced from
+nowhere.
 
-**Warn.** Two rules that overlap in topic without contradicting, or a rule whose evidence is a
-single occurrence.
+**Warn.** Two rules that overlap in topic without contradicting, a rule whose evidence is a single
+occurrence, or a Claude Code rule under `.claude/rules/` that no index doc mentions — that one
+loads natively and the missing pointer costs only discoverability.
 
 **Remediation.**
 - Two generated rules contradict → keep the one with the stronger evidence count, delete the
@@ -753,9 +763,14 @@ single occurrence.
 - Rule contradicts discovered fact → the repo wins. Rewrite the rule to match, or delete it. If
   the user genuinely asked for the change, reword it as intent — `we are moving to npm` — which is
   both the honest wording and what clears the check.
-- `rule_wired` fail → add the rule to the index doc's Rules table (or, for a rule that must apply
-  every turn, an `@` import; cap 2 of those) and re-run the static pass. If it does not earn a row
-  in the index doc, it does not earn a file: delete it and list it skipped.
+- `rule_wired` fail → nothing loads the file. Add the rule to the index doc's Rules table and
+  re-run the static pass. If it does not earn a row in the index doc, it does not earn a file:
+  delete it and list it skipped.
+- `rule_wired` **warn** → the rule loads natively out of `.claude/rules/` and only the pointer is
+  missing. Add the row to the index doc's Rules table for the human reading the repo, and **never
+  delete the rule over this row**. Do not "fix" it with an `@` import either: an `@` line
+  duplicates what the native walk already did for an unscoped rule and defeats the on-demand
+  behaviour of a `paths:`-scoped one (`adapters/claude-code.md` §4.2).
 - `evidence_match` fail → restore the manifest's evidence string into the file's frontmatter. Do
   not "fix" it by editing the manifest to match the file: the manifest carries the string the plan
   was approved with, and rewriting it hides the drift instead of undoing it.
@@ -877,10 +892,12 @@ branch base to confirm), it links only to files that exist, and it carries the a
 footer once. Fail: any pre-existing byte changed, a dead link, or duplicated markers from a
 previous run. Remediation: restore the original content, re-append cleanly.
 
-Check the other direction too, and the static pass does it for you: every generated rule needs a
-link *in*, not just working links *out*. That is `rule_wired`, and a fail there means the section
-was built with a row missing — add the row rather than deleting the rule, unless the rule was not
-worth a row in the first place.
+Check the other direction too, and the static pass does it for you: every generated rule wants a
+link *in*, not just working links *out*. That is `rule_wired`. A **fail** means the section was
+built with a row missing and nothing else loads the file — add the row rather than deleting the
+rule, unless the rule was not worth a row in the first place. A **warn** means the rule loads
+natively from `.claude/rules/` and only the section's row is missing; add the row, and leave the
+rule alone.
 
 **Permissions.** On Claude Code the artifact is the `permissions` object inside
 `.claude/settings.json`, verified as the `settings` artifact it shares a manifest entry with
