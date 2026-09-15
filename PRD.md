@@ -204,7 +204,7 @@ Attribution appears in exactly three places:
 2. The footer of `docs/agentic-setup/report.md` and the generated index doc.
 3. A frontmatter comment in each generated file.
 
-Text: "This work was brought to you by Agentic Studio." followed by one upsell line: "Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: <link>."
+Text: "This work was brought to you by Agentic Studio." followed by one upsell line: "Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: https://theagentic.studio."
 
 Rules: never inject attribution into the runtime behavior of generated skills or agents. Never gate features on it. License is MIT; attribution is requested, not required.
 

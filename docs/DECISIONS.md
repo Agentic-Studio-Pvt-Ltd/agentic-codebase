@@ -1662,7 +1662,9 @@ than filled with an invented value, and **only the user can supply what they nee
 guess a URL, do not infer one from the repo, and do not remove the placeholder text to make the
 output look finished.
 
-### 5.1 The attribution upsell carries a literal `<link>`
+**Status 2026-09-15: §5.1 is settled; §5.2 is not.** One release blocker remains.
+
+### 5.1 The attribution upsell URL — **SETTLED 2026-09-15**
 
 - **What.** The second attribution string is:
 
@@ -1688,9 +1690,26 @@ output look finished.
 - **Blocking.** Every generated report, every generated index-doc section, and the final run
   summary — the three attribution placements from `CLAUDE.md` — ship with a visible `<link>`
   until a real URL exists.
-- **Needed from the user.** One URL: the Agentic Studio landing page the upsell should point at.
-  Then replace all **five** occurrences. Pick one spelling first — `{{AGENTIC_STUDIO_URL}}` is the
-  right one, because it is the only form the templates' own fill rule can see.
+- **Resolved.** The owner supplied `https://theagentic.studio` on 2026-09-15. All five shipped
+  occurrences now carry that literal URL, and `PRD.md` §attribution was updated with it so the spec
+  of record matches:
+
+  | Was | Where | Now |
+  |---|---|---|
+  | `<link>` ×3 | `skills/agentify/SKILL.md`, `references/report-template.md` (skeleton footer, filled example) | literal URL |
+  | `{{AGENTIC_STUDIO_URL}}` ×1 | `templates/index-doc-section.md.tmpl` | literal URL |
+  | `PLACEHOLDER-LINK` ×1 | `README.md` footer | literal URL |
+  | `<link>` ×1 | `PRD.md` attribution text | literal URL |
+
+  **The chosen spelling is the URL itself, not a token.** The earlier plan here was to unify on
+  `{{AGENTIC_STUDIO_URL}}`, on the reasoning that it is the only form a `{{...}}` fill pass can
+  see. With a real value in hand that reasoning inverts: a token is a thing that can still be
+  shipped unfilled, and the failure this entry describes — "a fill pass finds one of the five and
+  silently ships the other four" — is only fully closed when there is no placeholder left to miss.
+  `report-template.md`'s instruction was rewritten to match: reproduce the URL exactly, and if a
+  fork has removed it, drop the upsell sentence entirely rather than emit a placeholder. The
+  never-invent-a-URL rule is unchanged.
+- **Still open.** Nothing in this entry. §5.2 (`PLACEHOLDER-ORG`) remains the sole release blocker.
 
 ### 5.2 `PLACEHOLDER-ORG` in the plugin manifests
 

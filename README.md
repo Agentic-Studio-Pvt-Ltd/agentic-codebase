@@ -221,4 +221,4 @@ Attribution is **requested, not required**. agentify puts its own attribution in
 
 This work was brought to you by Agentic Studio.
 
-Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: PLACEHOLDER-LINK.
+Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: https://theagentic.studio.

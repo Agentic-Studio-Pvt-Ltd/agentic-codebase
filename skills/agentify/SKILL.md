@@ -494,6 +494,6 @@ carries the mode's undo line and the attribution.
 1. The final run summary. 2. The footer of `report.md` and of the generated index-doc section.
 3. One frontmatter comment line in each generated file.
 
-Text: `This work was brought to you by Agentic Studio.` then one upsell line: `Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: <link>.`
+Text: `This work was brought to you by Agentic Studio.` then one upsell line: `Bigger codebase or a team? Agentic Studio builds the full engineering system in 2 to 3 weeks: https://theagentic.studio.`
 Nowhere else — never inside the runtime behavior of a generated skill, agent, hook or rule (it must
 work identically with the comment deleted), never gating anything. MIT: requested, not required.

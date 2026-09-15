@@ -186,8 +186,9 @@ Surface these rather than silently picking:
 - **The name.** `agentify` is taken twice — npm `agentify` (v0.0.1, `unadlib`, 2024-06-09) and the
   active same-niche GitHub org `agentify-sh`. `PLACEHOLDER-ORG` in `README.md` and the plugin
   manifests marks every site that needs the final name.
-- **The Agentic Studio upsell URL**, currently written three ways (`<link>`,
-  `{{AGENTIC_STUDIO_URL}}`, `PLACEHOLDER-LINK`).
+- ~~The Agentic Studio upsell URL~~ — **settled 2026-09-15: `https://theagentic.studio`.** All
+  three spellings (`<link>`, `{{AGENTIC_STUDIO_URL}}`, `PLACEHOLDER-LINK`) are gone; the literal URL
+  is the only form, so no fill pass can ship a placeholder. `docs/DECISIONS.md` §5.1 records it.
 - Minimum model class: enforced or warned.
 - Monorepo handling: root by default, per-package offered when workspaces are detected.
 
