@@ -21,7 +21,7 @@ It produces:
 
 > **Status: pre-release (v0.1.0).** The repo is not published yet, and the name `agentify` **is taken on both registries we checked**: npm has `agentify` (v0.0.1, published by `unadlib` on 2024-06-09), and GitHub has an active organisation in the same niche, `agentify-sh`. The name used throughout this repo is therefore a working title, and the final one is not decided. Every `PLACEHOLDER-ORG` in this README and in the plugin manifests is a placeholder to be replaced when the repo is published under its final name. Expect the install commands above — and possibly the name in them — to change.
 
-Requirements: Claude Code, and Python 3.9 or newer (standard library only, nothing to `pip install`). `git` is optional — without it you lose the commit-history evidence and the branch, the run says so, and it still reaches a plan and a build.
+Requirements: **Claude Code or Codex**, and Python 3.9 or newer (standard library only, nothing to `pip install`). Both targets are fully supported and nothing is substituted on either; the install route differs, and Codex additionally needs the repo marked trusted before it loads a repo-scoped setup — see [Install](#install). `git` is optional — without it you lose the commit-history evidence and the branch, the run says so, and it still reaches a plan and a build.
 
 ---
 
@@ -51,7 +51,7 @@ For Claude Code:
 
 | Artifact | Where it lands | Comes from |
 |---|---|---|
-| Index doc section | Appended to `CLAUDE.md` in a delimited block | Discovered commands, conventions, and repeated corrections |
+| Index doc section | Appended to `CLAUDE.md` in a delimited block, **and written last**, because its tables enumerate what was actually built | Discovered commands, conventions, and repeated corrections |
 | Path-scoped rules | `.claude/rules/` | Conventions tied to specific paths, and corrections you made 2+ times |
 | Hooks | `.claude/settings.json` plus scripts | Deterministic checks that should not depend on the model remembering |
 | Skills | `.claude/skills/` | Multi-step procedures you triggered repeatedly |
@@ -61,7 +61,7 @@ For Claude Code:
 
 For Codex: `AGENTS.md`, `.codex/hooks.json` (12 events, native), `.codex/rules/*.rules` (Starlark command policy, which is also that target's permission surface), `.codex/agents/*.toml` subagents, `.agents/skills/` skills, and a TOML MCP draft. **Nothing is substituted on either target.** Codex does have a full hook system — earlier versions of this README said it did not, and that was wrong.
 
-agentify does **not** produce a plugin manifest. The setup is derived from one repo's evidence and personalized to it, so a portable copy would be wrong wherever it landed.
+agentify does **not** produce a plugin manifest. The setup is derived from one repo's evidence and personalized to it, so a portable copy would be wrong wherever it landed. That is a different thing from *agentify itself* being distributed as a Claude Code plugin, which is install route 1 below — the tool is portable, the setup it writes for you is not.
 
 Every generated file starts with an ID, a date, a one-line evidence summary, and the line *"Safe to delete or edit."*
 
@@ -81,7 +81,7 @@ What replaced them:
 
 ## Safety and privacy
 
-- **Local only, with two named exceptions and no others.** The analyzer scripts open no sockets, and the default run makes no network call at all. There are exactly two paths that can, both read-only, both through your own already-authenticated GitHub CLI, and both disclosed here rather than buried: `mine_git.py` can run `gh pr list` to learn your PR conventions — a default run passes `--no-gh` and skips it, giving that evidence up on purpose — and if agentify is about to offer you a pull request, it asks `gh` whether you can actually push to the remote first, so it cannot offer to open a PR against a repo you only have read access to. Neither sends any repo content. Nothing else, anywhere in the tool, opens a connection.
+- **Local only, with two named exceptions and no others.** The analyzer scripts open no sockets, and the default run makes no network call at all. There are exactly two paths that can, both read-only, both through your own already-authenticated GitHub CLI, and both disclosed here rather than buried: `mine_git.py` can run `gh pr list` to learn your PR conventions — a default run passes `--no-gh` and skips it, giving that evidence up on purpose — and `mine_git.py` can ask `gh` whether you can push to the remote, which is how the report knows whether to tell you a PR is even an option for you. **agentify itself never pushes and never opens a pull request** — it leaves the branch and tells you what your own options are. Neither call sends any repo content. Nothing else, anywhere in the tool, opens a connection.
 - **Python standard library only.** No dependencies to audit, nothing to `pip install`.
 - **No telemetry.** None, by default or otherwise. There is nothing to opt out of.
 - **Consent every run.** Transcript access is asked for each time: yes, no, or yes but only the last N days. Answering no still produces a setup, derived from code and git alone, and the plan says so.
@@ -110,9 +110,18 @@ From the v1 non-goals, stated plainly so you know what you are getting:
 
 ## Install
 
+**Two things live in different places, and it is worth separating them before you start.**
+
+- **Where agentify is installed** — the tool itself, a skill your agent loads so you can invoke it. Global (every repo on your machine) or per-repo (checked in, so a team shares one version).
+- **Where agentify writes** — the setup it generates *for the repo you run it on*: `.claude/` or `.codex/` plus `.agents/skills/`, and a section in `CLAUDE.md` / `AGENTS.md`. That always lands in the target repo, on a branch, whichever way you installed the tool.
+
+Uninstalling the tool does not remove a generated setup, and removing a generated setup does not uninstall the tool. `report.md` covers the second; the [Uninstall](#uninstall) section below covers both.
+
+### Claude Code
+
 Three routes. Pick one.
 
-### 1. Plugin marketplace (recommended)
+#### 1. Plugin marketplace (recommended)
 
 ```
 /plugin marketplace add PLACEHOLDER-ORG/agentify
@@ -121,7 +130,7 @@ Three routes. Pick one.
 
 Updates arrive with `/plugin marketplace update agentify`.
 
-### 2. Global skill, manual copy
+#### 2. Global skill, manual copy
 
 Available in every repo on your machine.
 
@@ -131,7 +140,7 @@ mkdir -p ~/.claude/skills
 cp -R /tmp/agentify/skills/agentify ~/.claude/skills/agentify
 ```
 
-### 3. Per-repo skill
+#### 3. Per-repo skill
 
 Checked into one repo, so a team shares the same version.
 
@@ -143,15 +152,54 @@ cp -R /tmp/agentify/skills/agentify .claude/skills/agentify
 
 Verify any route with `python3 ~/.claude/skills/agentify/scripts/discover.py --help` (adjust the path for route 3).
 
+### Codex
+
+Codex has no plugin marketplace, so it is a file copy either way. Codex reads skills from `<repo>/.agents/skills/` and from its user-scoped skills directory; **resolve that one through `CODEX_HOME`, never a hardcoded `~/.codex`** — Codex sets `CODEX_HOME` in the environment of the commands it spawns, and it is not always your home directory.
+
+#### 1. Per-repo (recommended)
+
+Checked into the repo, so a team shares one version. This is also the path Codex loads regardless of whether the project is trusted.
+
+```bash
+git clone https://github.com/PLACEHOLDER-ORG/agentify.git /tmp/agentify
+mkdir -p .agents/skills
+cp -R /tmp/agentify/skills/agentify .agents/skills/agentify
+```
+
+#### 2. Global
+
+Available in every repo on your machine.
+
+```bash
+git clone https://github.com/PLACEHOLDER-ORG/agentify.git /tmp/agentify
+CODEX_SKILLS="${CODEX_HOME:-$HOME/.codex}/skills"
+mkdir -p "$CODEX_SKILLS"
+cp -R /tmp/agentify/skills/agentify "$CODEX_SKILLS/agentify"
+```
+
+**Invoke it** the same way as on Claude Code — inside the repo you want set up:
+
+```
+run agentify on this repo
+```
+
+**Check it was picked up** with `python3 .agents/skills/agentify/scripts/discover.py --help` (adjust for the global route). To confirm Codex itself sees the skill rather than just that the files are on disk, ask it to list its available skills; `codex doctor --json` will also tell you which `CODEX_HOME` it resolved.
+
+> **Project trust gates the setup agentify generates for Codex, and failure is silent.** `[projects."<abs repo path>"] trust_level = "trusted"` in `${CODEX_HOME:-$HOME/.codex}/config.toml` decides whether Codex loads a repo's `AGENTS.md`, `.codex/hooks.json` and `.codex/rules/` at all — in an untrusted repo they are simply absent, with no warning. Repo-scoped **skills** are the exception: they load either way (measured against codex-cli 0.152.1). agentify never edits `config.toml` to set trust; it reports it as something you do. A generated hook additionally needs a one-time trust approval through Codex's own `/hooks` prompt, so agentify says a hook is *installed*, never that it is *working*.
+
 ## Uninstall
 
 Removing the tool:
 
 ```
-/plugin uninstall agentify@agentify          # route 1
-rm -rf ~/.claude/skills/agentify             # route 2
-rm -rf .claude/skills/agentify               # route 3
+/plugin uninstall agentify@agentify                          # Claude Code, route 1
+rm -rf ~/.claude/skills/agentify                             # Claude Code, route 2
+rm -rf .claude/skills/agentify                               # Claude Code, route 3
+rm -rf .agents/skills/agentify                               # Codex, per-repo
+rm -rf "${CODEX_HOME:-$HOME/.codex}/skills/agentify"         # Codex, global
 ```
+
+That removes the **tool**. It does not touch a setup agentify generated — that is the next part, and `report.md` writes the exact commands for your run.
 
 Removing what it generated — **`report.md` generates the exact commands for your run; do not copy them from here.** The shape depends on what the build could commit:
 
@@ -161,13 +209,13 @@ git checkout <your-branch> && git branch -D agentic-setup/<yyyy-mm-dd>
 
 Both lines, in that order: `git branch -D` refuses to delete the branch you are standing on, and moving back to your own branch is what restores any file agentify appended to, because the appended block was committed on the agentify branch and never on yours.
 
-That is enough only when the branch actually holds everything. If your `.gitignore` excludes a path agentify wrote to — `.claude/` is a common one — git would not commit it, so the branch delete does not touch it, and `report.md` lists those files by name as a second step. It also tells you before you approve, at the plan gate, rather than after the build.
+That is enough only when the branch actually holds everything. If your `.gitignore` excludes a path agentify wrote to — `.claude/` and `.codex/` are common ones — git would not commit it, so the branch delete does not touch it, and `report.md` lists those files by name as a second step. It also tells you before you approve, at the plan gate, rather than after the build.
 
-Same for a file you wrote yourself that git never tracked: git has no pre-run copy to restore, so the whole undo for it is a script that takes agentify's own contribution back out — and **which script depends on the file's format, not on how git sees it.** A text file (`CLAUDE.md`, a rule, a shell config) was appended to inside `agentify:begin` / `agentify:end` markers, and the marker-removal script cuts exactly that block. A JSON config (`.claude/settings.json`, `.mcp.json`) has no comment syntax, so it never carried a marker and never can: it was merged into structurally, and the JSON un-merge script removes the entries this run added — deleting the file only when nothing but agentify's entries remain, and keeping it when you have since added keys of your own. `report.md` emits the right one per file; neither is a `rm`, and neither destroys your content.
+Same for a file you wrote yourself that git never tracked: git has no pre-run copy to restore, so the whole undo for it is a script that takes agentify's own contribution back out — and **which script depends on the file's format, not on how git sees it.** A text file (`CLAUDE.md`, `AGENTS.md`, a rule, a shell config) was appended to inside `agentify:begin` / `agentify:end` markers, and the marker-removal script cuts exactly that block. A TOML config (`.codex/config.toml`) carries the same markers as comments. A JSON config (`.claude/settings.json`, `.mcp.json`, `.codex/hooks.json`) has no comment syntax, so it never carried a marker and never can: it was merged into structurally, and the JSON un-merge script removes the entries this run added — matching each one on its whole path and the event it was registered under, never on a file name, so a script of yours that happens to share a name is left alone. It deletes the file only when nothing but agentify's entries remain, and keeps it when you have since added keys of your own. `report.md` emits the right one per file; neither is a `rm`, and neither destroys your content.
 
 In stage-only mode and in a repo with no git, nothing is committed and no branch exists: the undo is the numbered file list in `report.md`, and there is no branch to delete.
 
-Generated files are individually deletable either way: each is marked *"Safe to delete or edit,"* and the `CLAUDE.md` addition is a single delimited block you can cut out.
+Generated files are individually deletable either way: each is marked *"Safe to delete or edit,"* and the `CLAUDE.md` / `AGENTS.md` addition is a single delimited block you can cut out.
 
 ## Contributing
 
@@ -179,7 +227,7 @@ The codebase is three layers, and which layer your change belongs in is usually 
 
 That third boundary is the one to respect. A hardcoded `~/.claude/projects/...` path or a `.claude/settings.json` shape outside an adapter is a bug, even when it works. Formats change; the workflow does not.
 
-**Read [`docs/DECISIONS.md`](docs/DECISIONS.md) before changing a default.** Every default in this repo — the clustering threshold, the sizing caps, hook execution being opt-in, `--no-gh`, where the plan is written — is recorded there with the question it answers, why it was chosen, what changing it costs, and whether it is decided, provisional, or still open. A change that contradicts an entry there is not necessarily wrong, but it needs to update that entry in the same pass.
+**Read [`docs/DECISIONS.md`](docs/DECISIONS.md) before changing a default.** Every default in this repo — the clustering threshold, the analyzers' output budgets, hook execution being opt-in, `--no-gh`, where the plan is written — is recorded there, including the retired sizing caps and the argument that killed them, with the question it answers, why it was chosen, what changing it costs, and whether it is decided, provisional, or still open. A change that contradicts an entry there is not necessarily wrong, but it needs to update that entry in the same pass.
 
 ### Adding an analyzer
 
@@ -191,7 +239,10 @@ New evidence sources are the highest-value contribution. An analyzer is a Python
 - includes `schema_version`, `tool`, `warnings`, and `timing_ms` in that object;
 - follows the two-value exit contract: **exit 0** for success *and* every degraded run (a missing repo path, no git, no transcripts, a timeout — valid JSON with the loss explained in `warnings`), **exit 1** only when no JSON could be produced at all. Exit 2 is reserved and never emitted; even a usage error prints JSON and exits 1;
 - ships a `--selftest` flag that prints a JSON pass/fail report and exits 1 if any check fails, so a broken analyzer fails CI;
-- caps its own output, so a large input cannot blow the context window.
+- bounds its own **output size**, so a large input cannot blow the context window. This is a
+  runtime budget on how much JSON an analyzer emits, and it is the one kind of ceiling agentify
+  keeps — it is not a limit on how many artifacts a run may build, and it must never be described
+  to the user as one.
 
 Then add a mapping in `skills/agentify/references/mapping-rules.md` explaining what finding your signal produces and what artifact that finding justifies. A signal that maps to nothing is dead weight.
 
@@ -202,7 +253,7 @@ Adapters live in `skills/agentify/adapters/` (`claude-code.md` is the reference 
 1. **Detect** — how to tell this agent is the one running.
 2. **Locate transcripts** — where session files live, and how a repo path maps to a session directory.
 3. **List existing config** — index docs, skills, agents, rules, hooks, MCP servers, and enough provenance to tell what the team wrote from what it installed, because only the first drives maturity classification.
-4. **Emit each artifact type, or declare it unsupported.** Declaring it unsupported is a first-class answer. Codex has no hooks, so its adapter names the substitution and the plan tells the user about it. Silently dropping an artifact type is not acceptable; a stated substitution is.
+4. **Emit each artifact type, or declare it unsupported.** Declaring it unsupported is a first-class answer, and a stated substitution is acceptable where silently dropping a type never is. **Neither shipped adapter uses that escape hatch** — Claude Code and Codex both have a full native hook system, native subagents and native skills, so nothing is substituted on either target. The mechanism exists for the adapters that have not been written yet.
 5. **Run smoke tests** — how to verify each emitted artifact type actually loads in this agent.
 
 Pin the paths and formats you verified, and note the agent version you verified them against.
