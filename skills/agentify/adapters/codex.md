@@ -845,10 +845,14 @@ This changes the verification story and both the plan and the report must say so
 6. Never touch another event, another group, another handler, or the top-level `description` if the
    user wrote one. Preserve the file's existing indentation and trailing newline.
 7. Record `pre_existing_sha256` (the hash **before** the merge) and `restore: span` on the artifact's
-   manifest entry.
+   manifest entry, and record the merge as
+   `["hook_command", "<the command line you wrote>", "<Event>"]` — **three elements.** The event is
+   half of the identity: the same script can be registered under more than one event, so the command
+   alone does not say which registration is agentify's, and the undo refuses to guess rather than
+   removing the wrong one. `references/build-and-verify.md` §5.3a.
 8. Write to a temp file in the same directory and `os.replace()` it into place.
 
-#### Idempotency without markers — the identity is the command path, and adding metadata will break the file
+#### Idempotency without markers — the identity is the whole command path plus the event, and adding metadata will break the file
 
 **`hooks.json` rejects unknown keys at the top level.** Measured, with a `_agentify` object added
 beside `hooks`:
@@ -869,13 +873,17 @@ never as an error the user sees. The accepted top-level keys are exactly **`desc
   `"_agentify_id"` loaded normally). **Do not rely on that** — the top level is strict, the asymmetry
   is undocumented, and a future build tightening it would brick the file. Agentify emits no metadata
   key anywhere in `hooks.json`.
-- **The identity is the command path**, exactly as in `adapters/claude-code.md` §4.3: a nested
-  `hooks[].command` containing `/.codex/hooks/<name>.sh`. Provenance lives in the hook script's own
-  header comments and in `<plan-dir>/build-manifest.json`.
+- **The identity is the whole command path, plus the event it is registered under**, exactly as in
+  `adapters/claude-code.md` §4.3: a nested `hooks[].command` resolving to `/.codex/hooks/<name>.sh`
+  under a named event. **A basename is never an identity** — an unrelated `tools/block-npm.sh` the
+  user wrote shares its basename with a generated `.codex/hooks/block-npm.sh`, and an undo that
+  matched on basename removed both. The un-merge normalizes the repo-root spellings agentify emits
+  and compares the whole string. Provenance lives in the hook script's own header comments and in
+  `<plan-dir>/build-manifest.json`.
 - `description` is an accepted key and agentify may set it **only when it created the file**. If the
   file already exists, leave whatever `description` is there alone.
 - The undo for this file is the **JSON un-merge script** in `references/report-template.md` §3.1,
-  keyed on the command path — the same key as the Claude Code settings merge. The marker-removal
+  keyed on the normalized command path and the event — the same key as the Claude Code settings merge. The marker-removal
   script would find no marker, print `SKIP`, exit 0, and leave the hook registered forever.
 
 #### The hook script

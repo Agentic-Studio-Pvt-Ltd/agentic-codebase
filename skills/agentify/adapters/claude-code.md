@@ -717,7 +717,7 @@ defensively and must not crash on an unexpected shape — an exception in a hook
 8. Write to a temp file in the same directory and `os.replace()` it into place, so an interrupted
    run cannot leave a truncated settings file.
 
-**Idempotency without frontmatter — the identity is the command path, and nothing else.**
+**Idempotency without frontmatter — the identity is the whole command path plus its event, and never a basename.**
 
 JSON has no comment syntax, so this file carries **no `agentify:begin` / `agentify:end` markers and
 no `# agentify:<id>` line**, and it never can. What agentify emits into it is one command object and
@@ -732,14 +732,17 @@ The idempotency key is the one the template's merge procedure step 4 names: **a 
 `hooks[].command` that ends with `/.claude/hooks/<name>.sh`**. On a rerun, find the command object
 whose `command` ends with that suffix and replace that object in place. Never append a second copy.
 
-> **Cross-file note — `templates/settings-hooks.json.tmpl` still writes the unbraced
-> `$CLAUDE_PROJECT_DIR`.** Change it to `${CLAUDE_PROJECT_DIR}` for the PowerShell reason in the
-> bullet list above. The change is safe by construction: the idempotency key matches on the
-> **suffix** `/.claude/hooks/<name>.sh`, and the un-merge script normalises both spellings of the
-> project-root variable to the same `<repo>/.claude/hooks/<name>.sh` before comparing the **whole**
-> path — a basename is never an identity there (`report-template.md` §3.1 block C) — so a rerun over
-> a setup built by the current template still matches its own hook and replaces that one command
-> object in place rather than appending a second copy.
+> **Cross-file note — both spellings of the project-root variable are in the wild, and both
+> resolve.** `templates/settings-hooks.json.tmpl` writes the braced `${CLAUDE_PROJECT_DIR}` (the
+> PowerShell reason is in the bullet list above), but a setup built by an older agentify carries the
+> unbraced `$CLAUDE_PROJECT_DIR`, and a user may have written either by hand. A rerun still finds
+> its own hook either way: the un-merge script normalises both spellings — and the quoted and
+> unquoted `$(git rev-parse --show-toplevel)` forms, and a literal absolute path — to the same
+> `<repo>/.claude/hooks/<name>.sh` before comparing the **whole** path, under the recorded event.
+> **A basename is never an identity there** (`report-template.md` §3.1 block C): matching one is
+> what made an undo delete a user's unrelated script of the same name. `${CLAUDE_PLUGIN_ROOT}` is
+> deliberately *not* folded in — it is a different root, and folding it would invent exactly that
+> false identity.
 
 **Do not merge the fragment's `_agentify` key into `settings.json`** (template step 6). It is inert
 metadata describing the fragment, not settings, and this is the one `_agentify` block that is never

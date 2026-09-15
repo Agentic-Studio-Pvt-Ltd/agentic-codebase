@@ -191,9 +191,15 @@ undo can find it.
    into `settings.json`, and `.codex/hooks.json` accepts **exactly** `description` and `hooks` at the
    top level — an unknown key there made the whole file load **zero hooks, with zero warnings**
    (`adapters/codex.md` §4.3). `.mcp.json` is the one file that does carry `_agentify`. The identity
-   everywhere else is the **command path**.
+   everywhere else is the **whole command path plus the event it is registered under** — never a
+   basename, which is shared with whatever the user happened to name the same thing.
 8. Record `merge: {"strategy": "json-entries", "entries": [["hook_command", <the registered command
-   line>]]}` — or `["mcp_server", <name>]` per server — and `format: "json"`.
+   line>, <the event>]]}` — or `["mcp_server", <name>]` per server — and `format: "json"`.
+   **A `hook_command` entry carries a third element, the event it was registered under.** The same
+   command can be registered under more than one event, so the command alone does not identify which
+   registration is agentify's; the undo needs both. A two-element entry written by an older run still
+   parses, and when the command resolves to more than one registration the undo stops rather than
+   guessing — see `references/report-template.md` §3.1 block C.
 
 **(b) TOML — `.codex/config.toml`, and only on the opt-in write path.**
 
@@ -461,14 +467,14 @@ mechanism, and survived their own undo while the report reported success (`repor
 ```json
 "merge": {
   "strategy": "json-entries",
-  "entries": [["hook_command", "${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce-bun.sh"]]
+  "entries": [["hook_command", "${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce-bun.sh", "PreToolUse"]]
 }
 ```
 
 | Key | Value |
 |---|---|
 | `strategy` | `json-entries` — entries spliced into a parsed JSON object · `toml-table` — one marked `[table]` block appended to a TOML file. One arm of block C's script per value; a new target's new way of merging adds a value and an arm, and changes nothing else |
-| `entries` | `[kind, value]` pairs, and each kind is the identity the emitter actually leaves behind: `hook_command` (the registered command line — the whole of agentify's mark in `settings.json` and in `.codex/hooks.json`, both of which forbid a metadata key), `mcp_server` (a server name under `mcpServers`), `toml_table` (one per `[table]` header inside the appended block, in file order) |
+| `entries` | `[kind, value]` pairs — except `hook_command`, which is `[kind, value, event]`. Each kind is the identity the emitter actually leaves behind: `hook_command` (the registered command line **plus the event it was registered under** — the whole of agentify's mark in `settings.json` and in `.codex/hooks.json`, both of which forbid a metadata key; the command alone is not an identity, because the same script can be wired under two events), `mcp_server` (a server name under `mcpServers`), `toml_table` (one per `[table]` header inside the appended block, in file order) |
 | `marker_id` | `toml-table` only: the id in the `agentify:begin` / `agentify:end` comment pair. Same string as `agentify-id` |
 
 Three rules this record has to satisfy, all of them load-bearing:
@@ -498,7 +504,7 @@ and §5.3 rule 2 is one artifact entry per *file*. So that file gets **one** ent
 first of the two merges — whose `merge.entries` carries both kinds:
 
 ```
-("hook_command",     "<the hook artifact's manifest `command`>")
+("hook_command",     "<the hook artifact's manifest `command`>", "<Event>")
 ("permission_entry", "allow:Bash(bun run test:*)")
 ("permission_entry", "deny:Read(./.env.local)")
 ```
