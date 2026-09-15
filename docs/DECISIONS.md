@@ -50,6 +50,12 @@ a number out of the build contract, which has now been stale on selftest counts 
 for two rounds after `hook_wired`, `undo_partition` and `undo_created_dirs` landed — the same stale
 number the build contract carried. Do not cite these seven as stable: cite the exit code.)
 
+**Re-measured 2026-09-15**, after the launch-audit repairs, which added checks to all four
+entrypoints and to `scrub.py`: `discover.py` **81/0**, `mine_git.py` **32/0**,
+`mine_transcripts.py` **46/0**, `verify_artifacts.py` **115/0**, `scrub.py` **76/0**. `textnorm.py`
+and `emit.py` are unchanged. That is the fifth time these numbers have moved, which is the whole
+argument of this entry — **cite the exit code, not the count.**
+
 ---
 
 ## Part 1 — PRD §16 open questions
