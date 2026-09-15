@@ -809,9 +809,16 @@ def resolved_read_refusal(path, real_root="", real_home="", follow_links=False,
     filename and nothing else -- a `.env` that is a link, or one inside a
     `credentials/` directory, is still refused.
     """
-    if not (env_exception and scrublib.is_env_file(path)):
-        if scrublib.is_secret_path(path):
-            return "secret-name"
+    def credential_named(candidate):
+        # The dotenv waiver and the secret-name test, as one gate.  It is
+        # applied twice -- to the written path and to the resolved target --
+        # and writing it out twice is how the two copies drift apart.
+        if env_exception and scrublib.is_env_file(candidate):
+            return False
+        return scrublib.is_secret_path(candidate)
+
+    if credential_named(path):
+        return "secret-name"
     try:
         is_link = os.path.islink(path)
     except (IOError, OSError):
@@ -822,9 +829,8 @@ def resolved_read_refusal(path, real_root="", real_home="", follow_links=False,
         real = os.path.realpath(path)
     except (IOError, OSError):
         return "outside-root"
-    if not (env_exception and scrublib.is_env_file(os.path.basename(real))):
-        if scrublib.is_secret_path(real):
-            return "target-secret-name"
+    if credential_named(real):
+        return "target-secret-name"
     allowed = [base for base in (real_root, real_home if follow_links else "")
                if base]
     if allowed and not _under(real, allowed):
@@ -5938,8 +5944,14 @@ def main(argv=None):
             warnings,
             "%d path(s) matching secret patterns were never opened" % reader.refused,
         )
-    if state.link_files or reader.link_refused:
-        examples = state.link_examples or reader.link_examples
+    # Two different events, reported separately on purpose.  They are NOT
+    # summed: the tree walk and the config reader can both see the same
+    # symlinked file, so adding them would double-count it -- and they are not
+    # the same claim either.  A tree link was never opened; a config link WAS
+    # followed and then refused on the resolved target.  An earlier version
+    # merged them with `or`, which reported whichever count came first and
+    # silently dropped the other one's count and examples.
+    if state.link_files:
         emitlib.warn(
             warnings,
             "%d file(s) in the tree are symlinks (e.g. %s); they are listed "
@@ -5949,8 +5961,20 @@ def main(argv=None):
             "manifest, a doc, a CI file, a dotenv or part of the LOC totals. "
             "Agent configuration under .claude/, .codex/ and .agents/ is the "
             "one place a link is followed."
-            % (state.link_files or reader.link_refused,
-               ", ".join(examples) if examples else "no example recorded"),
+            % (state.link_files,
+               ", ".join(state.link_examples) if state.link_examples
+               else "no example recorded"),
+        )
+    if reader.link_refused:
+        emitlib.warn(
+            warnings,
+            "%d agent-configuration link(s) (e.g. %s) were followed and then "
+            "refused: the resolved target left this repository and your home "
+            "directory, or landed on a credential filename. Nothing was read "
+            "from them, and the target path is never echoed back here."
+            % (reader.link_refused,
+               ", ".join(reader.link_examples) if reader.link_examples
+               else "no example recorded"),
         )
     if not state.env_paths:
         emitlib.warn(warnings, "no .env files found; env var names come from CI references only")
@@ -6507,6 +6531,11 @@ def selftest():
             handle.write("release:\n\techo %s\n" % _bait)
         with open(os.path.join(outside5, ".env"), "w") as handle:
             handle.write("BAIT_TOKEN=%s\n" % _bait)
+        # An agent-config file linked OUT of the repo.  This one is on the
+        # follow-links path, so it is followed and then refused on the resolved
+        # target -- a different event from a tree link, which is never opened.
+        with open(os.path.join(outside5, "hooks.json"), "w") as handle:
+            handle.write('{"hooks":{"PreToolUse":[]},"note":"%s"}' % _bait)
 
         with open(os.path.join(fixture5, "README.md"), "w") as handle:
             handle.write("# fx5\n")
@@ -6547,6 +6576,8 @@ def selftest():
                        os.path.join(fixture5, ".codex", "rules", "team.rules"))
             os.symlink(os.path.join("..", "store", "settings.json"),
                        os.path.join(fixture5, ".claude", "settings.json"))
+            os.symlink(os.path.join(outside5, "hooks.json"),
+                       os.path.join(fixture5, ".codex", "hooks.json"))
         except (OSError, NotImplementedError, AttributeError):
             links5 = False
 
@@ -6630,6 +6661,18 @@ def selftest():
             (not links5)
             or ("symlink" in warn5 and outside5 not in raw5),
             warn5[:200],
+        )
+        # Both refusal kinds must reach the user.  The tree walk's count and the
+        # config reader's count were once merged with `or`, which reported
+        # whichever was truthy first and dropped the other's count and examples
+        # -- and the surviving wording ("listed and never read") was false of
+        # the config case, which IS followed and then refused on its target.
+        add(
+            "the tree-link and followed-then-refused warnings are both reported",
+            (not links5)
+            or ("file(s) in the tree are symlinks" in warn5
+                and "were followed and then refused" in warn5),
+            warn5[:300],
         )
         add(
             "an agent-configuration symlink is still followed and read",

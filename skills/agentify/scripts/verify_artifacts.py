@@ -1449,7 +1449,10 @@ _TOML_TABLE = re.compile(r"^\[")
 #: What `parse_toml` decided.  Three, not two: the third is the whole point.
 TOML_PARSED = "parsed"
 TOML_INVALID = "invalid"
-TOML_UNVERIFIED = "unverified"
+TOML_UNVERIFIED = UNVERIFIED  # the same string, and deliberately the same
+                             # object: a parse outcome and a check status
+                             # that must stay spelled alike, with nothing
+                             # but this line to keep them that way
 
 #: Said whenever syntax could not be checked, so the row names the interpreter
 #: and the version that would settle it rather than leaving the reader to guess.
