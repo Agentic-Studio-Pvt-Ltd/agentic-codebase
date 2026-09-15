@@ -93,31 +93,51 @@ was `NotAnEvent` loaded with zero hooks, zero warnings and zero errors. For ever
 build on Claude Code, Codex has an equivalent event; `PermissionRequest`, `PostCompact`,
 `SubagentStart` and `Interrupt` have no Claude Code counterpart.
 
-Matchers — Codex tool names are NOT Claude Code tool names
-----------------------------------------------------------
+Matchers — one regex, canonical name first, older spellings kept
+----------------------------------------------------------------
 
-`matcher` is a **regex over the tool name**, and it may be omitted or `null`, meaning "all". Codex's
-observed tool vocabulary is `exec`, `exec_command`, `apply_patch`, `shell_command`, `send_message`,
-`js`, `run`, `update_plan`, `request_user_input`, `write_stdin`, `view_image`, plus the multi-agent
-tools. **There is no `Bash`, no `Edit`, no `Write`.** A hook ported from Claude Code with
-`"matcher": "^Bash$"` never fires — a real repo on the research machine has exactly that bug in
-production.
+`matcher` is a **regex over the tool name**, and it may be omitted or `null`, meaning "all".
+
+**The canonical shell tool name is `Bash`, and the canonical edit tool is `apply_patch`** — that is
+what Codex's current hook documentation specifies (`https://learn.chatgpt.com/docs/hooks`), and it is
+the name a current build dispatches. Rollout and conversation records on the research machine spell
+the same shell step `exec`, `exec_command`, `shell_command`, `local_shell` and `run`; those are tool
+names **as they appear in transcripts**, which is not the same list as the names a hook is dispatched
+under, and an earlier version of this template conflated the two and asserted that `Bash` could not
+fire. It can, and a matcher that excludes it makes every generated shell guardrail inert.
+
+So emit **one matcher that accepts all of them, canonical name first**. Listing only the rollout
+spellings never fires on a current build; listing only `Bash` never fires on an older or
+differently-spelled one. A guardrail is better matching a name that is never sent than missing the
+one that is. Keep the regex **anchored** — `^(…)$` — so a name like `Bashful` cannot match as a
+substring.
 
 | Intent | Matcher to emit |
 |---|---|
-| Any shell command | `^(exec\|exec_command\|shell_command\|run\|local_shell)$` |
+| Any shell command | `^(Bash\|exec_command\|shell_command\|local_shell\|exec\|run)$` |
 | Any file edit | `^(apply_patch\|Edit\|Write)$` (the last two are harmless and cover dual-target setups) |
 | Prompt-, session- and stop-time events | **omit the `matcher` key entirely** |
+
+The script's own `{{TOOL_NAME_GLOB}}` filter must be the **same alternation** as whatever goes in
+`matcher`, minus the `^(`, `)$` — `Bash|exec_command|shell_command|local_shell|exec|run` for shell,
+`apply_patch|Edit|Write` for edits. A shell `case` pattern is whole-string, so it is anchored the
+same way the regex is. The two drifting apart is how a hook registers and then does nothing.
 
 Omit the key rather than emitting `""`: the schema types it as nullable, and an omitted matcher was
 verified to come back as `matcher: null`. For `SessionStart` the matcher matches the start source
 (`startup` / `resume` / `clear` / `compact`); for `PreCompact` / `PostCompact` the trigger (`manual` /
 `auto`); `UserPromptSubmit`, `Stop` and `Interrupt` ignore it.
 
-The tool-name list is what one machine's history contains, not a published enum. Say in the plan that
-the vocabulary is build-dependent, and pair a permissive matcher with a script that re-checks
-`tool_name` from its own stdin and exits 0 quietly on a shape it does not recognise — which is what
-`codex-hook.sh.tmpl` does. A narrow matcher that silently never fires is the failure mode to avoid.
+Beyond the two canonical names, the vocabulary is build-dependent and not a published enum. Say so in
+the plan, and pair the permissive matcher with a script that re-checks `tool_name` from its own stdin
+and exits 0 quietly on a shape it does not recognise — which is what `codex-hook.sh.tmpl` does. A
+narrow matcher that silently never fires is the failure mode to avoid.
+
+**What is established, and what is not.** The name `Bash` and the payload field `tool_input.command`
+come from the current hook documentation, and the fixtures in `adapters/codex.md` §8 prove the
+generated script selects on them and returns the expected decision. That is a **contract** check.
+It does **not** prove the hook is loaded or armed in a live Codex session — only `/hooks` plus the
+`hooks/list` probe can speak to that, and only in a trusted project. Never report the two as one.
 
 Handler keys
 ------------

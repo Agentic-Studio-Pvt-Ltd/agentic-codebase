@@ -11,7 +11,9 @@
 #          (PreToolUse | PermissionRequest | PostToolUse | PreCompact | PostCompact |
 #           SessionStart | SessionEnd | UserPromptSubmit | SubagentStart | SubagentStop |
 #           Stop | Interrupt)
-# Matcher: {{HOOK_MATCHER}}     regex over the CODEX tool name — not Claude Code's vocabulary
+# Matcher: {{HOOK_MATCHER}}     anchored regex over the Codex tool name. The canonical names are
+#          `Bash` (shell) and `apply_patch` (edits); the alternation also accepts the older
+#          spellings a differently-built Codex may send.
 # Wired by: .codex/hooks.json — see codex-hooks.json.tmpl for the fragment and the merge
 #           procedure. This file does nothing until that fragment is merged, and it does not run
 #           until you trust it: run /hooks in Codex. Installed is not armed.
@@ -65,9 +67,15 @@
 #>     is not optional housekeeping — a command hook that keeps the path filter hits the FAIL LOUD
 #>     branch on every single call and prints a stderr line each time. If the hook matches edits,
 #>     keep it: the extractor below reads real Codex payloads, not Claude Code's `file_path`.
-#>  5. The matcher in the wiring is deliberately permissive because Codex's tool-name list is not a
-#>     published enum. That is why the TOOL_NAME filter below re-checks it here: a shape this hook
-#>     does not recognise exits 0 quietly.
+#>  5. {{TOOL_NAME_GLOB}} is the SAME alternation as the wiring's {{HOOK_MATCHER}} with the `^(`
+#>     and `)$` removed — a shell `case` pattern is already whole-string, so both are anchored.
+#>     Shell: `Bash|exec_command|shell_command|local_shell|exec|run`. Edits:
+#>     `apply_patch|Edit|Write`. `Bash` and `apply_patch` are the canonical names in Codex's current
+#>     hook documentation and MUST be present and first; the rest are older spellings, kept because
+#>     a guardrail that over-matches a name never sent is safer than one that misses the name that
+#>     is. The wiring's matcher stays permissive because the vocabulary beyond those two is not a
+#>     published enum — which is why this filter re-checks it: a shape this hook does not recognise
+#>     exits 0 quietly.
 #>  6. Build a hook only for a deterministic check that must not depend on the model remembering.
 #>     Anything needing judgement is a rule or a skill, not a hook. If the check is "never run this
 #>     command", prefer `codex-rules.rules.tmpl` — an execution-policy rule fires before the
@@ -138,49 +146,62 @@ TOOL_NAME="$(json_get tool_name)"
 # ---------------------------------------------------------------------------
 # Extract the command and the touched file paths from `tool_input`.
 #
-# `tool_input` is typed `true` — i.e. ANY — in Codex's own pre-tool-use /
-# post-tool-use / permission-request JSON schemas, so its shape is whatever the
-# tool's arguments were. It is NOT Claude Code's `{file_path: "..."}`, and an
-# earlier version of this template guessed `tool_input.file_path` with a
-# fallback to `tool_input.path`. Neither key exists on any Codex tool. Measured
-# over 240 real rollouts in ${CODEX_HOME:-~/.codex}/sessions:
+# **The documented contract.** Codex's hook documentation
+# (https://learn.chatgpt.com/docs/hooks) states that `Bash` and `apply_patch`
+# both put their argument on `tool_input.command`: the shell string for `Bash`,
+# and **the raw patch text** for `apply_patch`. So the SAME field carries two
+# entirely different languages, and which one it is depends on `tool_name`.
+# That is the whole reason this extractor reads `tool_name` — an earlier version
+# read `command` as shell text unconditionally, which silently produced ZERO
+# paths for every patch and left every file-scoped guardrail running unfiltered.
+# `tool_input` is otherwise typed `true` — i.e. ANY — in Codex's own
+# pre-tool-use / post-tool-use / permission-request JSON schemas, and it is NOT
+# Claude Code's `{file_path: "..."}`.
 #
-#   apply_patch     1068/1068 calls  a FREEFORM tool: its whole input is the raw
-#                                    patch text, starting `*** Begin Patch`.
-#                                    No object, no file_path, no path. The
-#                                    paths live in the envelope headers.
-#   exec_command    5004/5004 calls  {"cmd": "...", "workdir", ...}. The key is
-#                                    `cmd`. `command` does not exist, so the old
-#                                    `tool_input.command` read empty here too.
+# Older and differently-spelled builds are still handled, because the same
+# argument has been observed under other keys. Over 240 rollouts in
+# ${CODEX_HOME:-~/.codex}/sessions:
+#
+#   apply_patch     1068/1068 calls  the whole input is the raw patch text,
+#                                    starting `*** Begin Patch`, with no object
+#                                    around it. The paths live in the headers.
+#   exec_command    5004/5004 calls  {"cmd": "...", "workdir", ...} — key `cmd`.
 #   shell_command    122/122  calls  {"command": "...", "workdir"} — a string.
 #   exec            4920/4920 calls  code-mode: input is a JS source string.
 #
+# Those are tool names as they appear in TRANSCRIPTS, which is a different list
+# from the names a hook is dispatched under; both are accepted here.
+#
 # The patch envelope is fixed by the binary's own grammar (VERIFIED, read out of
 # the Codex bundle): `*** Add File: <path>`, `*** Delete File: <path>`,
-# `*** Update File: <path>`, `*** Move to: <path>`. And a patch can carry SEVERAL
-# files, which is why this yields a LIST, not a scalar — filtering on the first
-# path only would let an edit to a matching file slip past behind an unmatching
-# one.
+# `*** Update File: <path>`, `*** Move to: <path>`. A rename is the Update/Move
+# PAIR, and BOTH sides are collected — a guard on the destination directory must
+# see a file moved into it, and a guard on the source must see it leave. A patch
+# can carry several files, which is why this yields a LIST, not a scalar:
+# filtering on the first path only would let an edit to a matching file slip
+# past behind an unmatching one.
 #
-# UNVERIFIED, deliberately, with an exit condition: how Codex serialises a
-# freeform tool's input INTO the `tool_input` field — as the bare string, or
-# wrapped as {"input": "..."} — was not established from the bundle or the
-# rollouts, both of which record the model-facing call rather than the hook
-# payload. Both spellings are handled below, plus the argv form
-# {"command": ["apply_patch", "<patch>"]} that the function-typed apply_patch
-# uses. To settle it: run a PreToolUse hook that does `cat > /tmp/payload.json`
-# and read the file. When it is settled, delete the branches that did not fire.
+# **Working directory.** The event object carries a top-level `cwd` — the
+# session's working directory, and what patch paths are relative to. Older
+# object payloads also carry a per-call `workdir`/`cwd` inside `tool_input`;
+# both are read, `tool_input` first. When that directory is not the repo root,
+# each path is ALSO emitted rewritten repo-relative, so a {{PATH_GLOB}} written
+# against repo-root spellings still matches a patch authored from a subdirectory.
+# The as-sent spelling is emitted too, and never dropped.
 #
 # What is NOT handled is handled LOUDLY: an unrecognised shape prints a
 # diagnostic to stderr and lets the check run UNFILTERED rather than skipping
-# it. A guardrail that quietly matches nothing is the failure this comment
-# block exists to prevent.
+# it. With `command` now parsed as a patch, reaching that branch should be rare
+# — it means a genuinely new payload shape, and it is worth reporting as such.
 # ---------------------------------------------------------------------------
 payload_fields() {
   printf '%s' "$INPUT" | python3 -c '
 import json, sys
 
-HEADERS = ("*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: ")
+HEADERS = ("*** Add File:", "*** Update File:", "*** Delete File:", "*** Move to:")
+PATCH_TOOLS = ("apply_patch", "applypatch", "ApplyPatch", "patch")
+SHELL_TOOLS = ("Bash", "bash", "shell", "local_shell", "exec", "exec_command",
+               "shell_command", "run", "js", "write_stdin")
 
 def patch_paths(text):
     out = []
@@ -195,12 +216,39 @@ def patch_paths(text):
 def is_patch(text):
     return text.lstrip().startswith("*** Begin Patch")
 
+def repo_relative(item, base, root):
+    """Rewrite a path given relative to `base` as relative to `root`. POSIX spellings;
+    returns "" when it cannot be placed inside the repo."""
+    if item.startswith("/"):
+        absolute = item
+    elif base.startswith("/"):
+        absolute = base.rstrip("/") + "/" + item
+    else:
+        return ""
+    parts = []
+    for part in absolute.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if parts:
+                parts.pop()
+            continue
+        parts.append(part)
+    absolute = "/" + "/".join(parts)
+    root = root.rstrip("/")
+    if root and absolute.startswith(root + "/"):
+        return absolute[len(root) + 1:]
+    return ""
+
 try:
     data = json.load(sys.stdin)
 except Exception:
     sys.exit(0)
 if not isinstance(data, dict):
     sys.exit(0)
+
+tool = data.get("tool_name")
+tool = tool if isinstance(tool, str) else ""
 
 payload = data.get("tool_input")
 # Some transports double-encode: a JSON object arriving as a JSON string.
@@ -210,10 +258,23 @@ if isinstance(payload, str) and payload.lstrip()[:1] in ("{", "["):
     except Exception:
         pass
 
+# The directory patch paths are relative to: the per-call workdir when the
+# payload carries one, otherwise the session cwd from the event object.
+workdir = ""
+if isinstance(payload, dict):
+    for key in ("workdir", "cwd", "working_directory"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            workdir = value.strip()
+            break
+if not workdir and isinstance(data.get("cwd"), str):
+    workdir = data["cwd"].strip()
+
 paths, command, shape = [], "", ""
+is_patch_tool = tool in PATCH_TOOLS
 
 if isinstance(payload, str):
-    if is_patch(payload):
+    if is_patch(payload) or is_patch_tool:
         paths, shape = patch_paths(payload), "freeform-patch"
     else:
         command, shape = payload, "freeform-string"
@@ -232,13 +293,24 @@ elif isinstance(payload, dict):
     if raw is None:
         raw = payload.get("command")
     if isinstance(raw, str):
-        command = raw
-        shape = shape or "command-string"
+        # `command` is patch TEXT for apply_patch and shell TEXT for Bash. Fall
+        # back to the shell reading only for a genuine shell tool or a tool this
+        # script does not know — never for a patch tool, and never for text that
+        # announces itself as a patch.
+        if is_patch_tool or (is_patch(raw) and tool not in SHELL_TOOLS):
+            paths.extend(patch_paths(raw))
+            shape = shape or "patch-command"
+        else:
+            command = raw
+            shape = shape or "command-string"
     elif isinstance(raw, list):
         parts = [item for item in raw if isinstance(item, str)]
         if parts and parts[0] in ("apply_patch", "applypatch") and len(parts) > 1:
             paths.extend(patch_paths(parts[1]))
             shape = shape or "argv-apply_patch"
+        elif is_patch_tool and parts:
+            paths.extend(patch_paths(parts[-1]))
+            shape = shape or "argv-patch"
         else:
             command = " ".join(parts)
             shape = shape or "command-argv"
@@ -249,22 +321,39 @@ elif payload is None:
 else:
     shape = "unrecognised"
 
-out = ["SHAPE\t" + shape, "COMMAND\t" + " ".join(command.split())]
-seen = set()
+# Emit each path as sent, and — when the tool ran from somewhere other than the
+# repo root — also rewritten relative to the repo root, so a repo-root glob
+# matches a patch authored from a subdirectory. Neither spelling replaces the
+# other; a filter matching EITHER is a match.
+repo_root = sys.argv[1] if len(sys.argv) > 1 else ""
+resolved = []
 for item in paths:
+    resolved.append(item)
+    if not repo_root:
+        continue
+    relative = repo_relative(item, workdir or repo_root, repo_root)
+    if relative and relative != item:
+        resolved.append(relative)
+
+out = ["SHAPE\t" + shape, "CWD\t" + workdir.replace("\t", " "),
+       "COMMAND\t" + " ".join(command.split())]
+seen = set()
+for item in resolved:
     if item not in seen:
         seen.add(item)
         out.append("PATH\t" + item.replace("\t", " "))
 sys.stdout.write("\n".join(out))
-' 2>/dev/null || printf ''
+' "$REPO_ROOT" 2>/dev/null || printf ''
 }
 
 PAYLOAD_SHAPE=""
 COMMAND=""
 FILE_PATHS=""
+PAYLOAD_CWD=""
 while IFS="$(printf '\t')" read -r _key _value; do
   case "$_key" in
     SHAPE) PAYLOAD_SHAPE="$_value" ;;
+    CWD) PAYLOAD_CWD="$_value" ;;
     COMMAND) COMMAND="$_value" ;;
     PATH) FILE_PATHS="${FILE_PATHS}${_value}
 " ;;
@@ -330,8 +419,12 @@ else
   # matches nothing looks identical to a guardrail that passed. Say so on
   # stderr, which is diagnostic-only and cannot break the session, and let the
   # check run unfiltered.
-  printf 'agentify hook {{AGENTIFY_ID}}: no file path in tool_input for tool %s (payload shape: %s); running the check UNFILTERED. If %s carries no path, delete this hook'"'"'s path filter.\n' \
-    "${TOOL_NAME:-<none>}" "${PAYLOAD_SHAPE:-<none>}" "${TOOL_NAME:-that tool}" >&2
+  #
+  # This branch should be RARE: `apply_patch` puts its patch text on
+  # tool_input.command and the extractor parses every path out of it. Reaching
+  # here on a patch tool means a payload shape nobody has seen — report it.
+  printf 'agentify hook {{AGENTIFY_ID}}: no file path in tool_input for tool %s (payload shape: %s, cwd: %s); running the check UNFILTERED. If %s carries no path, delete this hook'"'"'s path filter; otherwise this is an unrecognised payload shape worth reporting.\n' \
+    "${TOOL_NAME:-<none>}" "${PAYLOAD_SHAPE:-<none>}" "${PAYLOAD_CWD:-<none>}" "${TOOL_NAME:-that tool}" >&2
 fi
 
 # ---------------------------------------------------------------------------

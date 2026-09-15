@@ -17,7 +17,7 @@ column verified 2026-09-05 against **codex-cli 0.152.1** and current official do
 | Index doc | **Native** — `CLAUDE.md` | **Native** — `AGENTS.md` (`AGENTS.override.md` outranks it in the same directory). Codex does **not** read `CLAUDE.md` |
 | Rules — prose | **Convention** — `.claude/rules/<name>.md` wired into `CLAUDE.md`; `paths:` frontmatter auto-loads | **Convention** — short rules inline in `AGENTS.md`; long ones at `<plan-dir>/rules/<name>.md` plus an `AGENTS.md` pointer |
 | Rules — command policy | **Convention** — a `PreToolUse` hook on `Bash` | **Native** — `.codex/rules/<name>.rules`: Starlark `prefix_rule(pattern=[…], decision="allow"\|"prompt"\|"forbidden", justification=…)`. Experimental per the docs |
-| Hooks | **Native** — `.claude/settings.json`; exit 2 blocks and feeds stderr back to the model | **Native** — `<repo>/.codex/hooks.json`, same three-level shape (event → matcher group → handler list), 12 events, regex matchers over tool names |
+| Hooks | **Native** — `.claude/settings.json`; exit 2 blocks and feeds stderr back to the model | **Native** — `<repo>/.codex/hooks.json`, same three-level shape (event → matcher group → handler list), 12 events, anchored regex matchers over tool names. Canonical names are `Bash` (shell) and `apply_patch` (edits); the emitted matcher also accepts the older spellings `exec_command` / `shell_command` / `local_shell` / `exec` / `run` |
 | Skills | **Native** — `.claude/skills/<name>/SKILL.md` | **Native** — `<repo>/.agents/skills/<name>/SKILL.md`, committable. **Not** `.codex/skills/`, which is not a load path |
 | Subagents | **Native** — `.claude/agents/<name>.md` | **Native** — `<repo>/.codex/agents/<name>.toml`: `name`, `description`, `developer_instructions` required; `model`, `model_reasoning_effort`, `sandbox_mode` optional |
 | MCP servers | **Draft** — `.mcp.json`, env-var placeholders only | **Draft** — `<plan-dir>/codex-mcp.toml`, a fragment for `<repo>/.codex/config.toml` the user applies |
@@ -42,7 +42,9 @@ emit or suggest `--dangerously-bypass-hook-trust`. Blocking is
 exists. **`[features] hooks = true` is NOT required** and agentify must never write it: hooks are on
 by default at 0.152.1, verified against `codex doctor --json` on a machine whose `config.toml` has
 no `hooks` key (`adapters/codex.md` §3). *UNVERIFIED: the meaning of non-zero exit codes other
-than 2 is undocumented.*
+than 2 is undocumented.* *Also UNVERIFIED: that a generated hook fires on a real tool call. The
+matcher and the `tool_input.command` payload contract match the current documentation and are
+exercised by fixtures; live activation has not been observed. Say "installed", never "working".*
 
 **Codex index doc.** `project_doc_max_bytes` defaults to **32768**, shared by the whole `AGENTS.md`
 chain (global, root, every directory down to the cwd), and discovery **stops** at the cap — appending

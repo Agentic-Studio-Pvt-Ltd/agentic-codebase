@@ -648,7 +648,9 @@ Codex has a first-class hook system. It is a near-superset of Claude Code's.
 | Script path | `<repo>/.codex/hooks/<kebab-name>.sh`, mode `0755` |
 | Never write | `${CODEX_HOME}/hooks.json` — a user-global hook fires in every repo, is not evidenced by this repo, and the project layer removes any need for it |
 
-**Exact shape (VERIFIED — this file loaded and was reported back by `hooks/list`):**
+**Exact shape (the three-level structure is VERIFIED — this file loaded and was reported back by
+`hooks/list`. The `matcher` VALUE below was updated 2026-09-15 to the documented tool name and has
+not been re-run against a live build; see "Matchers"):**
 
 ```json
 {
@@ -656,7 +658,7 @@ Codex has a first-class hook system. It is a near-superset of Claude Code's.
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "^(exec|exec_command|shell_command|run)$",
+        "matcher": "^(Bash|exec_command|shell_command|local_shell|exec|run)$",
         "hooks": [
           {
             "type": "command",
@@ -698,28 +700,44 @@ omitted or `null`, meaning "all". **Omit the key** for events that have no tool 
 (`startup` / `resume` / `clear` / `compact`) and for `PreCompact` / `PostCompact` the trigger
 (`manual` / `auto`); `UserPromptSubmit`, `Stop` and `Interrupt` ignore it (**DOCUMENTED**).
 
-**Codex's tool names are not Claude Code's.** Tool names observed in this machine's own rollouts, by
-frequency: `exec`, `exec_command`, `apply_patch`, `shell_command`, `send_message`, `js`, `run`,
-`update_plan`, `request_user_input`, `write_stdin`, `view_image`, plus the multi-agent tools
-(`spawn_agent`, `wait_agent`, `list_agents`, `followup_task`, `interrupt_agent`). **No `Bash`, no
-`Edit`, no `Write`.** A hook ported from Claude Code with `"matcher": "^Bash$"` will never fire on
-Codex — and a real repo on this machine has exactly that mistake in production.
+**The canonical tool names are `Bash` and `apply_patch` (DOCUMENTED).** Codex's hook documentation
+(`https://learn.chatgpt.com/docs/hooks`) names `Bash` for shell execution and `apply_patch` / `Edit` /
+`Write` for file edits, and that is what a current build dispatches a hook under.
 
-Emit these, and say in the plan that the vocabulary is build-dependent:
+**Two different lists, and conflating them is a real defect this file shipped.** The names in this
+machine's own *rollout and conversation records*, by frequency, are `exec`, `exec_command`,
+`apply_patch`, `shell_command`, `send_message`, `js`, `run`, `update_plan`, `request_user_input`,
+`write_stdin`, `view_image`, plus the multi-agent tools (`spawn_agent`, `wait_agent`, `list_agents`,
+`followup_task`, `interrupt_agent`). Those are tool names **as a transcript records them**. Earlier
+revisions of this section read that list as the hook dispatch vocabulary and stated outright that
+there is no `Bash` — so agentify emitted shell matchers that excluded the one name a current Codex
+actually sends, and every generated shell guardrail was inert. Corrected 2026-09-15.
+
+Emit one matcher that accepts **both** vocabularies, canonical name first, and say in the plan that
+the vocabulary beyond the canonical names is build-dependent:
 
 | Intent | Matcher to emit |
 |---|---|
-| Any shell command | `^(exec\|exec_command\|shell_command\|run\|local_shell)$` |
+| Any shell command | `^(Bash\|exec_command\|shell_command\|local_shell\|exec\|run)$` |
 | Any file edit | `^(apply_patch\|Edit\|Write)$` (the last two are harmless and cover imported/dual-target setups) |
 | Prompt-, session- and stop-time events | omit `matcher` entirely |
 
-> **UNVERIFIED — the exhaustive tool-name list.** The names above are what this machine's history
-> contains, not a published enum, and no tool-name enum exists in the binary's generated schemas.
-> **What would confirm it:** an official tool reference for the target build, or `payload.name` of
-> `function_call` / `custom_tool_call` records across fresh sessions on that build. Because the list
-> is open, **the hook script must also check `tool_name` from its stdin and exit 0 quietly when it
-> does not recognise the shape.** A permissive matcher plus a defensive script is correct; a narrow
-> matcher that silently never fires is the failure mode to avoid.
+Keep the regex **anchored**: `^(…)$`, so `Bashful` or `prebash` cannot match as a substring. The
+generated script's own `case` filter must carry the **same alternation** minus the anchors — a `case`
+pattern is whole-string, so the two stay equivalent. Over-matching a name that is never sent costs
+one no-op `case` arm; under-matching the name that is sent costs the entire guardrail.
+
+> **UNVERIFIED — the exhaustive tool-name list, and live dispatch.** Beyond `Bash` and `apply_patch`
+> the list is empirical, not a published enum, and no tool-name enum exists in the binary's generated
+> schemas. Separately: that the matcher above **selects a real tool call in a running session** has
+> **not** been observed here — what has been established is that it matches the documented name and
+> that the generated script returns the expected decision on a fixture (§8). **What would confirm the
+> rest:** an official tool reference for the target build, `payload.name` of `function_call` /
+> `custom_tool_call` records across fresh sessions on that build, or a `PreToolUse` hook that dumps
+> its stdin during a live turn. Because the list is open, **the hook script must also check
+> `tool_name` from its stdin and exit 0 quietly when it does not recognise the shape.** A permissive
+> matcher plus a defensive script is correct; a narrow matcher that silently never fires is the
+> failure mode to avoid.
 
 #### Handler keys — and the one that silently does nothing
 
@@ -742,6 +760,29 @@ own `jq` reads): `session_id`, `turn_id`, `cwd`, `transcript_path`, `agent_trans
 `tool_use_id`, `tool_response`, `agent_id`, `agent_type`, `last_assistant_message`, `prompt`,
 `stop_hook_active`. Generated scripts must read stdin defensively and must never crash on an
 unexpected shape — an exception in a hook is a broken session.
+
+**`tool_input` and the one field that carries two languages (DOCUMENTED).** `tool_input` is typed
+`true` — i.e. ANY — in the pre-tool-use / post-tool-use / permission-request schemas, so its shape is
+the tool's own arguments; it is **not** Claude Code's `{file_path: …}`. The documentation states that
+**`Bash` and `apply_patch` both use `tool_input.command`**: for `Bash` it is the shell string, and for
+`apply_patch` it is **the raw patch text**. MCP and other local function tools pass their arguments
+directly inside `tool_input`.
+
+So the same field name means shell for one tool and a patch for another, and **`tool_name` is what
+disambiguates them.** A hook that reads `tool_input.command` as shell text unconditionally extracts
+zero file paths from every patch — which is exactly what `templates/codex-hook.sh.tmpl` did before
+2026-09-15, and it silently un-scoped every file-scoped guardrail (a rule like "never edit
+`db/migrations/`" stopped being tied to the files being edited, and the empty-path fallback then ran
+the check against *everything*, denying edits outside the guarded scope as well as missing edits
+inside it).
+
+For `apply_patch`, parse `tool_input.command` with the patch grammar and collect **every** affected
+path: `*** Add File:`, `*** Update File:`, `*** Delete File:` and `*** Move to:`. A rename is the
+`Update File:` / `Move to:` **pair** and both sides count. Paths are relative to the session's
+top-level **`cwd`** (older object payloads also carry a per-call `workdir`); resolve against it so a
+repo-root glob still matches a patch authored from a subdirectory, and keep the as-sent spelling too.
+The freeform spelling — `tool_input` being the bare patch string, as the rollouts record it — must
+keep working alongside the documented object form.
 
 **Blocking is expressed in JSON on stdout, and this is the difference from Claude Code that matters
 most.** A production `PreToolUse` hook on this machine blocks by printing
@@ -849,6 +890,15 @@ set -euo pipefail
 # Safe to delete or edit.
 
 input="$(cat)"
+tool="$(printf '%s' "$input" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("tool_name") or "")' 2>/dev/null || true)"
+
+# tool_input.command is the shell string for Bash and the PATCH TEXT for apply_patch, so a
+# command hook must check the tool name first or it will read a patch as a command.
+case "$tool" in
+  Bash|exec_command|shell_command|local_shell|exec|run) ;;
+  *) exit 0 ;;
+esac
+
 cmd="$(printf '%s' "$input" | python3 -c 'import json,sys;print((json.load(sys.stdin).get("tool_input") or {}).get("command",""))' 2>/dev/null || true)"
 
 case "$cmd" in
@@ -1297,9 +1347,9 @@ binary resolves** — say in the report which mode ran.
 | Rules (prose, files) | for each: `test -f "<plan-dir>/rules/<name>.md"`, frontmatter parses, and `grep -F "<name>.md" "$REPO/AGENTS.md"` | exists, parses, **and is referenced from `AGENTS.md`**. Unreferenced is a **fail** — nothing loads it (§4.2.1) |
 | Rules (command policy) | `"$CODEX" execpolicy check --pretty --rules "$REPO/.codex/rules/agentify.rules" -- <a command the rule targets>` and again with a command it must not catch | exit 0 both times; the first returns a `matchedRules` entry with the expected `decision`; the second returns `{"matchedRules":[]}`. **Not trust-gated, so this stays a hard pass condition on a first run** — measured: `execpolicy check` reads the `--rules` path it is handed and never consults `[projects]`. Capture the exit status directly, not through a pipe: `cmd | head` reports `head`'s status and a parse error reads as exit 0. **A parse error here means the file would break every Codex session in this repo — remove it, do not ship it.** With no binary: do not ship the file at all (§4.2.2 rule 1). |
 | Hooks (config) | `python3 -c "import json;json.load(open('.codex/hooks.json'))"`; then confirm the top-level keys are a subset of `{"description","hooks"}`; then confirm every pre-existing event, group and handler survived the merge | valid JSON; **no unknown top-level key** (one silently disables the whole file, §4.3); nothing pre-existing lost |
-| Hooks (installed) | `test -x "<script>"`; the registration resolves to that script; `hooks.json` parses with a top-level key subset of `{"description","hooks"}`; every `eventName` is one of the 12 spelled events and every `matcher` uses Codex tool names (§4.3) | **this is the pass condition, and it is always reachable.** All four hold ⇒ pass. This is what "the hook is installed" means and it is the strongest claim a first run may make. |
+| Hooks (installed) | `test -x "<script>"`; the registration resolves to that script; `hooks.json` parses with a top-level key subset of `{"description","hooks"}`; every `eventName` is one of the 12 spelled events; every `matcher` is anchored and, for a tool-scoped event, contains the canonical name for its intent — `Bash` for shell, `apply_patch` for edits (§4.3) | **this is the pass condition, and it is always reachable.** All four hold ⇒ pass. A shell matcher with no `Bash` alternative is a **fail**, not a warning: it registers and never fires. This is what "the hook is installed" means and it is the strongest claim a first run may make — it says nothing about the hook being loaded or armed. |
 | Hooks (loaded) — **trust-gated** | drive `hooks/list` over the app-server (below), having already read the Project trust row | **Trusted project:** the hook appears with the expected `matcher` and `sourcePath`, `source` is `"project"`, and `warnings` is empty ⇒ pass. Compare `eventName` **case-insensitively** — a hook declared `"PreToolUse"` is reported `"preToolUse"` (measured). **Untrusted or no entry:** `hooks: []`, `warnings: []`, `errors: []` is the **expected** result ⇒ `not tested — project not trusted`, plus needs-you step 1. Never a fail. **`warnings` non-empty in a trusted project** ⇒ fail; it names the offending field, line and column. **In an untrusted project `warnings` is empty even for a file Codex would reject** (measured), so this row can neither confirm nor deny the file's validity there — the Hooks (config) row is the only authority on that. The reason surfaces on the app-server's **stderr**, not in the JSON: capture it and match `Project-local config, hooks, and exec policies are disabled … until the project is trusted`, so the report states which case it was instead of guessing. |
-| Hooks (script) | `test -x "<script>"` → `bash -n "<script>"` → the two stdin fixtures below | executable; syntax valid; benign fixture exits 0 and prints nothing; blocking fixture exits 0 and prints JSON whose `hookSpecificOutput.permissionDecision` is `deny` with an actionable `permissionDecisionReason` |
+| Hooks (script) | `test -x "<script>"` → `bash -n "<script>"` → the stdin fixtures below, **including the canonical one** (`"tool_name":"Bash"` for a shell hook, `"tool_name":"apply_patch"` with the patch on `tool_input.command` for a file-scoped one) | executable; syntax valid; benign fixture exits 0 and prints nothing; blocking fixture exits 0 and prints JSON whose `hookSpecificOutput.permissionDecision` is `deny` with an actionable `permissionDecisionReason`; **the canonical fixture produces the same verdict as the legacy spelling** — a hook that denies `exec_command` and allows `Bash` is inert on a current build and is a fail; a file-scoped hook's paths come out of the payload, so the `UNFILTERED` stderr line must not appear |
 | Skills | `test -f "$REPO/.agents/skills/<n>/SKILL.md"`; frontmatter `name` equals the directory name; `len(description) < 1024`; description contains a trigger phrase traceable to `signals.json`; then drive `skills/list` | static checks pass **and** the skill comes back from `skills/list` with `"scope": "repo"` and the expected `path`. **Not trust-gated either** — measured: an untrusted project's `<repo>/.agents/skills/**` still loads with `"scope":"repo"`, which is why this row asserts `loaded` where the hooks row cannot |
 | Subagents | `test -f "$REPO/.codex/agents/<n>.toml"`; the file parses as TOML if a parser is available, otherwise `name`, `description` and `developer_instructions` are each present at the start of a line; `name` matches the filename stem | static checks pass. **No runtime check exists** (§4.5) — the report must carry the live check as a manual item. |
 | MCP (draft) | `test -f "<plan-dir>/codex-mcp.toml"`; scan with `lib/scrub.py` patterns; every env-var name appears in the report's needs-you list | file exists; **zero scrub hits**; every variable documented. **Never connect, never authenticate.** |
@@ -1308,17 +1358,48 @@ binary resolves** — say in the report which mode ran.
 | Plugin manifest | `python3 -m json.tool .codex-plugin/plugin.json > /dev/null`; `name` present; the `skills` path exists on disk | valid JSON, required field present, no dangling path |
 | `${CODEX_HOME}/config.toml` not modified **by agentify** | hash it before and after the build; **on a mismatch, diff the section headers and key names** (never the values) | the set of section headers and keys is unchanged. **A plain hash comparison is not a valid check on its own**: the ChatGPT desktop app and a background `codex app-server` daemon write to this file on their own — its mtime changed twice during verification with no write from here. A structural mismatch is a build failure (§4.6 rule 1); an mtime or hash change with identical structure is the desktop app, not agentify. |
 
-**Hook stdin fixtures** — feed the event JSON exactly as Codex does:
+**Hook stdin fixtures** — feed the event JSON exactly as Codex does. **The canonical fixture is the
+pass condition**, and it is the one that catches a matcher written against the transcript vocabulary
+only: a shell hook that ignores `"tool_name":"Bash"` is inert on a current build, whatever it does
+with `exec_command`.
 
 ```sh
-# Benign — must exit 0 and print nothing.
+# 1. Canonical + blocking — REQUIRED. Must exit 0 and print a permissionDecision of "deny".
 echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
-"tool_name":"exec","tool_input":{"command":"git status"}}' | .codex/hooks/<name>.sh; echo "exit=$?"
+"tool_name":"Bash","tool_input":{"command":"npm install left-pad"}}' | .codex/hooks/<name>.sh; echo "exit=$?"
 
-# Blocking — must exit 0 and print a permissionDecision of "deny".
+# 2. Canonical + benign — must exit 0 and print nothing.
 echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
-"tool_name":"exec","tool_input":{"command":"npm install left-pad"}}' | .codex/hooks/<name>.sh; echo "exit=$?"
+"tool_name":"Bash","tool_input":{"command":"git status"}}' | .codex/hooks/<name>.sh; echo "exit=$?"
+
+# 3. Legacy spelling — the same blocking verdict as 1, on an older build's tool name.
+echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
+"tool_name":"exec_command","tool_input":{"command":"npm install left-pad"}}' | .codex/hooks/<name>.sh; echo "exit=$?"
+
+# 4. Unrelated tool — must exit 0, print nothing, and print nothing on stderr either.
+echo '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
+"tool_name":"update_plan","tool_input":{"plan":[]}}' | .codex/hooks/<name>.sh; echo "exit=$?"
 ```
+
+For a **file-scoped** hook (one with a `PATH_GLOB` filter), fixtures 1–3 are replaced by a patch on
+`tool_input.command`, one path inside the guarded scope and one outside:
+
+```sh
+# 5. Inside the guarded scope — must deny, and must NOT print the "UNFILTERED" stderr line.
+printf '%s' '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
+"tool_name":"apply_patch","tool_input":{"command":"*** Begin Patch\n*** Update File: <guarded path>\n@@\n-a\n+b\n*** End Patch\n"}}' \
+  | .codex/hooks/<name>.sh; echo "exit=$?"
+
+# 6. Outside it — must exit 0, print nothing, and print nothing on stderr.
+printf '%s' '{"session_id":"smoke","cwd":"'"$REPO"'","hook_event_name":"PreToolUse",
+"tool_name":"apply_patch","tool_input":{"command":"*** Begin Patch\n*** Update File: <unguarded path>\n@@\n-a\n+b\n*** End Patch\n"}}' \
+  | .codex/hooks/<name>.sh; echo "exit=$?"
+```
+
+**Stderr is part of the pass condition on 4, 5 and 6.** The `no file path in tool_input …
+running the check UNFILTERED` line means the payload's paths were not extracted, so the path filter
+did nothing and the check ran against everything. A deny that comes with that line on stderr is not a
+pass — it is the filter failing open, and it denies work outside the guarded scope too.
 
 A hook that blocks the benign fixture is a **build failure**, not a warning: it will block the user's
 normal work in their next session. Remove it, record it in the report, and continue.
@@ -1410,8 +1491,14 @@ matching numbered step, or a step with no row, means one of the two was written 
 Update the `verified-against` date and version in the frontmatter when you work this list. Verify
 against a CLI install **and** a desktop-bundle install; they diverge (§1.3).
 
-- [ ] **Tool-name vocabulary for hook matchers** (§4.3). The list is empirical, not published, and it
-      drifts by build. Re-derive from a fresh corpus or from an official tool reference.
+- [ ] **Tool-name vocabulary for hook matchers** (§4.3). `Bash` and `apply_patch` are documented; the
+      rest of the list is empirical, not published, and it drifts by build. Re-derive from a fresh
+      corpus or from an official tool reference.
+- [ ] **Live activation of a generated hook** (§4.3, §8). The matcher and the `tool_input.command`
+      payload contract are checked against the documentation and against fixtures; **that a generated
+      hook fires on a real tool call has never been observed here.** Confirm by trusting a hook via
+      `/hooks` and dumping stdin from a live turn. Until then the report says *installed*, never
+      *working*.
 - [ ] **Does a written `.codex/agents/<name>.toml` load?** (§4.5) Spawn the generated agent in a live
       session and check the child rollout's `source.subagent.thread_spawn.agent_path`.
 - [ ] **Trust behaviour for a first-seen project** (§0.2): does declining the interactive trust prompt

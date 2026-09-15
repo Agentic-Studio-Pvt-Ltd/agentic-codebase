@@ -127,7 +127,7 @@ gets an `AGENTS.md` instruction block plus a git hook instead is stale — Codex
 a `hooks.json` (`adapters/codex.md` §4.3).** Native git hooks remain available on both targets as a
 separate, opt-in, separately-approved artifact for commit-time enforcement, never as a substitute.
 
-Three Codex facts that change what phase 7 can *claim*, all of which belong in the report rather than
+Four Codex facts that change what phase 7 can *claim*, all of which belong in the report rather than
 in a silent assumption:
 
 1. **Project trust gates the whole repo-scoped layer.** `AGENTS.md`, `.codex/hooks.json`,
@@ -137,9 +137,17 @@ in a silent assumption:
 2. **A generated hook is installed, not armed.** Codex keys hook trust to a hash of the definition and
    the user arms it with `/hooks`. Phase 8 may prove the JSON loads and the script runs; it may not
    say the hook is live. Never emit or suggest `--dangerously-bypass-hook-trust`.
-3. **Codex tool names are not Claude Code's.** A matcher ported as `^Bash$` never fires. Shell is
-   `^(exec|exec_command|shell_command|run|local_shell)$`, edits are
-   `^(apply_patch|Edit|Write)$`, and prompt/session/stop events take no matcher at all.
+3. **Codex matchers carry the canonical name first and the older spellings after.** Shell is
+   `^(Bash|exec_command|shell_command|local_shell|exec|run)$`, edits are
+   `^(apply_patch|Edit|Write)$`, and prompt/session/stop events take no matcher at all. `Bash` and
+   `apply_patch` are the documented names a current build dispatches under; the rest are the
+   spellings that appear in transcripts and in older builds, kept because over-matching a name that
+   is never sent is free and under-matching the one that is sent voids the guardrail. Keep the
+   anchors. The script's own `case` filter carries the same alternation without them.
+4. **`tool_input.command` is shell text for `Bash` and PATCH TEXT for `apply_patch`.** A file-scoped
+   hook must parse it with the patch grammar when the tool is `apply_patch` and collect every
+   affected path, both sides of a `Move to:` included — otherwise the path filter extracts nothing,
+   falls open, and the check runs against the whole repo.
 
 ### 2.3 The four write modes — this is the spine the undo hangs on
 
@@ -574,7 +582,7 @@ Five more that are Codex-only, and every one of them is silent unless phase 7 sa
 | the repo is not trusted — `discovery.existing_agentic_config.codex.repo_trust_level` is missing or `untrusted` | build anyway; the artifacts are correct and committable. Put the `trust_level = "trusted"` line, and the fact that **nothing loads without it**, in the plan's capability notes and at the top of the report's needs-you. Never edit `${CODEX_HOME}/config.toml` to set it |
 | `.codex/hooks.json` does not parse, or holds an unknown top-level key | stop on that file (§2.4a step 2). An unknown top-level key makes Codex load **zero hooks with zero warnings**, so never add one — not `_agentify`, not anything |
 | the `config.toml` append contract refuses (table exists, multi-line string, no binary to validate with) | fall back to the draft, and say **in the plan, before the build** which servers took which path and why. A silent downgrade is a promise the report then has to break |
-| a hook matcher was written with Claude Code tool names (`^Bash$`, `^Write$`) | fix it to the Codex vocabulary (§2.2). It parses, loads, and never fires — a real repo on this machine ships that mistake |
+| a Codex shell hook matcher omits `Bash`, or a matcher is unanchored | fix it to the full alternation in §2.2. A matcher with only the transcript spellings parses, loads, and never fires on a current build; an unanchored one matches unrelated tool names as substrings |
 | `codex` did not resolve (§1.3 of the adapter) | build; skip the smoke tests that need it, skip the `config.toml` write path entirely, and record both in the report |
 
 A build that stops early is still a run that must reach phase 8: the manifest and the report are what
