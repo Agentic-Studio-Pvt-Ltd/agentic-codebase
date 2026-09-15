@@ -15,7 +15,12 @@ Design constraints (build contract, PRD 7.2):
   pruning; `--timeout-s` is a soft budget that is checked *during* the walk.
   Blowing the budget degrades the output, it never hangs and never raises.
 * The main walk NEVER follows symlinks -- cycles, and a link can walk the
-  analyzer straight out of the repo.  The agent config directories
+  analyzer straight out of the repo.  A symlinked *file* is listed and never
+  read, so it is not a manifest, a doc, a CI file, a dotenv or part of the LOC
+  totals: its bytes come from wherever it points, which the repo-relative name
+  does not say.  The measured case was a `package.json` linked onto a
+  `credentials.json` outside the checkout, read in full and republished under
+  `raw_scripts`.  The agent config directories
   (`.claude/skills`, `.claude/agents`, ...) are the one exception, scanned
   separately by `scan_agentic_dirs` WITH links followed, because a shared
   skill store symlinked into `.claude/skills/` is a skill the agent really
@@ -64,6 +69,11 @@ Design constraints (build contract, PRD 7.2):
   refused.  `.env*` files are the single exception and get names-only
   treatment: everything left of the first `=` on a line, and the value is
   never bound to a variable at all (`line[:line.find("=")]`).
+  That test runs at EVERY read boundary (`resolved_read_refusal`), against the
+  RESOLVED path as well as the one written, together with a containment check
+  -- an ordinary read must resolve inside the repo, an agent-configuration
+  read inside the repo or the user's home.  Checking the repo-side name once,
+  at the entry to the walk, is what let a symlinked manifest through.
 * Exit codes follow the shared contract in `lib/emit.py`'s module docstring,
   which is the single normative statement -- do not restate it here and do not
   invent a code.  In one line: a missing, empty, unreadable or not-a-directory
@@ -765,21 +775,109 @@ def _glob_to_regex(pattern):
 # Bounded, secret-refusing file access
 # ---------------------------------------------------------------------------
 
+def resolved_read_refusal(path, real_root="", real_home="", follow_links=False,
+                          env_exception=False):
+    """
+    Why `path` must not be opened, as a short reason, or "" when it may be.
+
+    Four reasons, checked in this order:
+
+      ``secret-name``         the path as written matches a credential glob,
+      ``symlink``             an ordinary content file reached through a link,
+      ``target-secret-name``  the RESOLVED target matches a credential glob,
+      ``outside-root``        the RESOLVED target sits outside the allowed roots.
+
+    The last two are the reason this exists.  Every name check in the traversal
+    runs against the repo-side *name*, and a name says nothing about where the
+    bytes come from: a `package.json` symlinked onto a `credentials.json`
+    outside the checkout passes all of them, and was read and republished as
+    `raw_scripts["package.json"]` on a measured fixture.  Containment and the
+    secret-name rule are therefore settled here, on the resolved path, at every
+    read boundary rather than once at the entry to the walk.
+
+    `follow_links=True` is the separately guarded path for agent
+    configuration -- `.claude/settings.json`, an index doc, a Codex
+    `config.toml`, a linked skill's `SKILL.md`.  A link there is the
+    documented layout (one store, linked into each agent's native root), so it
+    is followed; but the resolved target must still be inside the repository
+    or the user's home, and must still not be credential-named.  Those are the
+    same two bounds `scan_agentic_dirs` enforces while enumerating them.
+
+    `env_exception=True` is what `env_var_names` passes: a dotenv file is
+    credential-named by definition, and reading it for NAMES ONLY is the one
+    documented exception.  It waives the two name checks for a dotenv
+    filename and nothing else -- a `.env` that is a link, or one inside a
+    `credentials/` directory, is still refused.
+    """
+    if not (env_exception and scrublib.is_env_file(path)):
+        if scrublib.is_secret_path(path):
+            return "secret-name"
+    try:
+        is_link = os.path.islink(path)
+    except (IOError, OSError):
+        return "symlink"
+    if is_link and not follow_links:
+        return "symlink"
+    try:
+        real = os.path.realpath(path)
+    except (IOError, OSError):
+        return "outside-root"
+    if not (env_exception and scrublib.is_env_file(os.path.basename(real))):
+        if scrublib.is_secret_path(real):
+            return "target-secret-name"
+    allowed = [base for base in (real_root, real_home if follow_links else "")
+               if base]
+    if allowed and not _under(real, allowed):
+        return "outside-root"
+    return ""
+
+
 class Reader(object):
     """Every byte this script reads goes through here."""
 
-    def __init__(self, warnings):
+    def __init__(self, warnings, root=""):
         self.warnings = warnings
+        self.root = root
+        try:
+            self.real_root = os.path.realpath(root) if root else ""
+        except (IOError, OSError):
+            self.real_root = ""
+        try:
+            self.real_home = os.path.realpath(os.path.expanduser("~"))
+        except (IOError, OSError):
+            self.real_home = ""
         self.bytes_read = 0
-        self.refused = 0
+        self.refused = 0          # paths refused for matching a secret pattern
+        self.link_refused = 0     # links, escapes, credential-named targets
+        self.link_examples = []   # basenames only, for the warning
 
     def budget_left(self):
         return self.bytes_read < MAX_TOTAL_READ_BYTES
 
-    def text(self, path, max_bytes=MAX_FILE_READ_BYTES):
-        """Read a bounded amount of text, or "" if the path is off limits."""
-        if scrublib.is_secret_path(path):
+    def _refuse(self, path, follow_links, env_exception=False):
+        """
+        The single gate every read below goes through.  Returns the refusal
+        reason ("" to proceed) and books it so `main` can say how many reads
+        were refused and why.
+        """
+        reason = resolved_read_refusal(
+            path, self.real_root, self.real_home, follow_links, env_exception)
+        if not reason:
+            return ""
+        if reason == "secret-name":
             self.refused += 1
+        else:
+            self.link_refused += 1
+            # the repo-side basename only: the target is what was refused and
+            # is never echoed back into the payload
+            name = os.path.basename(path)
+            if name and name not in self.link_examples and len(self.link_examples) < 3:
+                self.link_examples.append(name)
+        return reason
+
+    def text(self, path, max_bytes=MAX_FILE_READ_BYTES, follow_links=False):
+        """Read a bounded amount of text, or "" if the path is off limits."""
+        if self._refuse(path, follow_links):
             return ""
         if not self.budget_left():
             return ""
@@ -796,8 +894,8 @@ class Reader(object):
         except Exception:  # pragma: no cover - defensive
             return ""
 
-    def json(self, path):
-        text = self.text(path)
+    def json(self, path, follow_links=False):
+        text = self.text(path, follow_links=follow_links)
         if not text:
             return None
         try:
@@ -820,6 +918,8 @@ class Reader(object):
         beyond that, which is why every LOC number is called an estimate.
         """
         if size <= 0:
+            return (0, False)
+        if self._refuse(path, False):
             return (0, False)
         if not self.budget_left():
             return (max(1, int(size / 32)), False)
@@ -848,6 +948,11 @@ class Reader(object):
         """
         names = []
         if not scrublib.is_env_file(path):
+            return names
+        # The names-only exception belongs to a real dotenv file in THIS
+        # repository.  A `.env` that is a symlink, or one whose target
+        # resolves elsewhere, does not borrow it.
+        if self._refuse(path, False, env_exception=True):
             return names
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as fh:
@@ -1216,6 +1321,11 @@ class State(object):
         self.marker_files = set()    # basenames seen at depth <= 2
         self.rel_files = set()       # notable rel paths (shallow) for services
         self.ci_env_names = []       # env var NAMES referenced by CI files
+        #: ordinary files that are symlinks: listed in the tree, never read.
+        #: Agent configuration is the documented exception and is followed by
+        #: `scan_agentic_dirs` instead.
+        self.link_files = 0
+        self.link_examples = []      # repo-relative paths, at most three
         self.stopped_early = False
 
 
@@ -1230,8 +1340,11 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
     """
     One pass.  Prunes hard, checks the clock, never follows symlinks.
 
-    Symlink-following is confined to `scan_agentic_dirs`; see the module
-    docstring for why the two walks differ.
+    A symlinked *directory* is listed and not descended into; a symlinked
+    *file* is listed and never read, so nothing it points at reaches a
+    manifest, a doc, a CI file, a dotenv or the LOC totals.  Symlink-following
+    is confined to `scan_agentic_dirs`; see the module docstring for why the
+    two walks differ.
     """
     content_deadline = int(deadline_ms * 0.65)
     checked = 0
@@ -1305,12 +1418,28 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
                 break
 
             full = os.path.join(dirpath, name)
+            # An ordinary file that is a symlink is LISTED and never read.  Its
+            # bytes come from wherever the link points, which the repo-relative
+            # name does not say: the measured case was a `package.json` linked
+            # onto a `credentials.json` outside the checkout, read in full and
+            # republished under `raw_scripts`.  Every content-bearing
+            # classification below is therefore skipped for a link; the path
+            # facts (it exists, it is in this directory) are kept, and agent
+            # configuration keeps its own guarded, link-following scan.
+            try:
+                is_link = os.path.islink(full)
+            except (IOError, OSError):
+                is_link = True
+            if is_link:
+                state.link_files += 1
+                if len(state.link_examples) < 3:
+                    state.link_examples.append(rel_path)
             lower = name.lower()
             _stem, ext = os.path.splitext(lower)
 
             if name in LOCKFILES:
                 seen_lock = state.lockfiles.get(name)
-                if seen_lock is None or depth < seen_lock[0]:
+                if not is_link and (seen_lock is None or depth < seen_lock[0]):
                     state.lockfiles[name] = (depth, rel_path)
                 continue
 
@@ -1324,11 +1453,12 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
                 kind = "requirements.txt"
             if kind is None and lower.endswith(".csproj"):
                 kind = "csproj"
-            if kind is not None:
+            if kind is not None and not is_link:
                 state.manifest_paths.append((rel_path, kind, depth))
 
             if scrublib.is_env_file(name):
-                state.env_paths.append((rel_path, depth))
+                if not is_link:
+                    state.env_paths.append((rel_path, depth))
                 continue
 
             if rel_dir and not scrublib.is_secret_path(rel_path):
@@ -1336,10 +1466,11 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
                 if len(sample) < 200:
                     sample.append(name)
 
-            if rel_dir.startswith(".github/workflows") and ext in (".yml", ".yaml"):
-                state.ci_paths.append(rel_path)
-            elif rel_path in CI_FILES or name in CI_FILES:
-                state.ci_paths.append(rel_path)
+            if not is_link:
+                if rel_dir.startswith(".github/workflows") and ext in (".yml", ".yaml"):
+                    state.ci_paths.append(rel_path)
+                elif rel_path in CI_FILES or name in CI_FILES:
+                    state.ci_paths.append(rel_path)
 
             if (rel_dir == ".claude" or rel_dir.startswith(".claude/")
                     or rel_dir == ".codex" or rel_dir.startswith(".codex/")
@@ -1351,7 +1482,7 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
                 state.agentic_paths.append(rel_path)
 
             doc_kind = None if kind is not None else classify_doc(rel_dir, name, ext)
-            if doc_kind is not None and depth <= 3:
+            if doc_kind is not None and depth <= 3 and not is_link:
                 try:
                     size = os.path.getsize(full)
                 except (IOError, OSError):
@@ -1359,7 +1490,7 @@ def walk(root, state, reader, matcher, deadline_ms, timer, max_files):
                 state.doc_paths.append((rel_path, doc_kind, size, depth))
 
             language = LANG_BY_EXT.get(ext)
-            if language is not None and ".min." not in lower:
+            if language is not None and ".min." not in lower and not is_link:
                 state.lang_files[language] = state.lang_files.get(language, 0) + 1
                 try:
                     size = os.path.getsize(full)
@@ -4124,7 +4255,7 @@ def scan_codex_user_scope(repo_root, reader, warnings):
     except (IOError, OSError):
         has_hooks_json = False
     if has_hooks_json:
-        data = reader.json(hooks_json)
+        data = reader.json(hooks_json, follow_links=True)
         if isinstance(data, dict):
             inner = data.get("hooks") if isinstance(data.get("hooks"), dict) else data
             block["hooks"].extend(parse_hook_block(inner))
@@ -4159,7 +4290,7 @@ def scan_codex_user_scope(repo_root, reader, warnings):
     except (IOError, OSError):
         has_config = False
     if has_config:
-        text = reader.text(config_path)
+        text = reader.text(config_path, follow_links=True)
         if text:
             names, parsed_ok = parse_codex_mcp_servers(text)
             block["mcp_servers"] = sorted(set(_clean(str(n))[:80]
@@ -4237,7 +4368,7 @@ def read_skills_lock(root, reader, warnings):
         full = os.path.join(root, rel.replace("/", os.sep))
         if not os.path.exists(full):
             continue
-        data = reader.json(full)
+        data = reader.json(full, follow_links=True)
         if data is None:
             emitlib.warn(
                 warnings,
@@ -4402,9 +4533,12 @@ def classify_provenance(root, reader, artifacts, lock_map, warnings):
                     root, rel_dir.replace("/", os.sep))) if rel_dir else ""
             elif item.get("entry") and reads < MAX_PROVENANCE_READS:
                 reads += 1
+                # an artifact entrypoint is agent configuration, and reaching
+                # it through a linked skill directory is the supported layout
                 text = reader.text(
                     os.path.join(root, item["entry"].replace("/", os.sep)),
                     PROVENANCE_READ_BYTES,
+                    follow_links=True,
                 )
                 front = _frontmatter_map(text)
                 strong = _external_source_value(front, EXTERNAL_SOURCE_KEYS)
@@ -4630,36 +4764,83 @@ def scan_agentic_dirs(root, warnings):
     return scan
 
 
+#: Suffixes an artifact FILE carries that its counted name does not:
+#: `.claude/agents/qa.md` and `.codex/agents/qa.toml` are both the subagent
+#: `qa`, and a symlinked one has to report under that same spelling.
+ARTIFACT_NAME_SUFFIXES = (".md", ".toml")
+
+
+def _artifact_stem(name):
+    """`qa.md` / `qa.toml` -> `qa`; a directory name is returned unchanged."""
+    lowered = name.lower()
+    for suffix in ARTIFACT_NAME_SUFFIXES:
+        if lowered.endswith(suffix) and len(name) > len(suffix):
+            return name[:-len(suffix)]
+    return name
+
+
+#: How each native artifact root spells the entry `existing_agentic_config`
+#: counts, as `(prefix, bucket, spelling)`:
+#:
+#:   ``stem``     the child name with its artifact suffix removed,
+#:   ``child``    the child name exactly as it appears,
+#:   ``path``     the whole repo-relative path,
+#:   ``command``  the child stem behind the `command:` prefix.
+#:
+#: This table and the counting branches in `detect_agentic_config` are the
+#: same table, and they have to stay that way -- where it drifted, a linked
+#: artifact was counted and then missing from `symlinked`, which is the list
+#: the plan reads to know what it must never edit.  Three roots were wrong:
+#: `.agents/skills/` (Codex's verified repo skills root) had no row at all,
+#: `.codex/agents/<name>.toml` had `.md` stripped so a linked `qa.toml`
+#: reported as `qa.toml` against a counted `qa`, and `.codex/rules/` had no
+#: row either.
+SYMLINK_IDENTITY_ROOTS = (
+    (".claude/skills/", "skills", "stem"),
+    (".agents/skills/", "skills", "stem"),
+    (".codex/skills/", "skills", "stem"),
+    (".claude/agents/", "agents", "stem"),
+    (".codex/agents/", "agents", "stem"),
+    (".claude/commands/", "skills", "command"),
+    (".claude/rules/", "rules", "child"),
+    (".claude/hooks/", "hooks", "child"),
+    (".codex/hooks/", "hooks", "child"),
+    (".codex/rules/", "rules", "path"),
+    (".cursor/rules/", "rules", "path"),
+)
+
+
 def _symlink_identity(rel_path):
     """
-    `(bucket, name)` for a symlink that is an immediate child of a config
-    directory, where `name` is spelled exactly the way the corresponding
-    `existing_agentic_config` list spells it -- so membership can be checked
-    directly, and only symlinks that produced a counted entry get reported.
+    `(bucket, name)` for a symlink under a config directory, where `name` is
+    spelled exactly the way the corresponding `existing_agentic_config` list
+    spells it -- so membership can be checked directly, and only symlinks that
+    produced a counted entry get reported.
 
-    `("", "")` for a link nested deeper, or one under a directory that maps
-    to no list.
+    `("", "")` for a link nested deeper than its list's own spelling, or one
+    under a directory that maps to no list.
     """
-    for prefix, bucket in ((".claude/skills/", "skills"),
-                           (".codex/skills/", "skills"),
-                           (".claude/agents/", "agents"),
-                           (".codex/agents/", "agents"),
-                           (".claude/rules/", "rules"),
-                           (".claude/hooks/", "hooks"),
-                           (".claude/commands/", "commands")):
+    for prefix, bucket, spelling in SYMLINK_IDENTITY_ROOTS:
         if not rel_path.startswith(prefix):
             continue
         rest = rel_path[len(prefix):]
-        if not rest or "/" in rest:
+        if not rest:
             return ("", "")
-        if bucket in ("rules", "hooks"):
+        if spelling == "path":
+            return (bucket, rel_path)
+        if "/" in rest:
+            # `.claude/rules/` is walked recursively and a nested rule is
+            # counted under its path below that root, so a link to one has an
+            # identity; every other root counts immediate children only.
+            if prefix == ".claude/rules/":
+                return (bucket, rest)
+            return ("", "")
+        if spelling == "child":
             return (bucket, rest)
-        stem = rest[:-3] if rest.lower().endswith(".md") else rest
-        if bucket == "commands":
+        stem = _artifact_stem(rest)
+        if spelling == "command":
             return ("skills", "command:" + stem)
         return (bucket, stem)
-    if rel_path.startswith(".cursor/rules/"):
-        return ("rules", rel_path)
     return ("", "")
 
 
@@ -4728,7 +4909,7 @@ def detect_agentic_config(root, state, reader, warnings):
             size = 0
         has_section = False
         if 0 < size <= MAX_INDEX_DOC_BYTES:
-            text = reader.text(full, MAX_INDEX_DOC_BYTES)
+            text = reader.text(full, MAX_INDEX_DOC_BYTES, follow_links=True)
             has_section = AGENTIFY_MARKER in text
         try:
             is_link = os.path.islink(full)
@@ -4946,7 +5127,7 @@ def detect_agentic_config(root, state, reader, warnings):
         full = os.path.join(root, settings_rel.replace("/", os.sep))
         if not os.path.exists(full):
             continue
-        data = reader.json(full)
+        data = reader.json(full, follow_links=True)
         if not isinstance(data, dict):
             continue
         hook_block = data.get("hooks")
@@ -4978,7 +5159,7 @@ def detect_agentic_config(root, state, reader, warnings):
         full = os.path.join(root, mcp_rel.replace("/", os.sep))
         if not os.path.exists(full):
             continue
-        data = reader.json(full)
+        data = reader.json(full, follow_links=True)
         if isinstance(data, dict):
             block = data.get("mcpServers") or data.get("servers")
             if isinstance(block, dict):
@@ -4992,7 +5173,7 @@ def detect_agentic_config(root, state, reader, warnings):
         full = os.path.join(root, codex_rel.replace("/", os.sep))
         if not os.path.exists(full):
             continue
-        text = reader.text(full)
+        text = reader.text(full, follow_links=True)
         if not text:
             continue
         names, parsed_ok = parse_codex_mcp_servers(text)
@@ -5030,7 +5211,7 @@ def detect_agentic_config(root, state, reader, warnings):
         full = os.path.join(root, hooks_rel.replace("/", os.sep))
         if not os.path.isfile(full):
             continue
-        data = reader.json(full)
+        data = reader.json(full, follow_links=True)
         if not isinstance(data, dict):
             emitlib.warn(
                 warnings,
@@ -5060,7 +5241,7 @@ def detect_agentic_config(root, state, reader, warnings):
         full = os.path.join(root, manifest_rel.replace("/", os.sep))
         if not os.path.isfile(full):
             continue
-        data = reader.json(full)
+        data = reader.json(full, follow_links=True)
         name = ""
         if isinstance(data, dict):
             name = _clean(str(data.get("name", "")))[:80]
@@ -5651,7 +5832,9 @@ def main(argv=None):
     timer = emitlib.Timer()
     timer.__enter__()
 
-    reader = Reader(warnings)
+    # The reader is given the root so every read boundary can settle
+    # containment on the RESOLVED path, not on the repo-side name.
+    reader = Reader(warnings, root)
     state = State(root, warnings)
 
     matcher = GitignoreMatcher()
@@ -5754,6 +5937,20 @@ def main(argv=None):
         emitlib.warn(
             warnings,
             "%d path(s) matching secret patterns were never opened" % reader.refused,
+        )
+    if state.link_files or reader.link_refused:
+        examples = state.link_examples or reader.link_examples
+        emitlib.warn(
+            warnings,
+            "%d file(s) in the tree are symlinks (e.g. %s); they are listed "
+            "and never read, because a link's bytes come from wherever it "
+            "points -- one that resolves outside this repository, or onto a "
+            "credential filename, is refused outright, so nothing here is a "
+            "manifest, a doc, a CI file, a dotenv or part of the LOC totals. "
+            "Agent configuration under .claude/, .codex/ and .agents/ is the "
+            "one place a link is followed."
+            % (state.link_files or reader.link_refused,
+               ", ".join(examples) if examples else "no example recorded"),
         )
     if not state.env_paths:
         emitlib.warn(warnings, "no .env files found; env var names come from CI references only")
@@ -6281,6 +6478,192 @@ def selftest():
         )
     finally:
         shutil.rmtree(fixture4, ignore_errors=True)
+
+    # -- symlink refusal, and the do-not-edit metadata the plan reads --------
+    # Two measured defects, one fixture.
+    #
+    #   A repo-side `package.json` was a symlink whose target resolved OUTSIDE
+    #   the repository, onto a file named `credentials.json`.  Every name check
+    #   passed, because each ran against the repo-side *name* -- which says
+    #   nothing about where the bytes come from -- and discovery published the
+    #   target's contents as `raw_scripts["package.json"]`.  So the containment
+    #   and secret-name rules run on the RESOLVED path, at every read boundary,
+    #   and an ordinary content file is not read through a link at all.
+    #
+    #   Separately, a skill linked into `.agents/skills/`, a Codex subagent
+    #   linked as `.codex/agents/<name>.toml` and a linked `.codex/rules/`
+    #   entry were counted but missing from `symlinked` -- which is the list
+    #   the plan reads to know which artifacts it must never edit.
+    #
+    # Nothing here points at a real credential or a real `.env`: every byte is
+    # written by this function, into two temp directories it also removes.
+    outside5 = tempfile.mkdtemp(prefix="agentify-discover-outside-")
+    fixture5 = tempfile.mkdtemp(prefix="agentify-discover-symlink-")
+    try:
+        _bait = "SENTINEL-" + "NOT-A-REAL-CREDENTIAL"
+        with open(os.path.join(outside5, "credentials.json"), "w") as handle:
+            handle.write('{"scripts":{"dev":"echo %s"}}' % _bait)
+        with open(os.path.join(outside5, "build.mk"), "w") as handle:
+            handle.write("release:\n\techo %s\n" % _bait)
+        with open(os.path.join(outside5, ".env"), "w") as handle:
+            handle.write("BAIT_TOKEN=%s\n" % _bait)
+
+        with open(os.path.join(fixture5, "README.md"), "w") as handle:
+            handle.write("# fx5\n")
+        os.makedirs(os.path.join(fixture5, "src"))
+        with open(os.path.join(fixture5, "src", "app.ts"), "w") as handle:
+            handle.write("export const app = 1;\n" * 20)
+        # The supported shape: one store in the repo, linked into each agent's
+        # native root.  These links ARE followed -- that is the whole reason
+        # `scan_agentic_dirs` exists -- so the fix must not break them.
+        os.makedirs(os.path.join(fixture5, "store", "deploy-api"))
+        with open(os.path.join(fixture5, "store", "deploy-api", "SKILL.md"), "w") as handle:
+            handle.write("---\nname: deploy-api\ndescription: deploy the api\n---\n# d\n")
+        with open(os.path.join(fixture5, "store", "qa.toml"), "w") as handle:
+            handle.write('name = "qa"\ndescription = "run the suite"\n'
+                         'developer_instructions = "run the test suite"\n')
+        with open(os.path.join(fixture5, "store", "team.rules"), "w") as handle:
+            handle.write('prefix_rule(pattern=["npm"], decision="forbidden")\n')
+        with open(os.path.join(fixture5, "store", "settings.json"), "w") as handle:
+            handle.write('{"mcpServers":{"linked-only":{"url":"https://e.co/mcp"}}}')
+        os.makedirs(os.path.join(fixture5, ".agents", "skills"))
+        os.makedirs(os.path.join(fixture5, ".codex", "agents"))
+        os.makedirs(os.path.join(fixture5, ".codex", "rules"))
+        os.makedirs(os.path.join(fixture5, ".claude"))
+        links5 = True
+        try:
+            os.symlink(os.path.join(outside5, "credentials.json"),
+                       os.path.join(fixture5, "package.json"))
+            os.symlink(os.path.join(outside5, "build.mk"),
+                       os.path.join(fixture5, "Makefile"))
+            os.symlink(os.path.join(outside5, ".env"),
+                       os.path.join(fixture5, ".env"))
+            os.symlink("app.ts", os.path.join(fixture5, "src", "linked.ts"))
+            os.symlink(os.path.join("..", "..", "store", "deploy-api"),
+                       os.path.join(fixture5, ".agents", "skills", "deploy-api"))
+            os.symlink(os.path.join("..", "..", "store", "qa.toml"),
+                       os.path.join(fixture5, ".codex", "agents", "qa.toml"))
+            os.symlink(os.path.join("..", "..", "store", "team.rules"),
+                       os.path.join(fixture5, ".codex", "rules", "team.rules"))
+            os.symlink(os.path.join("..", "store", "settings.json"),
+                       os.path.join(fixture5, ".claude", "settings.json"))
+        except (OSError, NotImplementedError, AttributeError):
+            links5 = False
+
+        # The read boundary itself, asked directly.  `resolved_read_refusal`
+        # is what every `Reader` entry point consults, so these four cases are
+        # the contract in one place: an ordinary link is refused whatever it
+        # points at, an escape is refused, a resolved credential name is
+        # refused even for config, and a real file inside the repo is fine.
+        _real_root5 = os.path.realpath(fixture5)
+        _real_home5 = os.path.realpath(os.path.expanduser("~"))
+        add(
+            "the read boundary refuses links, escapes and resolved secret names",
+            (not links5)
+            or (resolved_read_refusal(os.path.join(fixture5, "src", "app.ts"),
+                                      _real_root5, _real_home5) == ""
+                and resolved_read_refusal(os.path.join(fixture5, "src", "linked.ts"),
+                                          _real_root5, _real_home5) == "symlink"
+                and resolved_read_refusal(os.path.join(fixture5, "Makefile"),
+                                          _real_root5, _real_home5,
+                                          follow_links=True) == "outside-root"
+                and resolved_read_refusal(os.path.join(fixture5, "package.json"),
+                                          _real_root5, _real_home5,
+                                          follow_links=True) == "target-secret-name"
+                and resolved_read_refusal(
+                    os.path.join(fixture5, ".claude", "settings.json"),
+                    _real_root5, _real_home5, follow_links=True) == ""),
+            "%r %r" % (resolved_read_refusal(os.path.join(fixture5, "package.json"),
+                                             _real_root5, _real_home5, follow_links=True),
+                       resolved_read_refusal(os.path.join(fixture5, "src", "linked.ts"),
+                                             _real_root5, _real_home5)),
+        )
+
+        buffer = io.StringIO()
+        saved = sys.stdout
+        try:
+            sys.stdout = buffer
+            code5 = main(["--repo", fixture5, "--timeout-s", "10"])
+        finally:
+            sys.stdout = saved
+        raw5 = buffer.getvalue()
+        try:
+            result5 = json.loads(raw5)
+        except ValueError:
+            result5 = {}
+        config5 = result5.get("existing_agentic_config") or {}
+        warn5 = " | ".join(result5.get("warnings") or [])
+        scripts5 = result5.get("raw_scripts") or {}
+        symlinked5 = config5.get("symlinked") or {}
+        manifests5 = [row.get("path") for row in (result5.get("manifests") or [])]
+
+        add(
+            "a symlinked manifest yields no bytes, no scripts and no manifest row",
+            (code5 == 0
+             and (not links5
+                  or (_bait not in raw5
+                      and "package.json" not in scripts5
+                      and "Makefile" not in scripts5
+                      and "package.json" not in manifests5
+                      and "Makefile" not in manifests5
+                      and (result5.get("commands") or {}).get("dev") == ""))),
+            "raw_scripts=%s manifests=%s dev=%r"
+            % (sorted(scripts5), manifests5,
+               (result5.get("commands") or {}).get("dev")),
+        )
+        add(
+            "a symlinked .env is not opened, not even for its variable names",
+            (not links5)
+            or ("BAIT_TOKEN" not in (result5.get("env_var_names") or [])),
+            str(result5.get("env_var_names")),
+        )
+        langs5 = dict((row.get("name"), row) for row in (result5.get("languages") or []))
+        add(
+            "a symlinked source file is not read and not counted twice",
+            (not links5)
+            or (langs5.get("TypeScript", {}).get("files") == 1
+                and langs5.get("TypeScript", {}).get("loc") == 20),
+            str(langs5),
+        )
+        add(
+            "the refusal is reported, and never names what it refused to open",
+            (not links5)
+            or ("symlink" in warn5 and outside5 not in raw5),
+            warn5[:200],
+        )
+        add(
+            "an agent-configuration symlink is still followed and read",
+            (not links5)
+            or ("linked-only" in (config5.get("mcp_servers") or [])
+                and any(row.get("file") == ".claude/settings.json"
+                        for row in config5.get("mcp_servers_by_source") or [])),
+            str(config5.get("mcp_servers")),
+        )
+        add(
+            "a linked skill, subagent and rules file are named in symlinked",
+            (not links5)
+            or (any(entry.startswith(".agents/skills/deploy-api ->")
+                    for entry in symlinked5.get("skills") or [])
+                and any(entry.startswith(".codex/agents/qa.toml ->")
+                        for entry in symlinked5.get("agents") or [])
+                and any(entry.startswith(".codex/rules/team.rules ->")
+                        for entry in symlinked5.get("rules") or [])),
+            emitlib.serialize(symlinked5),
+        )
+        add(
+            "every symlinked identity is spelled the way it was counted",
+            (not links5)
+            or (config5.get("skills") == ["deploy-api"]
+                and config5.get("agents") == ["qa"]
+                and config5.get("rules") == [".codex/rules/team.rules"]
+                and config5.get("counts") == {"skills": 1, "agents": 1,
+                                              "rules": 1, "hooks": 0}),
+            "%s %s %s %s" % (config5.get("skills"), config5.get("agents"),
+                             config5.get("rules"), config5.get("counts")),
+        )
+    finally:
+        shutil.rmtree(fixture5, ignore_errors=True)
+        shutil.rmtree(outside5, ignore_errors=True)
 
     # -- commands are resolved, never synthesized ----------------------------
     # The measured regression: `typescript` in devDependencies produced
