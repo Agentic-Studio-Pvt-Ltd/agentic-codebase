@@ -141,6 +141,20 @@ def _path_parts(path: str) -> List[str]:
     return [p for p in normalized.split("/") if p not in ("", ".", "..")]
 
 
+_LOWERED_GLOB_CACHE = {}
+
+
+def _lowered_globs(patterns: Sequence[str]) -> List[Tuple[str, str]]:
+    """`[(glob, glob.lower())]`, cached per pattern list identity."""
+    key = id(patterns)
+    cached = _LOWERED_GLOB_CACHE.get(key)
+    if cached is None or cached[0] is not patterns:
+        pairs = [(glob, glob.lower()) for glob in patterns]
+        _LOWERED_GLOB_CACHE[key] = (patterns, pairs)
+        return pairs
+    return cached[1]
+
+
 def secret_path_reason(path: str, patterns: Sequence[str] = None) -> str:
     """
     Return the glob that makes `path` secret-looking, or "" if none does.
@@ -154,10 +168,16 @@ def secret_path_reason(path: str, patterns: Sequence[str] = None) -> str:
     parts = _path_parts(path)
     if not parts:
         return ""
+    # `fnmatchcase`, not `fnmatch`: the latter calls `os.path.normcase` on BOTH
+    # arguments on every call, and both sides are already lower-cased here.  On
+    # a 3k-file tree that was 5.4M redundant `normcase` calls.  The lower-cased
+    # globs are cached because `glob.lower()` used to run in the innermost loop
+    # -- 21 patterns x every component x every read.
+    lowered_globs = _lowered_globs(patterns)
     for part in parts:
         lowered = part.lower()
-        for glob in patterns:
-            if fnmatch.fnmatch(lowered, glob.lower()):
+        for glob, lowered_glob in lowered_globs:
+            if fnmatch.fnmatchcase(lowered, lowered_glob):
                 return glob
     return ""
 
