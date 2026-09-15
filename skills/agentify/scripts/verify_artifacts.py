@@ -9828,10 +9828,16 @@ def selftest() -> int:
             "codex-agent-manifest.json", [agent_entry], top={"target": "codex"}
         )
         status, detail = worst(result, "subagent_frontmatter")
+        # Interpreter-aware on purpose.  A correct file PASSES where a parser
+        # exists and is UNVERIFIED where one does not -- never a fail either
+        # way, and never a pass without a parser.  Asserting PASS flatly made
+        # this suite exit 1 on Python 3.9, the documented floor.
         add(
             "a Codex subagent is read as TOML, not asked for YAML frontmatter",
-            status == PASS and result.get("summary", {}).get("fail", -1) == 0,
-            "%s: %s summary=%s" % (status, detail[:80], result.get("summary")),
+            status == (PASS if _toml_parser() is not None else UNVERIFIED)
+            and result.get("summary", {}).get("fail", -1) == 0,
+            "%s (tomllib=%s): %s summary=%s"
+            % (status, _toml_parser() is not None, detail[:80], result.get("summary")),
         )
 
         with open(os.path.join(codex_agents_dir, "nameless.toml"), "w") as handle:
@@ -9868,8 +9874,10 @@ def selftest() -> int:
         status, detail = worst(result, "mcp_json")
         add(
             "a Codex MCP draft is read as TOML, not parsed as JSON",
-            status == PASS and result.get("summary", {}).get("fail", -1) == 0,
-            "%s: %s summary=%s" % (status, detail[:80], result.get("summary")),
+            status == (PASS if _toml_parser() is not None else UNVERIFIED)
+            and result.get("summary", {}).get("fail", -1) == 0,
+            "%s (tomllib=%s): %s summary=%s"
+            % (status, _toml_parser() is not None, detail[:80], result.get("summary")),
         )
 
         # ...and its REMOVAL is `rm`, not the JSON un-merge script.  A draft
@@ -11219,10 +11227,18 @@ def selftest() -> int:
                 top={"target": "codex"},
             )
             broken_results.append((stem,) + worst(result, "subagent_frontmatter"))
+        # With a parser every one of these FAILS.  Without one, the partial
+        # scan catches some shapes and cannot see the rest -- those are
+        # UNVERIFIED.  The invariant that matters on BOTH interpreters is that
+        # a file `tomllib` would reject never comes back PASS.
         add(
             "every agent TOML that `tomllib` rejects FAILS subagent_frontmatter",
-            all(row[1] == FAIL for row in broken_results),
-            "; ".join("%s=%s" % (row[0], row[1]) for row in broken_results),
+            all(row[1] == FAIL for row in broken_results)
+            if _toml_parser() is not None
+            else all(row[1] in (FAIL, UNVERIFIED) for row in broken_results),
+            "tomllib=%s %s" % (_toml_parser() is not None,
+                               "; ".join("%s=%s" % (row[0], row[1])
+                                         for row in broken_results)),
         )
 
         # A file that PARSES but whose schema is wrong.  The hand reader turns
@@ -11238,10 +11254,15 @@ def selftest() -> int:
             top={"target": "codex"},
         )
         status, detail = worst(result, "subagent_frontmatter")
+        # Only a typed read can see `["a", "b"]` where Codex wants a string,
+        # so this is a parser-only capability.  Without one the row must be
+        # UNVERIFIED -- the point being that it is not silently PASSED.
         add(
             "a required key that parses but is not a string is a schema failure",
-            status == FAIL and "description" in detail and "not a string" in detail,
-            "%s: %s" % (status, detail[:150]),
+            (status == FAIL and "description" in detail and "not a string" in detail)
+            if _toml_parser() is not None
+            else status == UNVERIFIED,
+            "%s (tomllib=%s): %s" % (status, _toml_parser() is not None, detail[:150]),
         )
 
         with open(os.path.join(plan_dir, "broken-mcp.toml"), "w") as handle:
@@ -11259,8 +11280,9 @@ def selftest() -> int:
         status, detail = worst(result, "mcp_json")
         add(
             "an MCP draft `tomllib` rejects FAILS mcp_json",
-            status == FAIL,
-            "%s: %s" % (status, detail[:150]),
+            status == FAIL if _toml_parser() is not None
+            else status in (FAIL, UNVERIFIED),
+            "%s (tomllib=%s): %s" % (status, _toml_parser() is not None, detail[:150]),
         )
 
         # The 3.9/3.10 branch: no parser, so syntax is UNVERIFIED -- never a
@@ -11285,9 +11307,13 @@ def selftest() -> int:
             )
         finally:
             _module._TOMLLIB = saved_toml
+        # The real invariant, and the one that holds on every supported
+        # interpreter: the branch taken matches the interpreter running it.
+        # This previously asserted 3.11+ outright, which cannot pass on the
+        # documented 3.9 floor and made the whole suite exit 1 there.
         add(
-            "this interpreter really ran the 3.11+ branch",
-            _toml_parser() is not None and sys.version_info >= (3, 11),
+            "the TOML branch taken matches this interpreter",
+            (_toml_parser() is not None) == (sys.version_info >= (3, 11)),
             "tomllib=%s python=%s" % (_toml_parser() is not None, sys.version_info[:2]),
         )
 

@@ -645,8 +645,20 @@ class GitignoreMatcher(object):
         self._fast_dir = None
 
     # -- construction -------------------------------------------------
-    def add_file(self, path):
-        """Parse one `.gitignore`-format file.  Returns the number of rules."""
+    def add_file(self, path, gate=None):
+        """
+        Parse one `.gitignore`-format file.  Returns the number of rules.
+
+        `gate` is the read boundary -- `Reader._refuse` -- and it is not
+        optional in a real run.  This was the ONE file read in this module that
+        did not go through it, and the audit's own headline defect survived
+        here: a `.gitignore` symlinked onto an out-of-repo `credentials.json`
+        was opened, its patterns took effect, and a fragment of its bytes came
+        back out in the "patterns too exotic to interpret" warning.  Callers
+        without a Reader (the selftest) may omit it.
+        """
+        if gate is not None and gate(path, False):
+            return 0
         added = 0
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as fh:
@@ -5879,8 +5891,9 @@ def main(argv=None):
     matcher = GitignoreMatcher()
     gitignore = os.path.join(root, ".gitignore")
     if os.path.exists(gitignore):
-        matcher.add_file(gitignore)
-        matcher.add_file(os.path.join(root, ".git", "info", "exclude"))
+        matcher.add_file(gitignore, gate=reader._refuse)
+        matcher.add_file(os.path.join(root, ".git", "info", "exclude"),
+                         gate=reader._refuse)
         matcher.compile()
         if matcher.skipped:
             emitlib.warn(
@@ -6001,10 +6014,13 @@ def main(argv=None):
     if reader.link_refused:
         emitlib.warn(
             warnings,
-            "%d agent-configuration link(s) (e.g. %s) were followed and then "
-            "refused: the resolved target left this repository and your home "
-            "directory, or landed on a credential filename. Nothing was read "
-            "from them, and the target path is never echoed back here."
+            "%d link(s) on a followed read path (e.g. %s) were refused: the "
+            "resolved target left this repository and your home directory, or "
+            "landed on a credential filename. These are the reads that ARE "
+            "allowed to follow a link -- agent configuration, and the repo's "
+            "own ignore files -- so the refusal is on the target, not the "
+            "link. Nothing was read from them, and the target path is never "
+            "echoed back here."
             % (reader.link_refused,
                ", ".join(reader.link_examples) if reader.link_examples
                else "no example recorded"),
@@ -6569,6 +6585,12 @@ def selftest():
         # target -- a different event from a tree link, which is never opened.
         with open(os.path.join(outside5, "hooks.json"), "w") as handle:
             handle.write('{"hooks":{"PreToolUse":[]},"note":"%s"}' % _bait)
+        # A credential file a repo's .gitignore is symlinked onto.  The ignore
+        # read was the one file read in this module that skipped the refusal
+        # gate, and a fragment of these bytes came back out in the
+        # "patterns too exotic to interpret" warning.
+        with open(os.path.join(outside5, "ignore-bait"), "w") as handle:
+            handle.write("node_modules/\n\\weird-BAITLEAK-XYZ123\n")
 
         with open(os.path.join(fixture5, "README.md"), "w") as handle:
             handle.write("# fx5\n")
@@ -6611,6 +6633,8 @@ def selftest():
                        os.path.join(fixture5, ".claude", "settings.json"))
             os.symlink(os.path.join(outside5, "hooks.json"),
                        os.path.join(fixture5, ".codex", "hooks.json"))
+            os.symlink(os.path.join(outside5, "ignore-bait"),
+                       os.path.join(fixture5, ".gitignore"))
         except (OSError, NotImplementedError, AttributeError):
             links5 = False
 
@@ -6701,10 +6725,18 @@ def selftest():
         # -- and the surviving wording ("listed and never read") was false of
         # the config case, which IS followed and then refused on its target.
         add(
+            "a symlinked .gitignore is refused, and its bytes never reach a warning",
+            (not links5)
+            or ("BAITLEAK" not in raw5
+                and not [w for w in (result5.get("warnings") or [])
+                         if "exotic" in w and "BAITLEAK" in w]),
+            warn5[:200],
+        )
+        add(
             "the tree-link and followed-then-refused warnings are both reported",
             (not links5)
             or ("file(s) in the tree are symlinks" in warn5
-                and "were followed and then refused" in warn5),
+                and "on a followed read path" in warn5),
             warn5[:300],
         )
         add(
