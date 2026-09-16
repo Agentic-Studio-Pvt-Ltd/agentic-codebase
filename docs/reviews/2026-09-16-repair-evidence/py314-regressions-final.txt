@@ -1,0 +1,27 @@
+test_all_matching_files_are_checked (test_codex_contract.CodexHookContract.test_all_matching_files_are_checked) ... ok
+test_broken_canonical_filter_is_detectable (test_codex_contract.CodexHookContract.test_broken_canonical_filter_is_detectable) ... ok
+test_missing_check_is_not_a_clean_pass (test_codex_contract.CodexHookContract.test_missing_check_is_not_a_clean_pass) ... ok
+test_outside_path_does_not_alias_guarded_repo_file (test_codex_contract.CodexHookContract.test_outside_path_does_not_alias_guarded_repo_file) ... ok
+test_patch_object_and_freeform (test_codex_contract.CodexHookContract.test_patch_object_and_freeform) ... ok
+test_permission_request_decision (test_codex_contract.CodexHookContract.test_permission_request_decision) ... ok
+test_post_tool_feedback (test_codex_contract.CodexHookContract.test_post_tool_feedback) ... ok
+test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) ... ok
+test_shell_wiring_and_canonical_name (test_codex_contract.CodexHookContract.test_shell_wiring_and_canonical_name) ... ok
+test_stop_continuation_does_not_loop (test_codex_contract.CodexHookContract.test_stop_continuation_does_not_loop) ... ok
+test_subfolder_checks_the_actual_file (test_codex_contract.CodexHookContract.test_subfolder_checks_the_actual_file) ... ok
+test_unrelated_first_path_does_not_hide_guarded_path (test_codex_contract.CodexHookContract.test_unrelated_first_path_does_not_hide_guarded_path) ... ok
+test_agent_identity_does_not_require_matching_filename (test_repair_regressions.RepairRegressions.test_agent_identity_does_not_require_matching_filename) ... ok
+test_array_credentials_are_redacted_and_idempotent (test_repair_regressions.RepairRegressions.test_array_credentials_are_redacted_and_idempotent) ... ok
+test_fixture_protocol_rejects_wrong_event_and_failed_check (test_repair_regressions.RepairRegressions.test_fixture_protocol_rejects_wrong_event_and_failed_check) ... ok
+test_forbidden_sandbox_without_toml_parser (test_repair_regressions.RepairRegressions.test_forbidden_sandbox_without_toml_parser) ... ok
+test_mtime_cutoff_west_of_utc (test_repair_regressions.RepairRegressions.test_mtime_cutoff_west_of_utc) ... ok
+test_parent_continuation_cannot_erase_child_turn (test_repair_regressions.RepairRegressions.test_parent_continuation_cannot_erase_child_turn) ... ok
+test_partial_stream_repeat_is_retained (test_repair_regressions.RepairRegressions.test_partial_stream_repeat_is_retained) ... ok
+test_shell_substitution_heredoc_cannot_bypass_network_gate (test_repair_regressions.RepairRegressions.test_shell_substitution_heredoc_cannot_bypass_network_gate) ... ok
+test_timestamp_offsets_use_actual_utc (test_repair_regressions.RepairRegressions.test_timestamp_offsets_use_actual_utc) ... ok
+test_undated_and_invalid_consent_on_both_readers (test_repair_regressions.RepairRegressions.test_undated_and_invalid_consent_on_both_readers) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 1.954s
+
+OK

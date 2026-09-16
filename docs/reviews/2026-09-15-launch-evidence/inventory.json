@@ -1,0 +1,6293 @@
+{
+  "commit": "c159c58217cd515eedf322db7af0bbce6ee17aa5",
+  "tracked_entries": 47,
+  "text_files": 46,
+  "text_lines": 43774,
+  "files": [
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "kind": "text",
+      "bytes": 858,
+      "lines": 32,
+      "sha256": "2dbb2bd56417810738d7f0c8ce5e68d4fe698c8ff679c2dabaee7039dc3e2762",
+      "headings": [],
+      "json_parse": "pass",
+      "release_placeholder_lines": [
+        5,
+        15,
+        17
+      ]
+    },
+    {
+      "path": ".claude-plugin/plugin.json",
+      "kind": "text",
+      "bytes": 993,
+      "lines": 28,
+      "sha256": "f684d2212a1f20714bae44c4630ddb069e1a75dff1a5a3a41f99cfafe6ac2e72",
+      "headings": [],
+      "json_parse": "pass",
+      "release_placeholder_lines": [
+        7,
+        9,
+        10
+      ]
+    },
+    {
+      "path": ".gitignore",
+      "kind": "text",
+      "bytes": 1791,
+      "lines": 111,
+      "sha256": "d62aaa980d15d0523ae482969283aef832c043d382e2a53f445e35e22d50c62a",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 2,
+          "text": "# agentify \u2014 repository ignores"
+        },
+        {
+          "line": 4,
+          "text": "# Note: docs/agentic-setup/ is NOT ignored. plan.md and report.md are the"
+        },
+        {
+          "line": 5,
+          "text": "# deliverables a user is meant to review and commit. See the negations at the"
+        },
+        {
+          "line": 6,
+          "text": "# bottom of this file."
+        },
+        {
+          "line": 7,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 9,
+          "text": "# --- agentify run output (local, disposable, may contain repo-specific text) ---"
+        },
+        {
+          "line": 22,
+          "text": "# --- Python ---"
+        },
+        {
+          "line": 62,
+          "text": "# --- Node / Bun ---"
+        },
+        {
+          "line": 79,
+          "text": "# --- Secrets and local environment (never committed, never read by agentify) ---"
+        },
+        {
+          "line": 88,
+          "text": "# --- Editor / OS ---"
+        },
+        {
+          "line": 98,
+          "text": "# --- Logs and temp ---"
+        },
+        {
+          "line": 105,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 106,
+          "text": "# Explicitly tracked: agentify's own deliverables."
+        },
+        {
+          "line": 107,
+          "text": "# ---------------------------------------------------------------------------"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "CLAUDE.md",
+      "kind": "text",
+      "bytes": 13097,
+      "lines": 201,
+      "sha256": "50352cb7ff34ff069a3a836b588b19d9b06bdea60cea1258306eeb00ca87bba6",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# CLAUDE.md"
+        },
+        {
+          "line": 5,
+          "text": "## Repository status"
+        },
+        {
+          "line": 40,
+          "text": "## What is being built"
+        },
+        {
+          "line": 61,
+          "text": "## Architecture"
+        },
+        {
+          "line": 63,
+          "text": "### Eight-phase pipeline (PRD \u00a76, \u00a77)"
+        },
+        {
+          "line": 80,
+          "text": "### Progressive disclosure is a budget"
+        },
+        {
+          "line": 88,
+          "text": "### Three layers"
+        },
+        {
+          "line": 103,
+          "text": "### Build order"
+        },
+        {
+          "line": 109,
+          "text": "## Invariants any implementation must preserve"
+        },
+        {
+          "line": 175,
+          "text": "## Explicit non-goals (v1)"
+        },
+        {
+          "line": 182,
+          "text": "## Open decisions"
+        },
+        {
+          "line": 194,
+          "text": "## Editing this repo"
+        }
+      ],
+      "release_placeholder_lines": [
+        187,
+        190
+      ]
+    },
+    {
+      "path": "GOAL.md",
+      "kind": "text",
+      "bytes": 6616,
+      "lines": 31,
+      "sha256": "a6f8c9f28aac1a0f1c7baf7baa30dd729dc74c2503939985688658c259ec6eb0",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "LICENSE",
+      "kind": "text",
+      "bytes": 1086,
+      "lines": 21,
+      "sha256": "842082a4064ed3cb991caa7afa8ed7578f42ef79fa685baf40cf00e1bde23443",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "PRD.md",
+      "kind": "text",
+      "bytes": 27663,
+      "lines": 287,
+      "sha256": "2e196d3536bea3f362d430d2928d6d984422bf398a25138e1fa196fc9e0780b0",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# PRD: Agentic Setup Skill (working name: agentify)"
+        },
+        {
+          "line": 9,
+          "text": "## 1. Summary"
+        },
+        {
+          "line": 15,
+          "text": "## 2. Problem"
+        },
+        {
+          "line": 19,
+          "text": "## 3. Goals"
+        },
+        {
+          "line": 27,
+          "text": "## 4. Non-goals (v1)"
+        },
+        {
+          "line": 36,
+          "text": "## 5. Users"
+        },
+        {
+          "line": 44,
+          "text": "## 6. Solution overview"
+        },
+        {
+          "line": 60,
+          "text": "## 7. Detailed requirements by phase"
+        },
+        {
+          "line": 62,
+          "text": "### 7.1 Preflight"
+        },
+        {
+          "line": 71,
+          "text": "### 7.2 Discover (repo analyzer)"
+        },
+        {
+          "line": 87,
+          "text": "### 7.3 Mine (transcript and git miners)"
+        },
+        {
+          "line": 104,
+          "text": "### 7.4 Diagnose"
+        },
+        {
+          "line": 108,
+          "text": "### 7.5 Propose"
+        },
+        {
+          "line": 112,
+          "text": "### 7.6 Interview"
+        },
+        {
+          "line": 120,
+          "text": "### 7.7 Plan"
+        },
+        {
+          "line": 132,
+          "text": "### 7.8 Build"
+        },
+        {
+          "line": 141,
+          "text": "### 7.9 Verify and hand off"
+        },
+        {
+          "line": 151,
+          "text": "## 8. Mapping rules (finding \u2192 artifact)"
+        },
+        {
+          "line": 175,
+          "text": "## 9. Coverage \u2014 **revised 2026-09-07, replacing the sizing-cap table**"
+        },
+        {
+          "line": 179,
+          "text": "### What the caps used to be, and why they went"
+        },
+        {
+          "line": 189,
+          "text": "### What replaced them"
+        },
+        {
+          "line": 199,
+          "text": "## 10. Attribution and lead generation"
+        },
+        {
+          "line": 213,
+          "text": "## 11. Target support"
+        },
+        {
+          "line": 215,
+          "text": "### 11.1 Claude Code (v1)"
+        },
+        {
+          "line": 219,
+          "text": "### 11.2 Codex"
+        },
+        {
+          "line": 225,
+          "text": "### 11.3 Adapter contract"
+        },
+        {
+          "line": 229,
+          "text": "## 12. Distribution"
+        },
+        {
+          "line": 236,
+          "text": "## 13. Safety and privacy"
+        },
+        {
+          "line": 246,
+          "text": "## 14. Success metrics"
+        },
+        {
+          "line": 256,
+          "text": "## 15. Roadmap"
+        },
+        {
+          "line": 264,
+          "text": "## 16. Open questions"
+        },
+        {
+          "line": 272,
+          "text": "## 17. Risks"
+        }
+      ],
+      "release_placeholder_lines": [
+        266
+      ]
+    },
+    {
+      "path": "README.md",
+      "kind": "text",
+      "bytes": 21169,
+      "lines": 224,
+      "sha256": "def297a7ce8c4e0a62e3db0cd3b38e460e7664a1febed11375bfff04a77a0aa3",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# agentify"
+        },
+        {
+          "line": 28,
+          "text": "## What it does"
+        },
+        {
+          "line": 48,
+          "text": "## What it generates"
+        },
+        {
+          "line": 68,
+          "text": "## How much it builds"
+        },
+        {
+          "line": 82,
+          "text": "## Safety and privacy"
+        },
+        {
+          "line": 99,
+          "text": "## What it will not do"
+        },
+        {
+          "line": 111,
+          "text": "## Install"
+        },
+        {
+          "line": 115,
+          "text": "### 1. Plugin marketplace (recommended)"
+        },
+        {
+          "line": 124,
+          "text": "### 2. Global skill, manual copy"
+        },
+        {
+          "line": 134,
+          "text": "### 3. Per-repo skill"
+        },
+        {
+          "line": 146,
+          "text": "## Uninstall"
+        },
+        {
+          "line": 172,
+          "text": "## Contributing"
+        },
+        {
+          "line": 184,
+          "text": "### Adding an analyzer"
+        },
+        {
+          "line": 198,
+          "text": "### Adding a target adapter"
+        },
+        {
+          "line": 210,
+          "text": "### Testing a change"
+        },
+        {
+          "line": 214,
+          "text": "## License and attribution"
+        }
+      ],
+      "release_placeholder_lines": [
+        6,
+        22,
+        118,
+        129,
+        139,
+        224
+      ]
+    },
+    {
+      "path": "docs/DECISIONS.md",
+      "kind": "text",
+      "bytes": 131358,
+      "lines": 1727,
+      "sha256": "5a264d4a7db98fbb8b6ead88a192d5f64e0093c10d78863576ed7b9bafbe8518",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# Decisions"
+        },
+        {
+          "line": 55,
+          "text": "## Part 1 \u2014 PRD \u00a716 open questions"
+        },
+        {
+          "line": 57,
+          "text": "### 1.1 The name \"agentify\""
+        },
+        {
+          "line": 100,
+          "text": "### 1.2 Where the plan and report live"
+        },
+        {
+          "line": 123,
+          "text": "### 1.3 Minimum model class \u2014 enforce or warn"
+        },
+        {
+          "line": 146,
+          "text": "### 1.4 Starter skills for known stacks"
+        },
+        {
+          "line": 165,
+          "text": "### 1.5 Monorepos"
+        },
+        {
+          "line": 190,
+          "text": "## Part 2 \u2014 Deviations from the build contract"
+        },
+        {
+          "line": 195,
+          "text": "### 2.1 Clustering threshold: exact-skeleton + Jaccard 0.6 \u2192 stemmed 3-token key + 0.5 with guards"
+        },
+        {
+          "line": 245,
+          "text": "### 2.2 `discover.py` \u2014 `commands.verified` removed"
+        },
+        {
+          "line": 270,
+          "text": "### 2.3 Transcript resolution \u2014 a scored cascade, and siblings deliberately not merged"
+        },
+        {
+          "line": 316,
+          "text": "### 2.4 Uniform exit codes"
+        },
+        {
+          "line": 349,
+          "text": "### 2.5 `verify_artifacts.py` emits `timing_ms`"
+        },
+        {
+          "line": 364,
+          "text": "### 2.6 `--selftest` \u2014 documented before it existed"
+        },
+        {
+          "line": 405,
+          "text": "### 2.7 Hook execution during verification"
+        },
+        {
+          "line": 438,
+          "text": "### 2.8 Symlinks: never followed in the repo walk, always followed under the agent-config dirs"
+        },
+        {
+          "line": 467,
+          "text": "### 2.9 What counts as a reportable row in the transcript report"
+        },
+        {
+          "line": 516,
+          "text": "### 2.10 A dependency alone never fills a `commands` slot"
+        },
+        {
+          "line": 554,
+          "text": "### 2.11 The git window is adaptive, with a 50-commit floor"
+        },
+        {
+          "line": 586,
+          "text": "### 2.12 Maturity counts the team's own artifacts, not everything on disk"
+        },
+        {
+          "line": 626,
+          "text": "### 2.13 Bot-authored commits are excluded from every git statistic"
+        },
+        {
+          "line": 658,
+          "text": "### 2.14 Branch mode commits \u2014 the undo is the commit, not the branch"
+        },
+        {
+          "line": 687,
+          "text": "### 2.15 Gitignored artifacts stay out of the commit and get their own removal step"
+        },
+        {
+          "line": 722,
+          "text": "### 2.16 \"Can git put this back?\" is the predicate that partitions the build"
+        },
+        {
+          "line": 757,
+          "text": "### 2.17 Script-name matching is token-based with a qualifier gate"
+        },
+        {
+          "line": 799,
+          "text": "### 2.18 `npm ci` and `bun install --frozen-lockfile` are alternates, never the command"
+        },
+        {
+          "line": 825,
+          "text": "### 2.19 The undo mechanism is chosen by the file's FORMAT, not by how git sees it"
+        },
+        {
+          "line": 866,
+          "text": "### 2.20 Partial (blobless) clones degrade `churn` and nothing else"
+        },
+        {
+          "line": 904,
+          "text": "### 2.21 List a branch's files with `git diff BASE_COMMIT..branch`, never `git show branch`"
+        },
+        {
+          "line": 945,
+          "text": "### 2.22 There are no output caps, and no audit-only mode"
+        },
+        {
+          "line": 977,
+          "text": "### 2.23 Only artifacts inside the repo are the repo's setup"
+        },
+        {
+          "line": 1002,
+          "text": "### 2.24 A structural fact is evidence, and it carries a count"
+        },
+        {
+          "line": 1028,
+          "text": "### 2.25 The index doc is built last, not first"
+        },
+        {
+          "line": 1047,
+          "text": "### 2.26 Permissions are an artifact type; a plugin manifest is not"
+        },
+        {
+          "line": 1075,
+          "text": "### 2.27 agentify never opens a pull request"
+        },
+        {
+          "line": 1093,
+          "text": "### 2.28 The interview asks for a command it cannot find, and never guesses one"
+        },
+        {
+          "line": 1112,
+          "text": "### 2.29 One interview question has no trigger: the engineering system"
+        },
+        {
+          "line": 1130,
+          "text": "### 2.30 Three more questions retired \u2014 because their answers were derivable"
+        },
+        {
+          "line": 1172,
+          "text": "### 2.31 Every question carries its own answer, and one word accepts it"
+        },
+        {
+          "line": 1215,
+          "text": "### 2.32 \"Already covered\" has one definition: same type, same job, this repo"
+        },
+        {
+          "line": 1246,
+          "text": "### 2.33 User-scope artifacts cover nothing"
+        },
+        {
+          "line": 1267,
+          "text": "### 2.34 The core set, under the catalogue's names"
+        },
+        {
+          "line": 1299,
+          "text": "### 2.35 The catalogue walk is a section of the plan"
+        },
+        {
+          "line": 1326,
+          "text": "### 2.36 A rule the developer wrote into their own docs is evidence"
+        },
+        {
+          "line": 1356,
+          "text": "### 2.37 Phase 7 reads the files the evidence names"
+        },
+        {
+          "line": 1378,
+          "text": "### 2.38 The shortlist: the list is confirmed in chat before the plan is written"
+        },
+        {
+          "line": 1412,
+          "text": "### 2.39 The size test: a workflow, not a feature"
+        },
+        {
+          "line": 1440,
+          "text": "## Part 3 \u2014 Judgment calls flagged for sign-off"
+        },
+        {
+          "line": 1445,
+          "text": "### 3.1 Phase 0 detects the target without opening an adapter"
+        },
+        {
+          "line": 1489,
+          "text": "### 3.2 `mine_git.py` runs with `--no-gh` by default"
+        },
+        {
+          "line": 1551,
+          "text": "## Part 4 \u2014 Open, no default is an answer"
+        },
+        {
+          "line": 1553,
+          "text": "### 4.1 Do `.agents/` directories count toward maturity detection?"
+        },
+        {
+          "line": 1658,
+          "text": "## Part 5 \u2014 Release blockers"
+        },
+        {
+          "line": 1665,
+          "text": "### 5.1 The attribution upsell carries a literal `<link>`"
+        },
+        {
+          "line": 1695,
+          "text": "### 5.2 `PLACEHOLDER-ORG` in the plugin manifests"
+        },
+        {
+          "line": 1717,
+          "text": "## How to maintain this file"
+        }
+      ],
+      "release_placeholder_lines": [
+        1677,
+        1678,
+        1680,
+        1692,
+        1695,
+        1697,
+        1700,
+        1701,
+        1711
+      ]
+    },
+    {
+      "path": "skills/agentify/SKILL.md",
+      "kind": "text",
+      "bytes": 37819,
+      "lines": 499,
+      "sha256": "ed328a250dfd21c9134d37c7648805d762ad580a5c85c2a69b854c92a4e1ce08",
+      "headings": [
+        {
+          "line": 6,
+          "text": "# agentify"
+        },
+        {
+          "line": 11,
+          "text": "## The run in one glance"
+        },
+        {
+          "line": 34,
+          "text": "## Rules that override everything"
+        },
+        {
+          "line": 68,
+          "text": "## Before phase 0 \u2014 variables, script contract, JSON envelope"
+        },
+        {
+          "line": 114,
+          "text": "## Phase 0 \u2014 Preflight"
+        },
+        {
+          "line": 146,
+          "text": "## Phase 1 \u2014 Discover"
+        },
+        {
+          "line": 173,
+          "text": "## Phase 2 \u2014 Mine"
+        },
+        {
+          "line": 209,
+          "text": "## Phase 3 \u2014 Diagnose"
+        },
+        {
+          "line": 261,
+          "text": "## Phase 4 \u2014 Propose"
+        },
+        {
+          "line": 294,
+          "text": "## Phase 5 \u2014 Interview"
+        },
+        {
+          "line": 323,
+          "text": "## Phase 6 \u2014 Shortlist, then Plan \u2014 **HARD GATE**"
+        },
+        {
+          "line": 361,
+          "text": "## Phase 7 \u2014 Build"
+        },
+        {
+          "line": 448,
+          "text": "## Phase 8 \u2014 Verify and hand off"
+        },
+        {
+          "line": 492,
+          "text": "## Attribution \u2014 exactly three placements"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/adapters/capabilities.md",
+      "kind": "text",
+      "bytes": 8758,
+      "lines": 101,
+      "sha256": "481ebac15a31ff3368bb76ea9ec86342bc31e382543c0bbb4357a67dc06d83d0",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# Adapter capabilities \u2014 the one table"
+        },
+        {
+          "line": 13,
+          "text": "## The table"
+        },
+        {
+          "line": 28,
+          "text": "## Notes \u2014 copy the relevant ones into the plan"
+        },
+        {
+          "line": 94,
+          "text": "## Using it in phase 6"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/adapters/claude-code.md",
+      "kind": "text",
+      "bytes": 86726,
+      "lines": 1271,
+      "sha256": "2bb81406aa5d0fe3323576feb91f810461f5e8004dcb0104a72046546abb9681",
+      "headings": [
+        {
+          "line": 23,
+          "text": "# Adapter: Claude Code"
+        },
+        {
+          "line": 49,
+          "text": "## 1. DETECT"
+        },
+        {
+          "line": 51,
+          "text": "### 1.1 Is Claude Code the running agent?"
+        },
+        {
+          "line": 71,
+          "text": "# Detection probe \u2014 safe, read-only, no network."
+        },
+        {
+          "line": 82,
+          "text": "### 1.2 Home directory resolution"
+        },
+        {
+          "line": 88,
+          "text": "### 1.3 Settings precedence (needed for the \"will my hook actually run\" answer)"
+        },
+        {
+          "line": 97,
+          "text": "### 1.4 Model class check (PRD \u00a77.1 \u2014 warn, never enforce)"
+        },
+        {
+          "line": 105,
+          "text": "## 2. LOCATE TRANSCRIPTS"
+        },
+        {
+          "line": 114,
+          "text": "### 2.1 Path"
+        },
+        {
+          "line": 126,
+          "text": "### 2.2 Path encoding \u2014 settled, and it is broader than the old rule"
+        },
+        {
+          "line": 204,
+          "text": "### 2.3 Fallback when the encoded directory is missing"
+        },
+        {
+          "line": 222,
+          "text": "### 2.4 Record shape (what the miner will see)"
+        },
+        {
+          "line": 245,
+          "text": "### 2.5 Privacy obligations restated here because this is where the paths live"
+        },
+        {
+          "line": 267,
+          "text": "## 3. LIST EXISTING CONFIG"
+        },
+        {
+          "line": 338,
+          "text": "## 4. EMIT"
+        },
+        {
+          "line": 408,
+          "text": "### 4.1 Index doc \u2014 `CLAUDE.md`"
+        },
+        {
+          "line": 431,
+          "text": "## Agentic setup"
+        },
+        {
+          "line": 458,
+          "text": "### 4.2 Rules \u2014 `.claude/rules/<name>.md`"
+        },
+        {
+          "line": 526,
+          "text": "# All database access goes through the repository layer"
+        },
+        {
+          "line": 555,
+          "text": "### 4.3 Hooks \u2014 `.claude/settings.json`"
+        },
+        {
+          "line": 768,
+          "text": "### 4.4 Skills \u2014 `.claude/skills/<name>/SKILL.md`"
+        },
+        {
+          "line": 882,
+          "text": "### 4.5 Subagents \u2014 `.claude/agents/<name>.md`"
+        },
+        {
+          "line": 932,
+          "text": "### 4.6 MCP server drafts \u2014 `.mcp.json`"
+        },
+        {
+          "line": 1028,
+          "text": "### 4.7 Permissions \u2014 the `permissions` block in `.claude/settings.json`"
+        },
+        {
+          "line": 1070,
+          "text": "### 4.8 Plugin packaging \u2014 **not an artifact type**"
+        },
+        {
+          "line": 1154,
+          "text": "## 5. SMOKE TEST"
+        },
+        {
+          "line": 1170,
+          "text": "# Unscoped rule \u2014 must come back loaded."
+        },
+        {
+          "line": 1172,
+          "text": "# Path-scoped rule \u2014 must come back loaded only after a matching file is read."
+        },
+        {
+          "line": 1194,
+          "text": "# Benign \u2014 must exit 0 and stay silent."
+        },
+        {
+          "line": 1198,
+          "text": "# Blocking \u2014 must exit 2 and print an actionable instruction on stderr."
+        },
+        {
+          "line": 1212,
+          "text": "## Release checklist \u2014 re-verify before every release"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/adapters/codex.md",
+      "kind": "text",
+      "bytes": 101478,
+      "lines": 1439,
+      "sha256": "0321e3a30394e5ca61eea1747b470d609ae79bfc573be023a7657a90f67b37ce",
+      "headings": [
+        {
+          "line": 12,
+          "text": "# Adapter: Codex"
+        },
+        {
+          "line": 37,
+          "text": "## Verified against"
+        },
+        {
+          "line": 53,
+          "text": "## 0. Three facts that govern everything below"
+        },
+        {
+          "line": 124,
+          "text": "## 1. DETECT"
+        },
+        {
+          "line": 126,
+          "text": "### 1.1 Is Codex the running agent?"
+        },
+        {
+          "line": 138,
+          "text": "# Detection probe \u2014 read-only, no network."
+        },
+        {
+          "line": 159,
+          "text": "### 1.2 Home directory resolution"
+        },
+        {
+          "line": 166,
+          "text": "### 1.3 Finding the Codex binary \u2014 `which codex` fails on a working install"
+        },
+        {
+          "line": 195,
+          "text": "### 1.4 Model class check (PRD \u00a77.1 \u2014 warn, never enforce)"
+        },
+        {
+          "line": 204,
+          "text": "## 2. LOCATE TRANSCRIPTS"
+        },
+        {
+          "line": 213,
+          "text": "### 2.1 Paths"
+        },
+        {
+          "line": 233,
+          "text": "### 2.2 Sessions are NOT partitioned by repo \u2014 and this is a real cost difference"
+        },
+        {
+          "line": 302,
+          "text": "### 2.3 User turns \u2014 read `response_item`, not `event_msg`"
+        },
+        {
+          "line": 339,
+          "text": "### 2.4 Explicitly out of scope"
+        },
+        {
+          "line": 359,
+          "text": "### 2.5 Degradation"
+        },
+        {
+          "line": 367,
+          "text": "## 3. LIST EXISTING CONFIG"
+        },
+        {
+          "line": 428,
+          "text": "### 3.1 Maturity counting on this target"
+        },
+        {
+          "line": 458,
+          "text": "## 4. EMIT"
+        },
+        {
+          "line": 490,
+          "text": "### 4.1 Index doc \u2014 `AGENTS.md`"
+        },
+        {
+          "line": 536,
+          "text": "## Agentic setup"
+        },
+        {
+          "line": 561,
+          "text": "### 4.2 Rules \u2014 two different things, do not conflate them"
+        },
+        {
+          "line": 592,
+          "text": "# <repo>/.codex/rules/agentify.rules"
+        },
+        {
+          "line": 593,
+          "text": "# agentify-id: forbid-npm"
+        },
+        {
+          "line": 594,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 595,
+          "text": "# agentify-generated: 2026-09-05"
+        },
+        {
+          "line": 596,
+          "text": "# agentify-evidence: 6 corrections across 4 sessions telling the agent to use bun, not npm"
+        },
+        {
+          "line": 597,
+          "text": "# Safe to delete or edit."
+        },
+        {
+          "line": 641,
+          "text": "### 4.3 Hooks \u2014 **Native.** `<repo>/.codex/hooks.json`"
+        },
+        {
+          "line": 845,
+          "text": "# agentify-id: enforce-bun"
+        },
+        {
+          "line": 846,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 847,
+          "text": "# agentify-generated: 2026-09-05"
+        },
+        {
+          "line": 848,
+          "text": "# agentify-evidence: 6 corrections across 4 sessions telling the agent to use bun, not npm"
+        },
+        {
+          "line": 849,
+          "text": "# Safe to delete or edit."
+        },
+        {
+          "line": 912,
+          "text": "### 4.4 Skills \u2014 **Native.** `<repo>/.agents/skills/<name>/SKILL.md`"
+        },
+        {
+          "line": 1012,
+          "text": "### 4.5 Subagents \u2014 **Native.** `<repo>/.codex/agents/<name>.toml`"
+        },
+        {
+          "line": 1036,
+          "text": "# agentify-id: pr-reviewer"
+        },
+        {
+          "line": 1037,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 1038,
+          "text": "# agentify-generated: 2026-09-05"
+        },
+        {
+          "line": 1039,
+          "text": "# agentify-evidence: 11 review requests across 8 sessions; 34% of commits touch no test file"
+        },
+        {
+          "line": 1040,
+          "text": "# Safe to delete or edit."
+        },
+        {
+          "line": 1080,
+          "text": "### 4.6 MCP servers \u2014 TOML, and this is where stdlib-only Python runs out of road"
+        },
+        {
+          "line": 1087,
+          "text": "# remote / streamable HTTP"
+        },
+        {
+          "line": 1097,
+          "text": "# local / stdio"
+        },
+        {
+          "line": 1139,
+          "text": "# agentify-id: mcp-linear"
+        },
+        {
+          "line": 1140,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 1141,
+          "text": "# agentify-generated: 2026-09-05"
+        },
+        {
+          "line": 1142,
+          "text": "# agentify-evidence: \"linear\" mentioned in 12 user turns across 7 sessions"
+        },
+        {
+          "line": 1143,
+          "text": "# Safe to delete or edit."
+        },
+        {
+          "line": 1144,
+          "text": "# Append to <repo>/.codex/config.toml (create it if absent), then restart Codex."
+        },
+        {
+          "line": 1145,
+          "text": "# Export LINEAR_API_KEY in your shell first."
+        },
+        {
+          "line": 1165,
+          "text": "# This DOES NOT DO WHAT IT LOOKS LIKE."
+        },
+        {
+          "line": 1210,
+          "text": "### 4.7 Plugin manifest \u2014 **not an artifact type**"
+        },
+        {
+          "line": 1256,
+          "text": "## 5. SMOKE TEST"
+        },
+        {
+          "line": 1266,
+          "text": "### 5.0 Installed, loaded, armed \u2014 assert only the first"
+        },
+        {
+          "line": 1314,
+          "text": "# Benign \u2014 must exit 0 and print nothing."
+        },
+        {
+          "line": 1318,
+          "text": "# Blocking \u2014 must exit 0 and print a permissionDecision of \"deny\"."
+        },
+        {
+          "line": 1331,
+          "text": "# phase 8 helper \u2014 read-only, no network, no model call, no session created."
+        },
+        {
+          "line": 1332,
+          "text": "# --strict-config makes this the config validator too: an unknown field exits 1 on stderr."
+        },
+        {
+          "line": 1349,
+          "text": "# id 2 -> result.data[0] = {cwd, hooks[], warnings[], errors[]}"
+        },
+        {
+          "line": 1350,
+          "text": "#   each hook: {eventName, matcher, handlerType, timeoutSec, source, sourcePath,"
+        },
+        {
+          "line": 1351,
+          "text": "#               trustStatus, enabled, statusMessage, async, currentHash, key}"
+        },
+        {
+          "line": 1352,
+          "text": "# id 3 -> result.data[0] = {cwd, skills[]}"
+        },
+        {
+          "line": 1353,
+          "text": "#   each skill: {name, description, path, scope, enabled, pluginId}"
+        },
+        {
+          "line": 1408,
+          "text": "## Open questions \u2014 re-verify before every release"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/agentify",
+      "kind": "symlink",
+      "target": "/Users/ravisojitra/agentify/skills/agentify",
+      "target_exists": false
+    },
+    {
+      "path": "skills/agentify/references/blueprint.md",
+      "kind": "text",
+      "bytes": 49965,
+      "lines": 558,
+      "sha256": "ed6c747c8ffc10f018859b845ba5b55629039cde5ea5b41abda76cf48cb56be9",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# blueprint.md \u2014 what a complete personalized setup contains"
+        },
+        {
+          "line": 15,
+          "text": "## 1. The standard this run is held to"
+        },
+        {
+          "line": 30,
+          "text": "### 1.1 The five things that make it feel personalized"
+        },
+        {
+          "line": 46,
+          "text": "### 1.2 Where the personalization comes from"
+        },
+        {
+          "line": 60,
+          "text": "### 1.3 The core set \u2014 built on every run its licence holds"
+        },
+        {
+          "line": 95,
+          "text": "### 1.4 The size test \u2014 a workflow, not a feature"
+        },
+        {
+          "line": 117,
+          "text": "## 2. Evidence, restated for structural facts"
+        },
+        {
+          "line": 139,
+          "text": "### 2.1 What covers a candidate \u2014 and what never does"
+        },
+        {
+          "line": 166,
+          "text": "## 3. Subagents \u2014 the specialists"
+        },
+        {
+          "line": 196,
+          "text": "## 4. Hooks and permissions \u2014 the guardrails"
+        },
+        {
+          "line": 201,
+          "text": "### 4.1 The guardrail catalogue"
+        },
+        {
+          "line": 223,
+          "text": "### 4.2 Permissions \u2014 the allow/deny lists"
+        },
+        {
+          "line": 243,
+          "text": "## 5. Rules \u2014 the conventions"
+        },
+        {
+          "line": 248,
+          "text": "### 5.1 Zone rules \u2014 one per real zone"
+        },
+        {
+          "line": 281,
+          "text": "### 5.2 Workflow rules \u2014 how this developer works"
+        },
+        {
+          "line": 299,
+          "text": "## 6. Skills \u2014 the workflows"
+        },
+        {
+          "line": 305,
+          "text": "### 6.1 Integration skills \u2014 one workflow per service the repo actually uses"
+        },
+        {
+          "line": 334,
+          "text": "### 6.2 Practice skills \u2014 the workflows every serious repo has"
+        },
+        {
+          "line": 349,
+          "text": "### 6.3 `setup-manager` \u2014 build this one on every run"
+        },
+        {
+          "line": 376,
+          "text": "## 7. MCP drafts"
+        },
+        {
+          "line": 393,
+          "text": "## 8. The engineering system \u2014 ask, then install what they name"
+        },
+        {
+          "line": 414,
+          "text": "## 9. The stitch \u2014 the index doc is the last thing written"
+        },
+        {
+          "line": 444,
+          "text": "## 10. The catalogue walk \u2014 the table the plan must contain"
+        },
+        {
+          "line": 487,
+          "text": "## 11. What this file does not license"
+        },
+        {
+          "line": 513,
+          "text": "## 12. Worked example \u2014 what a complete walk produces"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/build-and-verify.md",
+      "kind": "text",
+      "bytes": 48114,
+      "lines": 667,
+      "sha256": "6509b2c718aa874b9b8f3510dfd115d427a3eef62ae4f6b5cd1221ab2765ae2f",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# build-and-verify.md \u2014 phases 7 and 8, operational detail"
+        },
+        {
+          "line": 27,
+          "text": "## 1. What is *not* in this file"
+        },
+        {
+          "line": 39,
+          "text": "## 2. Artifact type \u2192 template"
+        },
+        {
+          "line": 77,
+          "text": "### 2.1 Marker spelling"
+        },
+        {
+          "line": 95,
+          "text": "### 2.2 Where each type lands, and **how** agentify writes it \u2014 per target"
+        },
+        {
+          "line": 144,
+          "text": "### 2.3 The four write modes \u2014 this is the spine the undo hangs on"
+        },
+        {
+          "line": 160,
+          "text": "### 2.4 Merge procedures \u2014 one per format"
+        },
+        {
+          "line": 244,
+          "text": "## 3. Step 3 in full \u2014 the dirty tree, the pre-write capture, the ignore scan"
+        },
+        {
+          "line": 246,
+          "text": "### 3.1 Why `BASE_BRANCH` and `BASE_COMMIT` are read before the first byte"
+        },
+        {
+          "line": 265,
+          "text": "### 3.2 `git check-ignore -v` \u2014 reading the output and the exit code"
+        },
+        {
+          "line": 283,
+          "text": "### 3.3 Worked example \u2014 a repo that ignores `.claude/`"
+        },
+        {
+          "line": 295,
+          "text": "## 4. Step 4 in full \u2014 the commit, the partition, and `git add`"
+        },
+        {
+          "line": 297,
+          "text": "### 4.1 The two disqualifiers"
+        },
+        {
+          "line": 315,
+          "text": "### 4.2 Why never `git add -f`"
+        },
+        {
+          "line": 325,
+          "text": "### 4.3 Why one `git add` over a mixed list is not an option"
+        },
+        {
+          "line": 332,
+          "text": "### 4.4 Proving the commit \u2014 enumerate the branch, never one commit"
+        },
+        {
+          "line": 379,
+          "text": "## 5. `build-manifest.json` in full"
+        },
+        {
+          "line": 386,
+          "text": "### 5.1 Top-level fields"
+        },
+        {
+          "line": 400,
+          "text": "### 5.2 The undo record"
+        },
+        {
+          "line": 421,
+          "text": "### 5.3 Per-artifact fields"
+        },
+        {
+          "line": 440,
+          "text": "### 5.3a `format` and `merge` \u2014 the two fields that pick the undo"
+        },
+        {
+          "line": 477,
+          "text": "### 5.4 The `type` enum"
+        },
+        {
+          "line": 532,
+          "text": "### 5.5 agentify's own three entries, and when each is added"
+        },
+        {
+          "line": 550,
+          "text": "### 5.6 The metadata every generated file carries"
+        },
+        {
+          "line": 559,
+          "text": "## 6. Build-time failure shapes"
+        },
+        {
+          "line": 583,
+          "text": "## 7. Phase 8 \u2014 the static pass, in detail"
+        },
+        {
+          "line": 605,
+          "text": "## 8. Phase 8 \u2014 generating the undo from the manifest"
+        },
+        {
+          "line": 630,
+          "text": "## 9. The final summary \u2014 the three exact wordings"
+        },
+        {
+          "line": 657,
+          "text": "## 10. Phase 8 failure shapes"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/coverage.md",
+      "kind": "text",
+      "bytes": 13429,
+      "lines": 219,
+      "sha256": "1bf1e7a2fda8dc670ba0dac3982d7c5be91580b68d49139bddca3a64a7e71a44",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# coverage.md \u2014 completeness, ranking, and what gets skipped"
+        },
+        {
+          "line": 9,
+          "text": "## 1. There are no caps"
+        },
+        {
+          "line": 24,
+          "text": "### Why the caps went"
+        },
+        {
+          "line": 39,
+          "text": "## 2. Ranking \u2014 order, do not cut"
+        },
+        {
+          "line": 58,
+          "text": "### 2.1 When the total is large, say so \u2014 and still propose it"
+        },
+        {
+          "line": 71,
+          "text": "## 3. Thin evidence means less output, and says why"
+        },
+        {
+          "line": 96,
+          "text": "## 4. What to tell the user when presenting the list"
+        },
+        {
+          "line": 108,
+          "text": "## 5. The user's controls"
+        },
+        {
+          "line": 132,
+          "text": "## 6. Existing setups \u2014 de-duplicate hard, never throttle"
+        },
+        {
+          "line": 157,
+          "text": "### 6.1 Scope: this repo, never the machine"
+        },
+        {
+          "line": 171,
+          "text": "### 6.2 Reading the provenance fields"
+        },
+        {
+          "line": 188,
+          "text": "## 7. Zones, monorepos, and rerun accounting"
+        },
+        {
+          "line": 200,
+          "text": "## 8. What happens to skipped candidates"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/interview.md",
+      "kind": "text",
+      "bytes": 78161,
+      "lines": 956,
+      "sha256": "d8ef5cb39f6081908bfc6fd4e4097c10166e2b1792e347b01bfa274589e218d0",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# interview.md \u2014 phase 5 question bank and discipline"
+        },
+        {
+          "line": 9,
+          "text": "## 1. Hard rules"
+        },
+        {
+          "line": 61,
+          "text": "## 2. Banned questions \u2014 discovery already answered these"
+        },
+        {
+          "line": 119,
+          "text": "## 3. Selection procedure"
+        },
+        {
+          "line": 130,
+          "text": "### 3.1 Target-derived wording \u2014 the vocabulary the bank spells instead of literals"
+        },
+        {
+          "line": 194,
+          "text": "## 4. Question bank"
+        },
+        {
+          "line": 243,
+          "text": "### 4.1 Retired questions \u2014 Q1, Q2, Q4, Q5, Q6, Q8 and Q11, and what went with them"
+        },
+        {
+          "line": 277,
+          "text": "### 4.2 Deriving `team_size` \u2014 read one field, drop the machines, weigh the survivors"
+        },
+        {
+          "line": 374,
+          "text": "### 4.3 Trigger field audit"
+        },
+        {
+          "line": 483,
+          "text": "### 4.4 Q3's option text, per target \u2014 the answer is the same, the mechanism is not"
+        },
+        {
+          "line": 534,
+          "text": "### 4.5 Q9's docs clause \u2014 the old trigger had it exactly backwards"
+        },
+        {
+          "line": 585,
+          "text": "### 4.6 Q14's option text \u2014 the engineering system"
+        },
+        {
+          "line": 613,
+          "text": "### 4.7 Q15 and Q16 \u2014 asking for a command without leaking a guess"
+        },
+        {
+          "line": 649,
+          "text": "### 4.8 The three derived answers \u2014 `mode`, `services`, `team_size`"
+        },
+        {
+          "line": 721,
+          "text": "## 5. Rendering format \u2014 emit exactly this shape"
+        },
+        {
+          "line": 727,
+          "text": "## A few things I can't work out from the evidence (N questions)"
+        },
+        {
+          "line": 786,
+          "text": "## 6. Handling an accept-everything reply"
+        },
+        {
+          "line": 852,
+          "text": "## 7. Handling everything else"
+        },
+        {
+          "line": 902,
+          "text": "## 8. Output of this phase"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/mapping-rules.md",
+      "kind": "text",
+      "bytes": 107924,
+      "lines": 1452,
+      "sha256": "5afa24a131e3ef730370512213c1be20cb4e4cd7d273574b14093eaecf4d8d15",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# Mapping rules \u2014 findings to artifact candidates"
+        },
+        {
+          "line": 12,
+          "text": "## 0. The three rules that outrank the rest"
+        },
+        {
+          "line": 17,
+          "text": "### 0.1 A finding with no evidence count maps to nothing"
+        },
+        {
+          "line": 34,
+          "text": "### 0.2 A count is only as good as what it counts"
+        },
+        {
+          "line": 84,
+          "text": "### 0.3 The mechanism test \u2014 state it before you score"
+        },
+        {
+          "line": 116,
+          "text": "## 1. Mapping table (PRD \u00a78, expanded with thresholds)"
+        },
+        {
+          "line": 210,
+          "text": "### 1.1 Row 8 in full \u2014 the external-system test"
+        },
+        {
+          "line": 254,
+          "text": "### 1.2 Row 6 in full \u2014 the scope test"
+        },
+        {
+          "line": 380,
+          "text": "### Skipped (insufficient evidence)"
+        },
+        {
+          "line": 387,
+          "text": "### 1.3 Row 6 and `directory_hotspots[]` \u2014 a scope selector, never a trigger"
+        },
+        {
+          "line": 422,
+          "text": "## 2. Disambiguation \u2014 the overlapping cases"
+        },
+        {
+          "line": 426,
+          "text": "### 2.1 Skill vs subagent"
+        },
+        {
+          "line": 448,
+          "text": "### 2.2 Rule vs hook"
+        },
+        {
+          "line": 485,
+          "text": "### 2.3 Rule file vs index-doc line"
+        },
+        {
+          "line": 505,
+          "text": "### 2.4 Skill vs reference doc"
+        },
+        {
+          "line": 521,
+          "text": "### 2.5 Skill vs \"just an index-doc line\""
+        },
+        {
+          "line": 527,
+          "text": "### 2.6 The step test \u2014 count steps from the evidence, and never count knowledge as a step"
+        },
+        {
+          "line": 555,
+          "text": "## 3. Evidence sources allowed per artifact type"
+        },
+        {
+          "line": 643,
+          "text": "### 3.1 Which template emits which artifact"
+        },
+        {
+          "line": 747,
+          "text": "## 4. Anti-patterns \u2014 do not generate these"
+        },
+        {
+          "line": 831,
+          "text": "## 5. Evidence string format \u2014 every candidate carries one"
+        },
+        {
+          "line": 897,
+          "text": "## 6. Scoring rubric"
+        },
+        {
+          "line": 974,
+          "text": "### 6.1 Threshold edges, low confidence, and mixed artifacts"
+        },
+        {
+          "line": 983,
+          "text": "### Skipped (low confidence \u2014 opt in to build)"
+        },
+        {
+          "line": 1022,
+          "text": "### 6.2 Overlap \u2014 a count only adds to another count if they count different turns"
+        },
+        {
+          "line": 1098,
+          "text": "### 6.3 Structural `F` \u2014 the scale a run with no demand evidence is ranked on"
+        },
+        {
+          "line": 1159,
+          "text": "## 7. Worked examples"
+        },
+        {
+          "line": 1167,
+          "text": "### 7.1 Input \u2014 three records from `signals.json`"
+        },
+        {
+          "line": 1211,
+          "text": "### 7.2 Mapping decisions"
+        },
+        {
+          "line": 1241,
+          "text": "### 7.3 Output \u2014 the candidate list"
+        },
+        {
+          "line": 1290,
+          "text": "### 7.4 What carries forward"
+        },
+        {
+          "line": 1297,
+          "text": "### 7.5 Worked negative \u2014 `stripe-mcp-draft`, the candidate that scored highest and was wrong"
+        },
+        {
+          "line": 1346,
+          "text": "### Skipped (already covered)"
+        },
+        {
+          "line": 1356,
+          "text": "### 7.6 Worked negative \u2014 `commit-hostshare`, the right count on the wrong artifact"
+        },
+        {
+          "line": 1398,
+          "text": "### 7.7 Worked edge \u2014 `agentify-conventions`, a count sitting exactly on the line"
+        },
+        {
+          "line": 1438,
+          "text": "## 8. Handoff to coverage"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/plan-template.md",
+      "kind": "text",
+      "bytes": 40690,
+      "lines": 608,
+      "sha256": "4635be74c88027e40bf62b8b850ddfa724f0526d2c652e5d63c46aba97a12a4b",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# plan-template.md \u2014 phase 6 skeleton for `PLAN_DIR/plan.md`"
+        },
+        {
+          "line": 17,
+          "text": "## 0. The shortlist \u2014 printed before this file is written"
+        },
+        {
+          "line": 30,
+          "text": "## What I'd build for REPO_NAME \u2014 ARTIFACT_TOTAL items"
+        },
+        {
+          "line": 35,
+          "text": "### Rules (RULE_COUNT) \u2014 path-scoped; each loads only when you touch its zone"
+        },
+        {
+          "line": 41,
+          "text": "### Hooks (HOOK_COUNT) \u2014 enforced by the harness; they HOOK_STRICTNESS_WORD, per your answer"
+        },
+        {
+          "line": 46,
+          "text": "### Permissions (1)"
+        },
+        {
+          "line": 51,
+          "text": "### Skills (SKILL_COUNT) \u2014 invoke by name, or let the agent pick them up"
+        },
+        {
+          "line": 57,
+          "text": "### Subagents (SUBAGENT_COUNT) \u2014 isolated workers with their own context"
+        },
+        {
+          "line": 62,
+          "text": "### MCP drafts (MCP_COUNT) \u2014 config only; you authenticate"
+        },
+        {
+          "line": 67,
+          "text": "### Index doc (1)"
+        },
+        {
+          "line": 102,
+          "text": "## 1. Rules for filling the skeleton"
+        },
+        {
+          "line": 151,
+          "text": "### 1.1 The no-history case \u2014 consent given, nothing found"
+        },
+        {
+          "line": 182,
+          "text": "### Where the capability table comes from"
+        },
+        {
+          "line": 189,
+          "text": "### Estimating build time"
+        },
+        {
+          "line": 206,
+          "text": "## 2. The skeleton \u2014 reproduce this structure literally"
+        },
+        {
+          "line": 217,
+          "text": "# Agentic setup plan \u2014 REPO_NAME"
+        },
+        {
+          "line": 221,
+          "text": "## Summary"
+        },
+        {
+          "line": 259,
+          "text": "## What gets built"
+        },
+        {
+          "line": 261,
+          "text": "### 1. ARTIFACT_NAME"
+        },
+        {
+          "line": 273,
+          "text": "### 2. ARTIFACT_NAME"
+        },
+        {
+          "line": 287,
+          "text": "## Files created vs modified"
+        },
+        {
+          "line": 298,
+          "text": "## TARGET_NAME capability notes"
+        },
+        {
+          "line": 306,
+          "text": "## Existing setup notes"
+        },
+        {
+          "line": 319,
+          "text": "## Skipped candidates"
+        },
+        {
+          "line": 323,
+          "text": "### Skipped (insufficient evidence)"
+        },
+        {
+          "line": 331,
+          "text": "### Skipped (already covered)"
+        },
+        {
+          "line": 341,
+          "text": "### Skipped (low confidence \u2014 opt in to build)"
+        },
+        {
+          "line": 351,
+          "text": "## Your approval"
+        },
+        {
+          "line": 367,
+          "text": "## Rerun and undo"
+        },
+        {
+          "line": 378,
+          "text": "## Catalogue walk"
+        },
+        {
+          "line": 391,
+          "text": "## 3. Token reference"
+        },
+        {
+          "line": 434,
+          "text": "### 3.1 Filling `UNDO_INSTRUCTIONS_EXACT`"
+        },
+        {
+          "line": 530,
+          "text": "## 4. Filled example of one artifact block"
+        },
+        {
+          "line": 536,
+          "text": "### 4. new-endpoint"
+        },
+        {
+          "line": 572,
+          "text": "## 5. Filled example \u2014 the existing-setup sections"
+        },
+        {
+          "line": 579,
+          "text": "## Existing setup notes"
+        },
+        {
+          "line": 592,
+          "text": "## Skipped candidates"
+        },
+        {
+          "line": 594,
+          "text": "### Skipped (already covered)"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/privacy.md",
+      "kind": "text",
+      "bytes": 23971,
+      "lines": 374,
+      "sha256": "aa2c6758e55b3be1a5e1c92b6d12a1d4523640a97dcd565763d5fdb4365c4fd5",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# privacy.md \u2014 phase 0 consent script and privacy statement"
+        },
+        {
+          "line": 11,
+          "text": "## 1. When to ask"
+        },
+        {
+          "line": 16,
+          "text": "### First, resolve the directory you are asking about"
+        },
+        {
+          "line": 76,
+          "text": "## 2. The consent script \u2014 read this verbatim"
+        },
+        {
+          "line": 132,
+          "text": "## 3. Interpreting the answer"
+        },
+        {
+          "line": 159,
+          "text": "## 4. What is read, precisely"
+        },
+        {
+          "line": 215,
+          "text": "## 5. What is scrubbed, and when"
+        },
+        {
+          "line": 242,
+          "text": "## 6. What is never read \u2014 in any phase"
+        },
+        {
+          "line": 272,
+          "text": "## 7. Guarantees to state, and to keep"
+        },
+        {
+          "line": 287,
+          "text": "## 8. Degraded runs \u2014 no transcript evidence"
+        },
+        {
+          "line": 337,
+          "text": "### 8.1 The other zero-evidence path \u2014 consent given, nothing found"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/report-template.md",
+      "kind": "text",
+      "bytes": 85214,
+      "lines": 1139,
+      "sha256": "899adf54eb0e71c34b29dcd7c22520accc3f882daf086312f072e88bd0e4a09d",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# report-template.md \u2014 phase 8 skeleton for `PLAN_DIR/report.md`"
+        },
+        {
+          "line": 12,
+          "text": "## 1. Rules"
+        },
+        {
+          "line": 80,
+          "text": "## 2. The skeleton \u2014 reproduce this structure literally"
+        },
+        {
+          "line": 91,
+          "text": "# Agentic setup report \u2014 REPO_NAME"
+        },
+        {
+          "line": 96,
+          "text": "## What got built"
+        },
+        {
+          "line": 111,
+          "text": "## What got skipped"
+        },
+        {
+          "line": 119,
+          "text": "## Needs you"
+        },
+        {
+          "line": 124,
+          "text": "### 1. NEEDS_YOU_TITLE"
+        },
+        {
+          "line": 132,
+          "text": "### 2. NEEDS_YOU_TITLE"
+        },
+        {
+          "line": 141,
+          "text": "## Suggestions I did not build"
+        },
+        {
+          "line": 145,
+          "text": "## Verification"
+        },
+        {
+          "line": 155,
+          "text": "## Three things to try tomorrow"
+        },
+        {
+          "line": 172,
+          "text": "## Rerun"
+        },
+        {
+          "line": 179,
+          "text": "## How to remove everything"
+        },
+        {
+          "line": 227,
+          "text": "## 3. Token reference"
+        },
+        {
+          "line": 258,
+          "text": "### 3.1 Removal commands \u2014 generated, never pasted"
+        },
+        {
+          "line": 422,
+          "text": "# 1. Save these instructions. Step 2 takes report.md off your working tree along"
+        },
+        {
+          "line": 423,
+          "text": "#    with the rest of the branch; every step below is in this copy too."
+        },
+        {
+          "line": 426,
+          "text": "# 2. Delete the branch. Detached HEAD before the run: git checkout BASE_COMMIT"
+        },
+        {
+          "line": 457,
+          "text": "# 5. Delete the files that never reached the branch. Step 2 did not touch these."
+        },
+        {
+          "line": 460,
+          "text": "# 6. Remove the directories this run created that still held one of them, one"
+        },
+        {
+          "line": 461,
+          "text": "#    line each, deepest first. Directories holding only committed files were"
+        },
+        {
+          "line": 462,
+          "text": "#    emptied and removed by the checkout in step 2. These are empty now that"
+        },
+        {
+          "line": 463,
+          "text": "#    every step above has run; one you have since put something else in survives"
+        },
+        {
+          "line": 464,
+          "text": "#    and rmdir says so, and one already gone is skipped in silence."
+        },
+        {
+          "line": 468,
+          "text": "# 7. Confirm every appended-to file is exact. These files are never deleted."
+        },
+        {
+          "line": 470,
+          "text": "# expected: PRE_EXISTING_SHA256"
+        },
+        {
+          "line": 472,
+          "text": "# rm ~/agentify-removal-steps.md    # when you no longer want the record"
+        },
+        {
+          "line": 510,
+          "text": "# 1. Save these instructions. The last block deletes PLAN_DIR/report.md, the file"
+        },
+        {
+          "line": 511,
+          "text": "#    you are reading them from; every step below is in this copy too."
+        },
+        {
+          "line": 514,
+          "text": "# 2. Unstage what this run staged. Only these paths were staged; the gitignored"
+        },
+        {
+          "line": 515,
+          "text": "#    ones never were. Nothing is deleted here \u2014 the files stay on disk."
+        },
+        {
+          "line": 518,
+          "text": "# 3. Put each appended-to file git had tracked back, byte for byte, from the"
+        },
+        {
+          "line": 519,
+          "text": "#    commit you were on. git older than 2.23: git checkout BASE_COMMIT -- PATH"
+        },
+        {
+          "line": 535,
+          "text": "# 6. Delete the files this run created \u2014 staged and gitignored alike, but NOT"
+        },
+        {
+          "line": 536,
+          "text": "#    UNMERGE_PATHS: a merged-into config is the un-merge script's, not rm's. This is"
+        },
+        {
+          "line": 537,
+          "text": "#    the last step that deletes anything, because PLAN_DIR/report.md is in the"
+        },
+        {
+          "line": 538,
+          "text": "#    list: after it, step 1's copy is the only copy of these instructions."
+        },
+        {
+          "line": 541,
+          "text": "# 7. Remove the directories this run created, one line each, deepest first. They"
+        },
+        {
+          "line": 542,
+          "text": "#    are empty now that every step above has run. One you have since put"
+        },
+        {
+          "line": 543,
+          "text": "#    something else in survives and rmdir says so; one already gone is skipped in"
+        },
+        {
+          "line": 544,
+          "text": "#    silence, and neither stops the line after it."
+        },
+        {
+          "line": 548,
+          "text": "# 8. Confirm every appended-to file is exact. These files are never deleted."
+        },
+        {
+          "line": 550,
+          "text": "# expected: PRE_EXISTING_SHA256"
+        },
+        {
+          "line": 552,
+          "text": "# rm ~/agentify-removal-steps.md    # when you no longer want the record"
+        },
+        {
+          "line": 582,
+          "text": "# (path, agentify-id, sha256 of the file as it was before this run)"
+        },
+        {
+          "line": 652,
+          "text": "# (path, agentify-id, format, action, sha256 of the file as it was before this run"
+        },
+        {
+          "line": 653,
+          "text": "#  or \"\", entries this run merged in)"
+        },
+        {
+          "line": 654,
+          "text": "# format: \"json\" -- a structural merge into a JSON object: .claude/settings.json,"
+        },
+        {
+          "line": 655,
+          "text": "#                   .mcp.json, .codex/hooks.json"
+        },
+        {
+          "line": 656,
+          "text": "#         \"toml\" -- one whole marked [table] block appended to a TOML file:"
+        },
+        {
+          "line": 657,
+          "text": "#                   <repo>/.codex/config.toml"
+        },
+        {
+          "line": 658,
+          "text": "# entry kinds: (\"hook_command\",     \"<the hook artifact's manifest `command`>\")"
+        },
+        {
+          "line": 659,
+          "text": "#              (\"permission_entry\", \"<allow|ask|deny>:<exact rule string>\")"
+        },
+        {
+          "line": 660,
+          "text": "#              (\"mcp_server\",       \"<server name under mcpServers>\")"
+        },
+        {
+          "line": 661,
+          "text": "#              (\"toml_table\",       \"<table name, e.g. mcp_servers.linear>\")"
+        },
+        {
+          "line": 979,
+          "text": "### 3.2 \"Needs you\" content"
+        },
+        {
+          "line": 1015,
+          "text": "### 1. Authenticate the Linear MCP server"
+        },
+        {
+          "line": 1029,
+          "text": "### 2. Start a new session so the hook and the new files load"
+        },
+        {
+          "line": 1043,
+          "text": "### 1. Trust this project in Codex"
+        },
+        {
+          "line": 1057,
+          "text": "### 2. Trust the new hooks"
+        },
+        {
+          "line": 1067,
+          "text": "### 3. Apply the Linear MCP block"
+        },
+        {
+          "line": 1081,
+          "text": "### 4. Confirm what I could not"
+        },
+        {
+          "line": 1097,
+          "text": "### 3.3 \"Three things to try tomorrow\""
+        },
+        {
+          "line": 1124,
+          "text": "## 4. The footer \u2014 fixed text"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/references/verification.md",
+      "kind": "text",
+      "bytes": 129770,
+      "lines": 1665,
+      "sha256": "7cd6f9a76eaaa10f6c81c64671fba42efce8fadf650d31d4ff6ecf881ac866e5",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# verification.md \u2014 phase 8 smoke tests"
+        },
+        {
+          "line": 12,
+          "text": "## 1. Safety rules for this phase"
+        },
+        {
+          "line": 41,
+          "text": "## 2. Static pass \u2014 `verify_artifacts.py`"
+        },
+        {
+          "line": 43,
+          "text": "### 2.0 Before you run it: agentify's own output belongs in the manifest"
+        },
+        {
+          "line": 113,
+          "text": "### 2.1 Running it"
+        },
+        {
+          "line": 151,
+          "text": "### What it checks"
+        },
+        {
+          "line": 195,
+          "text": "### How to read the output"
+        },
+        {
+          "line": 239,
+          "text": "## 3. Live tests \u2014 general shape"
+        },
+        {
+          "line": 247,
+          "text": "## 4. Skills"
+        },
+        {
+          "line": 283,
+          "text": "## 5. Hooks"
+        },
+        {
+          "line": 305,
+          "text": "### 5.1 Executing a hook needs the user's word first"
+        },
+        {
+          "line": 336,
+          "text": "# only after an explicit yes"
+        },
+        {
+          "line": 393,
+          "text": "### 5.2 Behavioural test"
+        },
+        {
+          "line": 427,
+          "text": "# Claude Code \u2014 benign, then blocking."
+        },
+        {
+          "line": 433,
+          "text": "# Codex \u2014 benign, then blocking.  Tool names here are `exec` / `exec_command` /"
+        },
+        {
+          "line": 434,
+          "text": "# `shell_command` / `apply_patch`, never `Bash` / `Edit` / `Write`."
+        },
+        {
+          "line": 485,
+          "text": "### 5.3 Installed, loaded, armed \u2014 three claims, and only the first is checkable in the run that builds it"
+        },
+        {
+          "line": 572,
+          "text": "## 6. Rules"
+        },
+        {
+          "line": 574,
+          "text": "### 6.0 Two artifacts share the name `rule`. Check the one in front of you."
+        },
+        {
+          "line": 602,
+          "text": "### 6.1 Prose rules"
+        },
+        {
+          "line": 693,
+          "text": "### 6.2 Command policies (Codex)"
+        },
+        {
+          "line": 726,
+          "text": "## 7. Subagents"
+        },
+        {
+          "line": 763,
+          "text": "## 8. MCP drafts, permissions, index doc"
+        },
+        {
+          "line": 817,
+          "text": "## 9. Recording results and closing the phase"
+        },
+        {
+          "line": 819,
+          "text": "### 9.0 One dangling link is correct, and it resolves at step 5"
+        },
+        {
+          "line": 948,
+          "text": "## 10. The uninstall check \u2014 prove the undo before you publish it"
+        },
+        {
+          "line": 984,
+          "text": "### 10.1 The mode is whatever the manifest says \u2014 and the mode alone no longer picks the undo"
+        },
+        {
+          "line": 1044,
+          "text": "### 10.2 Every artifact is covered by a removal mechanism \u2014 enumerate, never infer"
+        },
+        {
+          "line": 1051,
+          "text": "# 1. what the BRANCH holds against its base (branch mode; empty in the other modes)."
+        },
+        {
+          "line": 1052,
+          "text": "#    BASE_COMMIT is manifest.base_commit -- the whole branch, not one commit."
+        },
+        {
+          "line": 1055,
+          "text": "# 2. what the undo you are about to print names for explicit per-file removal"
+        },
+        {
+          "line": 1056,
+          "text": "#    (the rm -f / restore / marker-script paths out of the \u00a73.1 block you generated)"
+        },
+        {
+          "line": 1158,
+          "text": "### 10.3 Stage-only and no-git: every step has to name something real"
+        },
+        {
+          "line": 1212,
+          "text": "### 10.4 The end-to-end rehearsal"
+        },
+        {
+          "line": 1263,
+          "text": "# block A saves the report to ~ ; the rehearsal must not write into the user's real home,"
+        },
+        {
+          "line": 1264,
+          "text": "# and pointing HOME at the copy is also what proves that step actually wrote something."
+        },
+        {
+          "line": 1266,
+          "text": "# >>> Render report-template.md \u00a73.1's blocks A, B, C and D from build-manifest.json into"
+        },
+        {
+          "line": 1267,
+          "text": "#     \"$REHEARSE/removal.md\" now, in printed order, each one inside a ```bash fence."
+        },
+        {
+          "line": 1268,
+          "text": "#     That is a step you take, not a command this block runs, and it has to happen here:"
+        },
+        {
+          "line": 1269,
+          "text": "#     $REHEARSE did not exist a line ago and the stand-in below is copied from it. <<<"
+        },
+        {
+          "line": 1340,
+          "text": "# report.md is a created path before it is an artifacts[] entry (see 9 step 4a),"
+        },
+        {
+          "line": 1341,
+          "text": "# so the stand-in is dropped by name whether or not the manifest lists it yet."
+        },
+        {
+          "line": 1358,
+          "text": "# RE-SORT. `listing()` sorts whole lines, so the sort key of a FILE line starts"
+        },
+        {
+          "line": 1359,
+          "text": "# with its HASH -- and rule 3 rewrites exactly that field.  Emitting the lines in"
+        },
+        {
+          "line": 1360,
+          "text": "# `built.txt`'s order therefore leaves every `action: modified` line filed under"
+        },
+        {
+          "line": 1361,
+          "text": "# its POST-build hash while `after.txt` files it under the restored one, and"
+        },
+        {
+          "line": 1362,
+          "text": "# `diff` reports each of them twice, as one deletion and one addition carrying"
+        },
+        {
+          "line": 1363,
+          "text": "# identical text.  Measured on the 2026-09-05 Codex dogfood: a byte-exact undo"
+        },
+        {
+          "line": 1364,
+          "text": "# produced a four-line diff naming `AGENTS.md` and `.codex/hooks.json`, both with"
+        },
+        {
+          "line": 1365,
+          "text": "# the correct restored hashes.  Result 4 is a set comparison, so sort both sides."
+        },
+        {
+          "line": 1567,
+          "text": "# the marker script \u2014 the shipped defect"
+        },
+        {
+          "line": 1571,
+          "text": "# the JSON un-merge script \u2014 same fixture, same manifest entry"
+        },
+        {
+          "line": 1618,
+          "text": "### 10.5 Recording it"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/discover.py",
+      "kind": "text",
+      "bytes": 300559,
+      "lines": 6840,
+      "sha256": "52d4dfff274d8346c94b1602221de12c2ef436390bf9b8a3ccb0eb7651296822",
+      "python_ast": "pass",
+      "definitions": [
+        {
+          "line": 621,
+          "name": "GitignoreMatcher",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 719,
+          "name": "_glob_to_regex",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 768,
+          "name": "Reader",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 875,
+          "name": "parse_toml_sections",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 900,
+          "name": "toml_dep_names",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 915,
+          "name": "toml_array_values",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 949,
+          "name": "parse_requirements",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 961,
+          "name": "parse_make_targets",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 985,
+          "name": "_just_note",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 992,
+          "name": "_just_signature_end",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1015,
+          "name": "_just_params",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1039,
+          "name": "_just_needs_args",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1058,
+          "name": "_just_body",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1094,
+          "name": "parse_just_recipes",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1163,
+          "name": "parse_go_mod",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1186,
+          "name": "parse_gemfile",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1194,
+          "name": "State",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 1222,
+          "name": "_rel",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1229,
+          "name": "walk",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1383,
+          "name": "classify_doc",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1427,
+          "name": "Manifests",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 1502,
+          "name": "build_workspace_system",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1544,
+          "name": "_glob_to_re",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1569,
+          "name": "GlobSet",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 1597,
+          "name": "workspace_globset",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1605,
+          "name": "_manifest_dir",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1609,
+          "name": "_round_robin_by_kind",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1642,
+          "name": "select_manifests",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1673,
+          "name": "_coverage_line",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1701,
+          "name": "_warn_just_skips",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1741,
+          "name": "_read_one_manifest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1955,
+          "name": "read_manifests",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2021,
+          "name": "_clean",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2027,
+          "name": "_printable",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2038,
+          "name": "lock_depth",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2044,
+          "name": "_path_words",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2049,
+          "name": "under_vendored_tree",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2058,
+          "name": "lock_evidence",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2096,
+          "name": "declared_js_pm",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2130,
+          "name": "detect_package_managers",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2257,
+          "name": "_js_pm",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2265,
+          "name": "_py_runner",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2457,
+          "name": "_name_tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2463,
+          "name": "_score_name",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2516,
+          "name": "_body_slot",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2554,
+          "name": "_candidate",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2567,
+          "name": "_script_candidates",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2646,
+          "name": "_provenance",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2669,
+          "name": "_ci_install_lines",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2694,
+          "name": "resolve_commands",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2931,
+          "name": "_dep_lookup",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2950,
+          "name": "detect_frameworks",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2971,
+          "name": "detect_services",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3026,
+          "name": "build_folders",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3082,
+          "name": "detect_tooling",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3094,
+          "name": "build_languages",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3111,
+          "name": "read_ci",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3133,
+          "name": "read_env_names",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3188,
+          "name": "_yaml_scalar",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3202,
+          "name": "_yaml_flow_seq",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3210,
+          "name": "parse_pnpm_workspace",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3317,
+          "name": "detect_monorepo",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3530,
+          "name": "parse_codex_mcp_servers",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3624,
+          "name": "codex_home_dir",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3636,
+          "name": "claude_home_dir",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3683,
+          "name": "parse_codex_config_facts",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3791,
+          "name": "parse_hook_block",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3836,
+          "name": "_codex_skill_dirs",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3888,
+          "name": "_codex_list_files",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3917,
+          "name": "_artifact_home",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3929,
+          "name": "_group_artifact_rows",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3982,
+          "name": "scan_codex_user_scope",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4225,
+          "name": "read_skills_lock",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4280,
+          "name": "_is_vendor_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4292,
+          "name": "_frontmatter_map",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4316,
+          "name": "_external_source_value",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4327,
+          "name": "_tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4331,
+          "name": "_third_party_doc_hint",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4360,
+          "name": "classify_provenance",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4456,
+          "name": "AgenticScan",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 4471,
+          "name": "_under",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4479,
+          "name": "_link_label",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4496,
+          "name": "scan_agentic_dirs",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4633,
+          "name": "_symlink_identity",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4666,
+          "name": "detect_agentic_config",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5432,
+          "name": "_git",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5460,
+          "name": "collect_git",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5511,
+          "name": "build_parser",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5528,
+          "name": "empty_agentic_config",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5572,
+          "name": "empty_payload",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5620,
+          "name": "main",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5800,
+          "name": "selftest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 630,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 638,
+          "name": "add_file",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 650,
+          "name": "add_pattern",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 687,
+          "name": "compile",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 702,
+          "name": "is_ignored",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 771,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 776,
+          "name": "budget_left",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 779,
+          "name": "text",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 799,
+          "name": "json",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 815,
+          "name": "count_lines",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 843,
+          "name": "env_var_names",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1195,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1240,
+          "name": "on_error",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1428,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1484,
+          "name": "add_workspace_system",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1489,
+          "name": "add_workspace_row",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1572,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1580,
+          "name": "__bool__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1585,
+          "name": "matches",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2152,
+          "name": "add",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2724,
+          "name": "take",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2807,
+          "name": "configured",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2826,
+          "name": "convention",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2974,
+          "name": "add",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4459,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4776,
+          "name": "_add_row",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4784,
+          "name": "_record",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4799,
+          "name": "_same_file_elsewhere",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4927,
+          "name": "_add_mcp",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5815,
+          "name": "add",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6370,
+          "name": "_score",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6400,
+          "name": "_pm_fixture",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6216,
+          "name": "_row",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6643,
+          "name": "write",
+          "kind": "FunctionDef"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/lib/__init__.py",
+      "kind": "text",
+      "bytes": 2008,
+      "lines": 47,
+      "sha256": "8a66fe785dd82f85bb08ba806328a5b5a3415fbd6f3b6b238d94659c6c25d8e4",
+      "python_ast": "pass",
+      "definitions": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/lib/emit.py",
+      "kind": "text",
+      "bytes": 39608,
+      "lines": 1043,
+      "sha256": "c8b0afff346347ae2bca5cdd4b178409f58510e9ac38e2b149fe1160e48bf8e2",
+      "python_ast": "pass",
+      "definitions": [
+        {
+          "line": 151,
+          "name": "eprint",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 156,
+          "name": "serialize",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 167,
+          "name": "_coerce",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 178,
+          "name": "warn",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 193,
+          "name": "Timer",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 229,
+          "name": "_resolve_list",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 241,
+          "name": "_auto_trim_keys",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 260,
+          "name": "_average_entry_chars",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 277,
+          "name": "_trim_to_budget",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 349,
+          "name": "_set_truncation_warning",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 373,
+          "name": "_stamp_output_chars",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 390,
+          "name": "emit",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 452,
+          "name": "fail",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 500,
+          "name": "resolve_repo",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 510,
+          "name": "base_parser",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 608,
+          "name": "main_guard",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 649,
+          "name": "compiled_patterns",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 684,
+          "name": "check_regexes",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 708,
+          "name": "selftest_report",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 762,
+          "name": "_selftest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 205,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 210,
+          "name": "__enter__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 214,
+          "name": "__exit__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 218,
+          "name": "elapsed_ms",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 596,
+          "name": "_error",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 660,
+          "name": "consider",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 767,
+          "name": "check",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 974,
+          "name": "_boom",
+          "kind": "FunctionDef"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/lib/scrub.py",
+      "kind": "text",
+      "bytes": 39115,
+      "lines": 1139,
+      "sha256": "0955c5b29e1e167d19a746f4864bb1484a11dd59a7b4df74dc90cb09126a96be",
+      "python_ast": "pass",
+      "definitions": [
+        {
+          "line": 136,
+          "name": "_path_parts",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 144,
+          "name": "secret_path_reason",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 165,
+          "name": "is_secret_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 178,
+          "name": "is_env_file",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 221,
+          "name": "_simple",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 236,
+          "name": "_prefixed",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 251,
+          "name": "_assignment_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 310,
+          "name": "_class_count",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 330,
+          "name": "_looks_like_secret_value",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 368,
+          "name": "_env_assignment_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 388,
+          "name": "_flag_value_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 420,
+          "name": "_aws_secret_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 443,
+          "name": "_hex_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 471,
+          "name": "_base64_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 506,
+          "name": "_base64_padded_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 674,
+          "name": "collapse_home_paths",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 696,
+          "name": "scrub_detailed",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 743,
+          "name": "scrub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 755,
+          "name": "scrub_all",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 771,
+          "name": "scrub_all_detailed",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 793,
+          "name": "redaction_counts",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 801,
+          "name": "make_scrub_stats",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 819,
+          "name": "_selftest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 224,
+          "name": "_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 239,
+          "name": "_factory",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 261,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 379,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 396,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 431,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 452,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 486,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 513,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 823,
+          "name": "check",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 227,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 242,
+          "name": "_sub",
+          "kind": "FunctionDef"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/lib/textnorm.py",
+      "kind": "text",
+      "bytes": 86491,
+      "lines": 2004,
+      "sha256": "83f623fa45fb39743ae7cbbf38df68003a160b9207216f0272fe5d1d25b97ac8",
+      "python_ast": "pass",
+      "definitions": [
+        {
+          "line": 144,
+          "name": "_has_digit",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 151,
+          "name": "_hexish_sub",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 156,
+          "name": "normalize",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 193,
+          "name": "tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 200,
+          "name": "jaccard",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 212,
+          "name": "count_tokens_estimate",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 312,
+          "name": "_filter_tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 337,
+          "name": "_trim_edges",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 347,
+          "name": "skeleton",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 413,
+          "name": "stem",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 448,
+          "name": "_undouble",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 472,
+          "name": "_key_from_skeleton",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 488,
+          "name": "shape_key",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 505,
+          "name": "_coerce_item",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 540,
+          "name": "_cluster_id",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 551,
+          "name": "_example_text",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 558,
+          "name": "cluster",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 796,
+          "name": "_intent_text",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 926,
+          "name": "_has_action_verb",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 942,
+          "name": "_meta_topic_prepared",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 953,
+          "name": "meta_topic",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 972,
+          "name": "_is_social",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 982,
+          "name": "classify_intent",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1103,
+          "name": "_classify_correction",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1120,
+          "name": "_score_kind",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1175,
+          "name": "is_directive_sentence",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1197,
+          "name": "detect_correction",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1261,
+          "name": "_truncate_sentence",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1354,
+          "name": "_normalize_command_tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1398,
+          "name": "_strip_request_lead_in",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1421,
+          "name": "_command_from_candidate",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1491,
+          "name": "extract_commands",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1610,
+          "name": "_build_alias_index",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1632,
+          "name": "_context_ok",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1638,
+          "name": "find_services",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1678,
+          "name": "find_services_names",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1688,
+          "name": "_selftest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1689,
+          "name": "check",
+          "kind": "FunctionDef"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/mine_git.py",
+      "kind": "text",
+      "bytes": 120679,
+      "lines": 2955,
+      "sha256": "41cc5da04794839053b97afd6cf0c5a69570397a892071f721f93e1de24d4143",
+      "python_ast": "pass",
+      "definitions": [
+        {
+          "line": 329,
+          "name": "GitSafetyError",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 535,
+          "name": "_norm_author_name",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 539,
+          "name": "_name_forms",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 553,
+          "name": "classify_author",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 596,
+          "name": "partition_commits",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 668,
+          "name": "empty_authorship",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 679,
+          "name": "analyze_authorship",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 754,
+          "name": "_child_env",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 792,
+          "name": "_run",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 840,
+          "name": "_assert_read_only",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 876,
+          "name": "_git",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 890,
+          "name": "_gh",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 910,
+          "name": "_first_line",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 919,
+          "name": "_clean",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 932,
+          "name": "_looks_like_missing_object",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 937,
+          "name": "_config_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 963,
+          "name": "detect_partial_clone",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1025,
+          "name": "plan_log_pass",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1036,
+          "name": "_log_args",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1057,
+          "name": "_warn_path_only",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1082,
+          "name": "_unquote_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1095,
+          "name": "_resolve_rename",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1108,
+          "name": "_parse_numstat_line",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1123,
+          "name": "_safe_int",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1130,
+          "name": "_parse_path_only_line",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1155,
+          "name": "_parse_log",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1206,
+          "name": "_is_lockfile",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1210,
+          "name": "_is_generated",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1221,
+          "name": "_is_binary_asset",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1226,
+          "name": "_is_noise_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1231,
+          "name": "_is_test_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1242,
+          "name": "_dir_depth2",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1256,
+          "name": "_day",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1270,
+          "name": "_span",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1281,
+          "name": "_exists_checker",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1318,
+          "name": "_median",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1328,
+          "name": "_pct",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1334,
+          "name": "_strip_prefixes",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1346,
+          "name": "_looks_imperative",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1369,
+          "name": "analyze_conventions",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1428,
+          "name": "_rank_pairs",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1432,
+          "name": "_ranked",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1436,
+          "name": "_classify_branch",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1473,
+          "name": "_people_tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1497,
+          "name": "analyze_branch_naming",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1545,
+          "name": "analyze_cochange",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1748,
+          "name": "analyze_hotspots",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1823,
+          "name": "analyze_test_discipline",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1846,
+          "name": "analyze_reverts",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1854,
+          "name": "analyze_contributors",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1888,
+          "name": "_warn_authorship",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1935,
+          "name": "_empty_pr_patterns",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1939,
+          "name": "analyze_pr_patterns",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2056,
+          "name": "empty_window",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2080,
+          "name": "_describe_days",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2084,
+          "name": "_count_commits",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2103,
+          "name": "choose_window",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2212,
+          "name": "empty_payload",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2242,
+          "name": "_find_git_root",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2258,
+          "name": "collect",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2465,
+          "name": "build_parser",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2525,
+          "name": "main",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2572,
+          "name": "selftest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1293,
+          "name": "check",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1477,
+          "name": "absorb",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2591,
+          "name": "add",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2694,
+          "name": "run",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2745,
+          "name": "run_main",
+          "kind": "FunctionDef"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/mine_transcripts.py",
+      "kind": "text",
+      "bytes": 157175,
+      "lines": 3868,
+      "sha256": "09654f65d51d7205bc220ba2b06ba0bb361348f694bdf913e1b590b9eb2d005e",
+      "python_ast": "pass",
+      "definitions": [
+        {
+          "line": 226,
+          "name": "encode_project_dir",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 231,
+          "name": "_dir_bytes",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 249,
+          "name": "_name_tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 253,
+          "name": "_score_candidate",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 297,
+          "name": "_config_home",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 311,
+          "name": "locate_claude_root",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 424,
+          "name": "locate_codex_roots",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 476,
+          "name": "_git_dir",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 517,
+          "name": "repo_git_url",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 562,
+          "name": "normalize_git_url",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 595,
+          "name": "_date_dir_upper_bound",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 626,
+          "name": "list_codex_session_files",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 694,
+          "name": "codex_session_meta",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 726,
+          "name": "is_codex_subagent",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 762,
+          "name": "_meta_git_url",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 771,
+          "name": "_nested_repo_between",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 794,
+          "name": "match_codex_sessions",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 933,
+          "name": "codex_read_order",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 975,
+          "name": "_utc_now",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 980,
+          "name": "_iso_cutoff",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 987,
+          "name": "list_session_files",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1019,
+          "name": "_human_bytes",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1028,
+          "name": "select_sessions",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1104,
+          "name": "_wants",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1121,
+          "name": "_blocks_text",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1147,
+          "name": "_pair",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1151,
+          "name": "_open_ended",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1219,
+          "name": "sentence_around",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1254,
+          "name": "unwrap",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1454,
+          "name": "_is_directed_at_agent",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1472,
+          "name": "is_rule_candidate",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1512,
+          "name": "_is_paste_line",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1519,
+          "name": "prose_prefix",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1646,
+          "name": "_looks_like_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1666,
+          "name": "_strip_repo_prefix",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1698,
+          "name": "_anchored_outside_repo",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1717,
+          "name": "extract_paths",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1821,
+          "name": "mask_profanity",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1828,
+          "name": "_example",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1837,
+          "name": "_date_only",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1843,
+          "name": "_safe",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1854,
+          "name": "Signals",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 2006,
+          "name": "read_claude_session",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2200,
+          "name": "_strip_leading_json",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2227,
+          "name": "unwrap_codex",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2281,
+          "name": "_turn_key",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2292,
+          "name": "read_codex_session",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2489,
+          "name": "_is_generic",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2521,
+          "name": "_prefer_repeated",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2537,
+          "name": "build_request_shapes",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2582,
+          "name": "_containment_merge",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2615,
+          "name": "build_corrections",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2680,
+          "name": "build_meta_queries",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2756,
+          "name": "build_pain",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2782,
+          "name": "is_doc_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2798,
+          "name": "split_hotspots",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2810,
+          "name": "_counted",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2816,
+          "name": "history_bucket",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2826,
+          "name": "apply_redaction",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2848,
+          "name": "fit_to_cap",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2912,
+          "name": "_mtime_iso",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2923,
+          "name": "_resolve_only_report",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2977,
+          "name": "build_parser",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3042,
+          "name": "main",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3313,
+          "name": "selftest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 862,
+          "name": "_named",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 953,
+          "name": "place",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1855,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1879,
+          "name": "_bump",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1884,
+          "name": "note_slash",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1896,
+          "name": "note_timestamp",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1905,
+          "name": "add_turn",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3330,
+          "name": "add",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3373,
+          "name": "user",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3545,
+          "name": "rec",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3548,
+          "name": "meta",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3553,
+          "name": "uturn",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3561,
+          "name": "event_uturn",
+          "kind": "FunctionDef"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/scripts/verify_artifacts.py",
+      "kind": "text",
+      "bytes": 443388,
+      "lines": 9873,
+      "sha256": "23d184407235d6ac777f75ca5bb0e239f30eb087659d6184eb531ba6af45b071",
+      "python_ast": "pass",
+      "definitions": [
+        {
+          "line": 811,
+          "name": "normalize_target",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 821,
+          "name": "target_profile",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 950,
+          "name": "_short",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 960,
+          "name": "_safe_detail",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 966,
+          "name": "_join_and",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1002,
+          "name": "_normalize_evidence",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1019,
+          "name": "_norm_type",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1029,
+          "name": "_is_json_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1042,
+          "name": "_is_markdown",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1047,
+          "name": "_read_text",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1076,
+          "name": "_strip_inline_comment",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1104,
+          "name": "_unquote",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1116,
+          "name": "_parse_inline_list",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1156,
+          "name": "parse_frontmatter",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1302,
+          "name": "read_toml_scalars",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1378,
+          "name": "find_markers",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1399,
+          "name": "marker_block",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1429,
+          "name": "collect_metadata",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1478,
+          "name": "validate_glob",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1505,
+          "name": "extract_globs",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1601,
+          "name": "_inside_single_quotes",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1617,
+          "name": "_scan_line",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1666,
+          "name": "scan_network_calls",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1732,
+          "name": "minimal_env",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1784,
+          "name": "absolutize_command",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1807,
+          "name": "strip_command_comments",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1824,
+          "name": "build_argv",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1870,
+          "name": "project_dir_vars",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1876,
+          "name": "expand_command",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1888,
+          "name": "split_command",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1895,
+          "name": "resolve_command_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 1958,
+          "name": "run_hook",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2014,
+          "name": "_terminate",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2036,
+          "name": "_mask_placeholders",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2040,
+          "name": "_is_placeholder",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2049,
+          "name": "scan_json_secrets",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2094,
+          "name": "scan_text_secrets",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2388,
+          "name": "_member_hits",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2427,
+          "name": "_heading_label",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2488,
+          "name": "_heading_of",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2499,
+          "name": "_skipped_section",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2538,
+          "name": "_clean_directive",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2549,
+          "name": "_canon_token",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2558,
+          "name": "_subject_tokens",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2577,
+          "name": "_qualifier_of",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2585,
+          "name": "_members_in",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2595,
+          "name": "_polarity_of",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2606,
+          "name": "extract_directives",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2758,
+          "name": "_glob_prefix",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2783,
+          "name": "_glob_pair_overlap",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2793,
+          "name": "scopes_overlap",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2804,
+          "name": "_scope_is_narrower",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2825,
+          "name": "_is_declared_exception",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2830,
+          "name": "_is_aspirational",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2835,
+          "name": "_exempt_pair",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2849,
+          "name": "find_contradictions",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2985,
+          "name": "conventions_from_discovery",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3049,
+          "name": "find_convention_conflicts",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3161,
+          "name": "rule_subtype",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3180,
+          "name": "parse_policy_rules",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3237,
+          "name": "_policy_pattern_of",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3245,
+          "name": "_policy_pattern_readable",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3267,
+          "name": "policy_matches",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3294,
+          "name": "_resolve_codex",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3311,
+          "name": "load_manifest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3364,
+          "name": "load_discovery",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3406,
+          "name": "_repo_relative",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3422,
+          "name": "Verifier",
+          "kind": "ClassDef"
+        },
+        {
+          "line": 7729,
+          "name": "_settings_hook_commands",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 7758,
+          "name": "build_parser",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 7824,
+          "name": "main",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 8298,
+          "name": "selftest",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2057,
+          "name": "_visit",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 2860,
+          "name": "pair_key",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3008,
+          "name": "note",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3017,
+          "name": "scan",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3423,
+          "name": "__init__",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3473,
+          "name": "add",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3503,
+          "name": "warn",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3506,
+          "name": "rel",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3512,
+          "name": "display",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3519,
+          "name": "inside_repo",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3526,
+          "name": "exec_enabled",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3535,
+          "name": "_index_generated_paths",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3551,
+          "name": "is_generated_by_this_run",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3560,
+          "name": "_ensure_fixture",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3567,
+          "name": "cleanup_fixture",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3583,
+          "name": "run",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3651,
+          "name": "_prepare_artifacts",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3728,
+          "name": "_check_ids_unique",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3751,
+          "name": "_check_names_unique",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3785,
+          "name": "_check_artifact",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3818,
+          "name": "_check_containment",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3854,
+          "name": "_check_exists",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3882,
+          "name": "_check_frontmatter",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3920,
+          "name": "_check_markers",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 3996,
+          "name": "_check_metadata",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4092,
+          "name": "_check_skill",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4122,
+          "name": "_check_subagent",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4187,
+          "name": "_check_subagent_toml",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4258,
+          "name": "_check_rule",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4360,
+          "name": "_check_rule_policy",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4520,
+          "name": "_check_policy_examples",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4618,
+          "name": "_check_policy_execpolicy",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4711,
+          "name": "_check_hook",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4826,
+          "name": "_check_hook_network",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4905,
+          "name": "_locate",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4930,
+          "name": "_existing_skill_dir",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4939,
+          "name": "_check_core_set",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5043,
+          "name": "_check_settings_json",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5131,
+          "name": "_check_committed_clean",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5201,
+          "name": "_check_plugin_paths",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5277,
+          "name": "_check_mcp_json",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5317,
+          "name": "_check_mcp_toml",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5376,
+          "name": "_check_mcp_secrets",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5399,
+          "name": "_check_rule_contradictions",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5504,
+          "name": "_index_doc_texts",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5552,
+          "name": "_check_rule_wired",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5678,
+          "name": "_git_hook_dirs",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5733,
+          "name": "_hook_registration_sources",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5801,
+          "name": "_user_registry_paths",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5817,
+          "name": "_check_hook_wired",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5866,
+          "name": "_check_git_hook_wired",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 5936,
+          "name": "_check_settings_hook_wired",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6022,
+          "name": "_check_evidence_match",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6084,
+          "name": "_undo_key",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6097,
+          "name": "_check_undo_record",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6222,
+          "name": "_dir_empties_on_undo",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6260,
+          "name": "_expected_created_dirs",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6296,
+          "name": "_check_created_dirs",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6429,
+          "name": "_git_read",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6479,
+          "name": "_git_usable",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6496,
+          "name": "_branch_contents",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6524,
+          "name": "_worktree_matches",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6545,
+          "name": "_check_committed_worktree",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6594,
+          "name": "_uninstall_mechanism",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6633,
+          "name": "_is_merged_json",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6658,
+          "name": "_op_path",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6671,
+          "name": "_operands",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6696,
+          "name": "_removal_section",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6735,
+          "name": "_parse_removal_ops",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6896,
+          "name": "_under",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6900,
+          "name": "_order_problems",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 7163,
+          "name": "_unmerge_handles",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 7195,
+          "name": "_check_uninstall",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 7712,
+          "name": "payload",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 8311,
+          "name": "add",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 8340,
+          "name": "run_main",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 4949,
+          "name": "labels",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6753,
+          "name": "note_placeholder",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6758,
+          "name": "new_op",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6776,
+          "name": "take",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6940,
+          "name": "note",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 6948,
+          "name": "defer",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 7207,
+          "name": "emit",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 7670,
+          "name": "compose",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 8482,
+          "name": "worst",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 8490,
+          "name": "verify",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9443,
+          "name": "fake_git",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9526,
+          "name": "block_save",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9533,
+          "name": "block_marker",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9538,
+          "name": "block_unmerge",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9545,
+          "name": "block_close",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9579,
+          "name": "write_report",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9589,
+          "name": "saw",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9445,
+          "name": "_read",
+          "kind": "FunctionDef"
+        },
+        {
+          "line": 9552,
+          "name": "step",
+          "kind": "FunctionDef"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/codex-agent.toml.tmpl",
+      "kind": "text",
+      "bytes": 9364,
+      "lines": 163,
+      "sha256": "3af795114e36c89feec91df3f7b083e2a37dbf5651002e6a5de1138b3e6f1661",
+      "headings": [
+        {
+          "line": 60,
+          "text": "# agentify-id: {{AGENTIFY_ID}}"
+        },
+        {
+          "line": 61,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 62,
+          "text": "# agentify-generated: {{GENERATED_DATE}}"
+        },
+        {
+          "line": 63,
+          "text": "# agentify-evidence: {{EVIDENCE_LINE}}"
+        },
+        {
+          "line": 64,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 66,
+          "text": "# {{SUBAGENT_TITLE}}"
+        },
+        {
+          "line": 67,
+          "text": "# Remove: delete this file. Nothing else points at it."
+        },
+        {
+          "line": 103,
+          "text": "# Role"
+        },
+        {
+          "line": 112,
+          "text": "# Scope boundaries"
+        },
+        {
+          "line": 133,
+          "text": "# Method"
+        },
+        {
+          "line": 145,
+          "text": "# Output contract"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/codex-hook.sh.tmpl",
+      "kind": "text",
+      "bytes": 17856,
+      "lines": 381,
+      "sha256": "63801907554843cbd793079ff3cd8a0301e9131b4505d1609639478251ffd4b9",
+      "headings": [
+        {
+          "line": 2,
+          "text": "# agentify-id: {{AGENTIFY_ID}}"
+        },
+        {
+          "line": 3,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 4,
+          "text": "# agentify-generated: {{GENERATED_DATE}}"
+        },
+        {
+          "line": 5,
+          "text": "# agentify-evidence: {{EVIDENCE_LINE}}"
+        },
+        {
+          "line": 6,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 8,
+          "text": "# {{HOOK_TITLE}}"
+        },
+        {
+          "line": 10,
+          "text": "# Event:   {{HOOK_EVENT}}"
+        },
+        {
+          "line": 11,
+          "text": "#          (PreToolUse | PermissionRequest | PostToolUse | PreCompact | PostCompact |"
+        },
+        {
+          "line": 12,
+          "text": "#           SessionStart | SessionEnd | UserPromptSubmit | SubagentStart | SubagentStop |"
+        },
+        {
+          "line": 13,
+          "text": "#           Stop | Interrupt)"
+        },
+        {
+          "line": 14,
+          "text": "# Matcher: {{HOOK_MATCHER}}     regex over the CODEX tool name \u2014 not Claude Code's vocabulary"
+        },
+        {
+          "line": 15,
+          "text": "# Wired by: .codex/hooks.json \u2014 see codex-hooks.json.tmpl for the fragment and the merge"
+        },
+        {
+          "line": 16,
+          "text": "#           procedure. This file does nothing until that fragment is merged, and it does not run"
+        },
+        {
+          "line": 17,
+          "text": "#           until you trust it: run /hooks in Codex. Installed is not armed."
+        },
+        {
+          "line": 19,
+          "text": "# Contract (adapters/codex.md \u00a74.3)"
+        },
+        {
+          "line": 20,
+          "text": "#   stdin  one JSON event object: tool_name, tool_input, cwd, session_id, hook_event_name, \u2026"
+        },
+        {
+          "line": 21,
+          "text": "#   stdout the decision, as JSON. Blocking is"
+        },
+        {
+          "line": 22,
+          "text": "#            {\"hookSpecificOutput\":{\"hookEventName\":\"\u2026\",\"permissionDecision\":\"deny\","
+        },
+        {
+          "line": 23,
+          "text": "#             \"permissionDecisionReason\":\"\u2026\"}}"
+        },
+        {
+          "line": 24,
+          "text": "#          and permissionDecisionReason is the text the MODEL acts on \u2014 write it as an"
+        },
+        {
+          "line": 25,
+          "text": "#          instruction (\"Run: bun install\"), never as a log line."
+        },
+        {
+          "line": 26,
+          "text": "#   exit   ALWAYS 0. Codex documents 0 and 2 (2 blocks with stderr as the reason); the meaning of"
+        },
+        {
+          "line": 27,
+          "text": "#          every other status is undocumented, so this script never returns one. Silence plus"
+        },
+        {
+          "line": 28,
+          "text": "#          exit 0 is \"allow\"."
+        },
+        {
+          "line": 30,
+          "text": "# Budget: under 2 seconds, enforced by CHECK_TIMEOUT_S below. This runs on every matching tool"
+        },
+        {
+          "line": 31,
+          "text": "# call, so a slow check taxes every single edit. The wiring also sets an explicit timeout of 5 \u2014"
+        },
+        {
+          "line": 32,
+          "text": "# without one Codex waits 600 seconds."
+        },
+        {
+          "line": 34,
+          "text": "# Fail open: any internal problem \u2014 malformed stdin, no python3, missing tool, timeout \u2014 prints"
+        },
+        {
+          "line": 35,
+          "text": "# nothing and exits 0. A guard that breaks the session is worse than a guard that misses a"
+        },
+        {
+          "line": 36,
+          "text": "# violation. Only a check that ran to completion and found a real violation denies."
+        },
+        {
+          "line": 38,
+          "text": "# This script does not modify, move, or delete any file, and makes no network call."
+        },
+        {
+          "line": 86,
+          "text": "# `set -e` must never turn an internal error into a non-zero exit: that is an undocumented status"
+        },
+        {
+          "line": 87,
+          "text": "# on this target. Anything unexpected leaves quietly, allowing the work through."
+        },
+        {
+          "line": 92,
+          "text": "# The block message, verbatim. The delimiter is quoted, so NOTHING inside this heredoc is expanded"
+        },
+        {
+          "line": 93,
+          "text": "# by the shell \u2014 a backtick, a $VAR or a $(command) in the text stays text. The one rule when"
+        },
+        {
+          "line": 94,
+          "text": "# filling it: no line of the message may be the delimiter word on its own."
+        },
+        {
+          "line": 101,
+          "text": "# Hooks are invoked from whatever cwd the session happens to have. Codex exports no project-root"
+        },
+        {
+          "line": 102,
+          "text": "# variable \u2014 there is no $CLAUDE_PROJECT_DIR here \u2014 so resolve the repo root from git, which is"
+        },
+        {
+          "line": 103,
+          "text": "# the same idiom the wiring uses in the hook's command path."
+        },
+        {
+          "line": 107,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 108,
+          "text": "# Read the trigger payload. Empty or unreadable stdin means nothing to judge."
+        },
+        {
+          "line": 109,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 113,
+          "text": "# python3 is already required by agentify, so it is safe to parse with. jq is not assumed."
+        },
+        {
+          "line": 116,
+          "text": "# json_get <dotted.path> \u2014 prints the value, or nothing if absent. Never fails."
+        },
+        {
+          "line": 138,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 139,
+          "text": "# Extract the command and the touched file paths from `tool_input`."
+        },
+        {
+          "line": 141,
+          "text": "# `tool_input` is typed `true` \u2014 i.e. ANY \u2014 in Codex's own pre-tool-use /"
+        },
+        {
+          "line": 142,
+          "text": "# post-tool-use / permission-request JSON schemas, so its shape is whatever the"
+        },
+        {
+          "line": 143,
+          "text": "# tool's arguments were. It is NOT Claude Code's `{file_path: \"...\"}`, and an"
+        },
+        {
+          "line": 144,
+          "text": "# earlier version of this template guessed `tool_input.file_path` with a"
+        },
+        {
+          "line": 145,
+          "text": "# fallback to `tool_input.path`. Neither key exists on any Codex tool. Measured"
+        },
+        {
+          "line": 146,
+          "text": "# over 240 real rollouts in ${CODEX_HOME:-~/.codex}/sessions:"
+        },
+        {
+          "line": 148,
+          "text": "#   apply_patch     1068/1068 calls  a FREEFORM tool: its whole input is the raw"
+        },
+        {
+          "line": 149,
+          "text": "#                                    patch text, starting `*** Begin Patch`."
+        },
+        {
+          "line": 150,
+          "text": "#                                    No object, no file_path, no path. The"
+        },
+        {
+          "line": 151,
+          "text": "#                                    paths live in the envelope headers."
+        },
+        {
+          "line": 152,
+          "text": "#   exec_command    5004/5004 calls  {\"cmd\": \"...\", \"workdir\", ...}. The key is"
+        },
+        {
+          "line": 153,
+          "text": "#                                    `cmd`. `command` does not exist, so the old"
+        },
+        {
+          "line": 154,
+          "text": "#                                    `tool_input.command` read empty here too."
+        },
+        {
+          "line": 155,
+          "text": "#   shell_command    122/122  calls  {\"command\": \"...\", \"workdir\"} \u2014 a string."
+        },
+        {
+          "line": 156,
+          "text": "#   exec            4920/4920 calls  code-mode: input is a JS source string."
+        },
+        {
+          "line": 158,
+          "text": "# The patch envelope is fixed by the binary's own grammar (VERIFIED, read out of"
+        },
+        {
+          "line": 159,
+          "text": "# the Codex bundle): `*** Add File: <path>`, `*** Delete File: <path>`,"
+        },
+        {
+          "line": 160,
+          "text": "# `*** Update File: <path>`, `*** Move to: <path>`. And a patch can carry SEVERAL"
+        },
+        {
+          "line": 161,
+          "text": "# files, which is why this yields a LIST, not a scalar \u2014 filtering on the first"
+        },
+        {
+          "line": 162,
+          "text": "# path only would let an edit to a matching file slip past behind an unmatching"
+        },
+        {
+          "line": 163,
+          "text": "# one."
+        },
+        {
+          "line": 165,
+          "text": "# UNVERIFIED, deliberately, with an exit condition: how Codex serialises a"
+        },
+        {
+          "line": 166,
+          "text": "# freeform tool's input INTO the `tool_input` field \u2014 as the bare string, or"
+        },
+        {
+          "line": 167,
+          "text": "# wrapped as {\"input\": \"...\"} \u2014 was not established from the bundle or the"
+        },
+        {
+          "line": 168,
+          "text": "# rollouts, both of which record the model-facing call rather than the hook"
+        },
+        {
+          "line": 169,
+          "text": "# payload. Both spellings are handled below, plus the argv form"
+        },
+        {
+          "line": 170,
+          "text": "# {\"command\": [\"apply_patch\", \"<patch>\"]} that the function-typed apply_patch"
+        },
+        {
+          "line": 171,
+          "text": "# uses. To settle it: run a PreToolUse hook that does `cat > /tmp/payload.json`"
+        },
+        {
+          "line": 172,
+          "text": "# and read the file. When it is settled, delete the branches that did not fire."
+        },
+        {
+          "line": 174,
+          "text": "# What is NOT handled is handled LOUDLY: an unrecognised shape prints a"
+        },
+        {
+          "line": 175,
+          "text": "# diagnostic to stderr and lets the check run UNFILTERED rather than skipping"
+        },
+        {
+          "line": 176,
+          "text": "# it. A guardrail that quietly matches nothing is the failure this comment"
+        },
+        {
+          "line": 177,
+          "text": "# block exists to prevent."
+        },
+        {
+          "line": 178,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 206,
+          "text": "# Some transports double-encode: a JSON object arriving as a JSON string."
+        },
+        {
+          "line": 276,
+          "text": "# The first touched path, for a {{CHECK_COMMAND}} that takes one file. Use"
+        },
+        {
+          "line": 277,
+          "text": "# \"$FILE_PATHS\" (newline-separated) when the check can take several."
+        },
+        {
+          "line": 280,
+          "text": "# deny <reason> [check output] \u2014 the only blocking primitive. Exits 0; the reason reaches the"
+        },
+        {
+          "line": 281,
+          "text": "# model. Both arguments are passed to python3 as ARGUMENTS, never spliced into code, and python3"
+        },
+        {
+          "line": 282,
+          "text": "# does the JSON escaping \u2014 so a reason containing quotes, newlines or backticks cannot break the"
+        },
+        {
+          "line": 283,
+          "text": "# protocol or run anything. No python3, no JSON, no decision: the work is allowed through."
+        },
+        {
+          "line": 304,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 305,
+          "text": "# Filters. Every early exit here is a tool call this hook costs nothing on."
+        },
+        {
+          "line": 306,
+          "text": "# The wiring's regex matcher is permissive on purpose; this is the real filter."
+        },
+        {
+          "line": 307,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 313,
+          "text": "# A patch can touch several files, so this matches if ANY touched path matches."
+        },
+        {
+          "line": 337,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 338,
+          "text": "# The check."
+        },
+        {
+          "line": 339,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 343,
+          "text": "# run_check must return 0 when clean and 1 when it found a real violation. Any other status is"
+        },
+        {
+          "line": 344,
+          "text": "# treated as \"the check could not run\" and lets the work through."
+        },
+        {
+          "line": 353,
+          "text": "# run_guarded <command...> \u2014 runs with a hard time budget, no dependency on timeout(1),"
+        },
+        {
+          "line": 354,
+          "text": "# which is absent on stock macOS."
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/codex-hooks.json.tmpl",
+      "kind": "text",
+      "bytes": 10901,
+      "lines": 173,
+      "sha256": "9284f99c6219952b4f27139100cff547806af4394f973ac1499494ea865426dc",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/codex-mcp.toml.tmpl",
+      "kind": "text",
+      "bytes": 10811,
+      "lines": 151,
+      "sha256": "4b334a682d85ed2d3bb49630bdea9d085c0d056d2beb7481782c49251bda52e4",
+      "headings": [
+        {
+          "line": 95,
+          "text": "# agentify-id: {{AGENTIFY_ID}}"
+        },
+        {
+          "line": 96,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 97,
+          "text": "# agentify-generated: {{GENERATED_DATE}}"
+        },
+        {
+          "line": 98,
+          "text": "# agentify-evidence: {{EVIDENCE_LINE}}"
+        },
+        {
+          "line": 99,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 101,
+          "text": "# DRAFT \u2014 not authenticated, not yet working. agentify wrote the shape; you supply the access."
+        },
+        {
+          "line": 103,
+          "text": "# What to do with this file:"
+        },
+        {
+          "line": 104,
+          "text": "#   1. Create the credential \u2014 {{CREDENTIAL_CREATION_STEP}}"
+        },
+        {
+          "line": 105,
+          "text": "#   2. Export it in your shell as {{CREDENTIAL_ENV_VAR}}, or add it to the gitignored env file"
+        },
+        {
+          "line": 106,
+          "text": "#      this repo already uses. Do not paste it into any config file \u2014 the key below takes the"
+        },
+        {
+          "line": 107,
+          "text": "#      variable's NAME and Codex reads the value from the environment at launch."
+        },
+        {
+          "line": 108,
+          "text": "#   3. Confirm it is set, without printing it:"
+        },
+        {
+          "line": 109,
+          "text": "#        printenv {{CREDENTIAL_ENV_VAR}} >/dev/null && echo set || echo missing"
+        },
+        {
+          "line": 110,
+          "text": "#   4. Append the block below to <repo>/.codex/config.toml (create the file if it is absent)."
+        },
+        {
+          "line": 111,
+          "text": "#      Append it whole, header line included, at the END of the file. Never paste a bare"
+        },
+        {
+          "line": 112,
+          "text": "#      key/value pair into an existing file: it binds to whatever [table] precedes it."
+        },
+        {
+          "line": 113,
+          "text": "#   5. Confirm the config still parses: `codex --strict-config app-server` \u2014 it validates and"
+        },
+        {
+          "line": 114,
+          "text": "#      exits before any auth or model call."
+        },
+        {
+          "line": 115,
+          "text": "#   6. Restart Codex, then ask for something only this server can answer:"
+        },
+        {
+          "line": 116,
+          "text": "#        {{SMOKE_TEST_PROMPT}}"
+        },
+        {
+          "line": 117,
+          "text": "#   7. Scope check before you finish: {{PERMISSION_SCOPE_NOTE}}"
+        },
+        {
+          "line": 119,
+          "text": "# Remove: delete the [mcp_servers.{{SERVER_NAME}}] block from <repo>/.codex/config.toml, and"
+        },
+        {
+          "line": 120,
+          "text": "# delete this draft. If it was the only table you added, the file can go entirely."
+        },
+        {
+          "line": 122,
+          "text": "# Not this file's job: the user-global ${CODEX_HOME}/config.toml is yours and agentify never"
+        },
+        {
+          "line": 123,
+          "text": "# touches it. If you"
+        },
+        {
+          "line": 124,
+          "text": "# want this server available in every repo, move the block there yourself."
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/codex-plugin.json.tmpl",
+      "kind": "text",
+      "bytes": 7161,
+      "lines": 56,
+      "sha256": "59e63b629fac6dc743d0979a0543f58bdbc6a6ee4a3559a6985a680c101d5b08",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/codex-rules.rules.tmpl",
+      "kind": "text",
+      "bytes": 8664,
+      "lines": 123,
+      "sha256": "855554a9b855e93f876b9f1a2383eac28fd0b0b0123dc59592c7685bd7dee58e",
+      "headings": [
+        {
+          "line": 76,
+          "text": "# agentify-id: {{AGENTIFY_ID}}"
+        },
+        {
+          "line": 77,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 78,
+          "text": "# agentify-generated: {{GENERATED_DATE}}"
+        },
+        {
+          "line": 79,
+          "text": "# agentify-evidence: {{EVIDENCE_LINE}}"
+        },
+        {
+          "line": 80,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 82,
+          "text": "# Codex command policy for {{REPO_NAME}}."
+        },
+        {
+          "line": 83,
+          "text": "# Most restrictive wins when several rules match. Prefix matching only \u2014 see the plan for what"
+        },
+        {
+          "line": 84,
+          "text": "# each rule does not cover."
+        },
+        {
+          "line": 85,
+          "text": "# Remove: delete this file. Nothing else points at it, and nothing else in .codex/rules/ is"
+        },
+        {
+          "line": 86,
+          "text": "# agentify's."
+        },
+        {
+          "line": 87,
+          "text": "# Check one command against this file:"
+        },
+        {
+          "line": 88,
+          "text": "#   codex execpolicy check --pretty --rules .codex/rules/agentify.rules -- {{EXAMPLE_COMMAND}}"
+        },
+        {
+          "line": 92,
+          "text": "# rule: {{RULE_1_ID}}"
+        },
+        {
+          "line": 93,
+          "text": "# evidence: {{RULE_1_EVIDENCE}}"
+        },
+        {
+          "line": 115,
+          "text": "# rule: {{RULE_2_ID}}"
+        },
+        {
+          "line": 116,
+          "text": "# evidence: {{RULE_2_EVIDENCE}}"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/hook.sh.tmpl",
+      "kind": "text",
+      "bytes": 8183,
+      "lines": 180,
+      "sha256": "12f12ec8d0f1b67e0861dab929c7e4a5c0c8651ff3a1c5994566a61425a59366",
+      "headings": [
+        {
+          "line": 2,
+          "text": "# agentify-id: {{AGENTIFY_ID}}"
+        },
+        {
+          "line": 3,
+          "text": "# agentify-version: 1"
+        },
+        {
+          "line": 4,
+          "text": "# agentify-generated: {{GENERATED_DATE}}"
+        },
+        {
+          "line": 5,
+          "text": "# agentify-evidence: {{EVIDENCE_LINE}}"
+        },
+        {
+          "line": 6,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 8,
+          "text": "# {{HOOK_TITLE}}"
+        },
+        {
+          "line": 10,
+          "text": "# Target:  Claude Code. The Codex hook script is a different file, codex-hook.sh.tmpl."
+        },
+        {
+          "line": 11,
+          "text": "# Event:   {{HOOK_EVENT}}     (PreToolUse | PostToolUse | UserPromptSubmit | Stop | SessionStart)"
+        },
+        {
+          "line": 12,
+          "text": "# Matcher: {{HOOK_MATCHER}}   regex over CLAUDE CODE tool names (Bash, Edit, Write, MultiEdit)"
+        },
+        {
+          "line": 13,
+          "text": "# Wired by: .claude/settings.json \u2014 see settings-hooks.json.tmpl for the fragment and the"
+        },
+        {
+          "line": 14,
+          "text": "#           merge procedure. This file does nothing until that fragment is merged."
+        },
+        {
+          "line": 16,
+          "text": "# Contract"
+        },
+        {
+          "line": 17,
+          "text": "#   stdin  one JSON object describing the tool call (or prompt) that triggered the hook"
+        },
+        {
+          "line": 18,
+          "text": "#   exit 0 allow. Anything on stderr is diagnostic only."
+        },
+        {
+          "line": 19,
+          "text": "#   exit 2 block. stderr is shown to the agent as the reason, so stderr must say what to do next."
+        },
+        {
+          "line": 20,
+          "text": "#   other  the harness treats it as a non-blocking error; this script never returns one on purpose."
+        },
+        {
+          "line": 22,
+          "text": "# Budget: under 2 seconds, enforced by CHECK_TIMEOUT_S below. This runs on every matching tool"
+        },
+        {
+          "line": 23,
+          "text": "# call, so a slow check taxes every single edit."
+        },
+        {
+          "line": 25,
+          "text": "# Fail open: any internal problem \u2014 malformed stdin, no python3, missing tool, timeout \u2014 exits 0"
+        },
+        {
+          "line": 26,
+          "text": "# and lets the work through. A guard that breaks the session is worse than a guard that misses a"
+        },
+        {
+          "line": 27,
+          "text": "# violation. Only a check that ran to completion and found a real violation blocks."
+        },
+        {
+          "line": 29,
+          "text": "# This script does not modify, move, or delete any file."
+        },
+        {
+          "line": 60,
+          "text": "# The block message and its fix, verbatim. The heredoc delimiter is quoted, so NOTHING inside is"
+        },
+        {
+          "line": 61,
+          "text": "# expanded by the shell \u2014 a backtick, a $VAR or a $(command) in the text stays text. One rule when"
+        },
+        {
+          "line": 62,
+          "text": "# filling it: no line of the message may be the delimiter word on its own."
+        },
+        {
+          "line": 69,
+          "text": "# Hooks are invoked from the session's cwd. Prefer the harness's project root; fall back to the"
+        },
+        {
+          "line": 70,
+          "text": "# git root, which is the same idiom the Codex wiring uses, so this line stays correct if the"
+        },
+        {
+          "line": 71,
+          "text": "# script is ever copied to a target that exports no project-directory variable. Bare `cd .` is"
+        },
+        {
+          "line": 72,
+          "text": "# not a fallback: it silently runs the check against whatever directory the session happened to"
+        },
+        {
+          "line": 73,
+          "text": "# be in."
+        },
+        {
+          "line": 77,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 78,
+          "text": "# Read the trigger payload. Empty or unreadable stdin means nothing to judge."
+        },
+        {
+          "line": 79,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 83,
+          "text": "# python3 is already required by agentify, so it is safe to parse with. jq is not assumed."
+        },
+        {
+          "line": 86,
+          "text": "# json_get <dotted.path> \u2014 prints the value, or nothing if absent. Never fails."
+        },
+        {
+          "line": 110,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 111,
+          "text": "# Filters. Every early exit here is a tool call this hook costs nothing on."
+        },
+        {
+          "line": 112,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 125,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 126,
+          "text": "# The check."
+        },
+        {
+          "line": 127,
+          "text": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "line": 131,
+          "text": "# run_check must exit 0 when clean and 1 when it found a real violation. Any other exit status is"
+        },
+        {
+          "line": 132,
+          "text": "# treated as \"the check could not run\" and lets the work through."
+        },
+        {
+          "line": 141,
+          "text": "# run_guarded <command...> \u2014 runs with a hard time budget, no dependency on timeout(1),"
+        },
+        {
+          "line": 142,
+          "text": "# which is absent on stock macOS."
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/index-doc-section.md.tmpl",
+      "kind": "text",
+      "bytes": 12185,
+      "lines": 205,
+      "sha256": "2afb94bbafb77b239a1fa2c6ad86936af4a65e0f9abb70ceeff1453baa97973f",
+      "headings": [
+        {
+          "line": 83,
+          "text": "## Agentic setup"
+        },
+        {
+          "line": 97,
+          "text": "### How work moves here"
+        },
+        {
+          "line": 110,
+          "text": "### Subagents"
+        },
+        {
+          "line": 121,
+          "text": "### Skills"
+        },
+        {
+          "line": 133,
+          "text": "### Rules"
+        },
+        {
+          "line": 148,
+          "text": "### Guardrails"
+        },
+        {
+          "line": 163,
+          "text": "### Connected services"
+        },
+        {
+          "line": 173,
+          "text": "### Working with this repo"
+        },
+        {
+          "line": 182,
+          "text": "### Removing this"
+        }
+      ],
+      "release_placeholder_lines": [
+        203
+      ]
+    },
+    {
+      "path": "skills/agentify/templates/mcp.json.tmpl",
+      "kind": "text",
+      "bytes": 5022,
+      "lines": 56,
+      "sha256": "8498edfc71a1aa6be3881656d7bdc1bf0a73b0947e22bfb71e15d7a6e6419173",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/plugin.json.tmpl",
+      "kind": "text",
+      "bytes": 4113,
+      "lines": 55,
+      "sha256": "7573b4d3ec6db386ce8b502943cac2a1868889faa1842b1a9260d70d4899e700",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/rule.md.tmpl",
+      "kind": "text",
+      "bytes": 6477,
+      "lines": 104,
+      "sha256": "f4ec049168f3c1723f13371f749a85618ab2a6749b56d8524b9fe13f9883a347",
+      "headings": [
+        {
+          "line": 68,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 71,
+          "text": "# {{RULE_TITLE}}"
+        },
+        {
+          "line": 84,
+          "text": "## Why"
+        },
+        {
+          "line": 88,
+          "text": "## Evidence"
+        },
+        {
+          "line": 92,
+          "text": "## Correct"
+        },
+        {
+          "line": 98,
+          "text": "## Incorrect"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/settings-hooks.json.tmpl",
+      "kind": "text",
+      "bytes": 5245,
+      "lines": 95,
+      "sha256": "5f99839e1434c6bfc18eabe626c6fca6c78e2e26862141ac651c2e73072a3e8e",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/settings-permissions.json.tmpl",
+      "kind": "text",
+      "bytes": 8008,
+      "lines": 172,
+      "sha256": "4ddc37a6d5bd33f97df95b85de4bb0cb9a5a3e4cc4418f9e5a48a85f33cd5301",
+      "headings": [],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/skill.md.tmpl",
+      "kind": "text",
+      "bytes": 9922,
+      "lines": 172,
+      "sha256": "3a26ac37ce0c3c0937d03ab820faecb35c4a0d572e1443549e7c4f2bb7c30b60",
+      "headings": [
+        {
+          "line": 81,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 84,
+          "text": "# {{SKILL_TITLE}}"
+        },
+        {
+          "line": 88,
+          "text": "## When to use"
+        },
+        {
+          "line": 97,
+          "text": "## When not to use"
+        },
+        {
+          "line": 105,
+          "text": "## Inputs"
+        },
+        {
+          "line": 121,
+          "text": "## Steps"
+        },
+        {
+          "line": 132,
+          "text": "## Verification"
+        },
+        {
+          "line": 150,
+          "text": "## Failure modes"
+        },
+        {
+          "line": 160,
+          "text": "## References"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "skills/agentify/templates/subagent.md.tmpl",
+      "kind": "text",
+      "bytes": 5793,
+      "lines": 115,
+      "sha256": "16686b0bc0444a865c78d9703ae868ceebd757125eaabbf6962b73977ebaec49",
+      "headings": [
+        {
+          "line": 52,
+          "text": "# Safe to delete or edit. This work was brought to you by Agentic Studio."
+        },
+        {
+          "line": 55,
+          "text": "# Role"
+        },
+        {
+          "line": 64,
+          "text": "# Scope boundaries"
+        },
+        {
+          "line": 84,
+          "text": "# Method"
+        },
+        {
+          "line": 96,
+          "text": "# Output contract"
+        }
+      ],
+      "release_placeholder_lines": []
+    },
+    {
+      "path": "test-repos.md",
+      "kind": "text",
+      "bytes": 13843,
+      "lines": 194,
+      "sha256": "e014e8e063eede71867fb128d84005ef00bbaff3c5ba9c43d4aa0afd56b34570",
+      "headings": [
+        {
+          "line": 1,
+          "text": "# Regression repos"
+        },
+        {
+          "line": 9,
+          "text": "## The set"
+        },
+        {
+          "line": 23,
+          "text": "### Fixture 1: fresh repo"
+        },
+        {
+          "line": 37,
+          "text": "### Alternates"
+        },
+        {
+          "line": 41,
+          "text": "## Running the regression"
+        },
+        {
+          "line": 43,
+          "text": "### 0. Set up"
+        },
+        {
+          "line": 75,
+          "text": "### 1. Run the three analyzers"
+        },
+        {
+          "line": 98,
+          "text": "### 1a. Run the selftests first \u2014 they are cheaper than a bad regression run"
+        },
+        {
+          "line": 118,
+          "text": "### 2. Assertions that must hold for every repo"
+        },
+        {
+          "line": 153,
+          "text": "### 3. Run the skill to the plan gate, and stop"
+        },
+        {
+          "line": 164,
+          "text": "### 4. Diff the plan against the expected counts"
+        },
+        {
+          "line": 186,
+          "text": "### 5. Clean up"
+        },
+        {
+          "line": 192,
+          "text": "## Recording results"
+        }
+      ],
+      "release_placeholder_lines": []
+    }
+  ]
+}

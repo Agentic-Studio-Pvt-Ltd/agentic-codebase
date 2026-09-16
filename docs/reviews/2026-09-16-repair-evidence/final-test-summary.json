@@ -1,0 +1,76 @@
+[
+  {
+    "name": "py314-discover-final",
+    "exit": 0,
+    "pass": 84,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py314-mine_git-final",
+    "exit": 0,
+    "pass": 32,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py314-mine_transcripts-final",
+    "exit": 0,
+    "pass": 48,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py314-verify_artifacts-final",
+    "exit": 0,
+    "pass": 119,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py314-regressions-final",
+    "exit": 0,
+    "summary": [
+      "Ran 22 tests in 1.954s",
+      "",
+      "OK"
+    ]
+  },
+  {
+    "name": "py39-discover-final",
+    "exit": 0,
+    "pass": 84,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py39-mine_git-final",
+    "exit": 0,
+    "pass": 32,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py39-mine_transcripts-final",
+    "exit": 0,
+    "pass": 48,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py39-verify_artifacts-final",
+    "exit": 0,
+    "pass": 119,
+    "fail": 0,
+    "warn": 0
+  },
+  {
+    "name": "py39-regressions-final",
+    "exit": 0,
+    "summary": [
+      "Ran 22 tests in 1.757s",
+      "",
+      "OK"
+    ]
+  }
+]

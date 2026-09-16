@@ -167,7 +167,7 @@ table to read a row; the name goes into the report's Check column unchanged.
 | `name_unique` | no two skills, and no two subagents, share a frontmatter `name` | fail |
 | `core_set` | `blueprint.md` §1.3's core set is present in the manifest — at least one skill, `setup-manager`, a reviewer subagent, and with `--discovery` the `db-inspector`, `qa`, analytics and env-leak artifacts the repo's services and frameworks license. **Warn only, on purpose:** a core artifact the user dropped at the gate is a correct outcome, and one the repo already carries under its own `.claude/skills/<name>` or `.claude/agents/` is not flagged; a core artifact the catalogue walk never proposed is the defect this row surfaces (measured 2026-09-07: a 268k-line repo with eight services shipped two skills and no reviewer, designer or analyst, and every other row was green because every other row is about a file that exists) | warn |
 | `skill_frontmatter` | `name` matches the skill directory; `description` is non-empty and under 1024 chars | fail |
-| `subagent_frontmatter` | the subagent's identity, read **in its own format**. Claude Code (`.claude/agents/<name>.md`): `name` and `description` in YAML frontmatter. Codex (`.codex/agents/<name>.toml`): the file is **parsed** with `tomllib` and checked against a **typed** schema — `name`, `description` and `developer_instructions` each present and each a non-empty **string**, `model` / `model_reasoning_effort` / `sandbox_mode` optional strings, and the filename stem equal to `name` (the static contract `codex-agent.toml.tmpl` §10 states). A parse error carries the parser's own message and is a fail: Codex cannot load the agent at all. **Three outcomes on TOML, not two.** `tomllib` is Python 3.11+ and these scripts run on 3.9+, so on **3.9 / 3.10** there is no parser, the row comes back **`unverified`**, and its detail names the interpreter version and the command that would settle it. A definite defect the partial scan still finds — a missing required key — stays a **fail** there, with the unverified note appended so the row is not read as a full verdict; what never happens again is a partial regex scan reported as a parse success. Measured 2026-09-15: four invalid agent files (unterminated string, duplicate key, unterminated table header, bare unquoted value) passed this check while `tomllib` rejected every one. Until 2026-09-05 this asked a TOML file for YAML frontmatter and failed every correct Codex subagent | fail |
+| `subagent_frontmatter` | the subagent's identity, read **in its own format**. Claude Code (`.claude/agents/<name>.md`): `name` and `description` in YAML frontmatter. Codex (`.codex/agents/<name>.toml`): the file is **parsed** with `tomllib` and checked against a **typed** schema — `name`, `description` and `developer_instructions` each present and each a non-empty **string**, `model` / `model_reasoning_effort` / `sandbox_mode` optional strings, and the non-empty agent `name` (filename matching is a generation convention) (the static contract `codex-agent.toml.tmpl` §10 states). A parse error carries the parser's own message and is a fail: Codex cannot load the agent at all. **Three outcomes on TOML, not two.** `tomllib` is Python 3.11+ and these scripts run on 3.9+, so on **3.9 / 3.10** there is no parser, the row comes back **`unverified`**, and its detail names the interpreter version and the command that would settle it. A definite defect the partial scan still finds — a missing required key — stays a **fail** there, with the unverified note appended so the row is not read as a full verdict; what never happens again is a partial regex scan reported as a parse success. Measured 2026-09-15: four invalid agent files (unterminated string, duplicate key, unterminated table header, bare unquoted value) passed this check while `tomllib` rejected every one. Until 2026-09-05 this asked a TOML file for YAML frontmatter and failed every correct Codex subagent | fail |
 | `subagent_tools` | Claude Code: the declared tools look like real tool names (warn). Codex: there is **no per-agent tool allowlist**, so the check is that none was invented (warn if a `tools` key appears, because the restriction is silently lost) and that `sandbox_mode` is not `danger-full-access` (**fail** — a generated agent is never granted it). A pinned `model` is a warn: it goes stale and silently changes the user's session | fail |
 | `rule_scope` | **prose rules only** — `scope` is present and its globs parse | fail |
 | `rule_body` | **prose rules only** — the rule body is not empty | fail |
@@ -818,14 +818,14 @@ with YAML frontmatter. Codex reads `<repo>/.codex/agents/<name>.toml` — TOML w
 optional, and **no per-agent tool allowlist at all**. The static pass reads whichever it is given
 (until 2026-09-05 it asked the TOML file for YAML frontmatter and failed every correct Codex
 subagent); when you judge one by hand, judge it as the format it is. On Codex the static contract
-is: it parses as TOML, the three required keys are present, and the filename stem equals `name`.
+is: it parses as TOML, the three required keys are present, and the `name` identifies the agent (matching the filename is a convention).
 
 **Test — and which half of it runs automatically is a fact about the target, not a preference.**
 Two passes, always in this order.
 
 1. **The static contract, on both targets, always, with no user action.** The identity block parses
    in the format the file actually is; the three required keys are present (Codex) or the YAML
-   frontmatter is well-formed (Claude Code); the filename stem equals `name`; the tool list resolves
+   frontmatter is well-formed (Claude Code); the `name` identifies the agent (matching the filename is a convention); the tool list resolves
    to tools that exist in this environment (Claude Code) or `sandbox_mode` is honest and is not
    `danger-full-access` (Codex); and no description sits so close to another agent's that dispatch
    would be ambiguous. The static pass catches exact name duplicates; the near-duplicate description
@@ -1777,3 +1777,12 @@ passed. Never hand off on the strength of the step-1 row alone.
 block; only the rehearsal compares **bytes**, and a mechanism that is correctly routed can still be
 wrong about what it writes back. `uninstall` failing means stop. `uninstall` passing means the
 rehearsal is now worth running, not that it can be skipped.
+
+### Codex hook fixture interpretation (2026-09-16)
+
+Interpret output using the event-specific protocol in `adapters/codex.md` §4.3. Invalid JSON,
+unsupported decisions and `check did not complete` diagnostics are inconclusive or failures,
+never a passing allow verdict. File-scoped checks use normalized repo-relative paths and run
+once per matched path, including later files in a multi-file patch. Developer regression tests
+render the shipped templates: `python3 -m unittest discover -s tests -v`. These tests are not
+part of a real agentify run and do not establish hook trust or live custom-agent loading.

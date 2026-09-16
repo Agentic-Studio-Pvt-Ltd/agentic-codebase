@@ -802,7 +802,8 @@ For `apply_patch`, parse `tool_input.command` with the patch grammar and collect
 path: `*** Add File:`, `*** Update File:`, `*** Delete File:` and `*** Move to:`. A rename is the
 `Update File:` / `Move to:` **pair** and both sides count. Paths are relative to the session's
 top-level **`cwd`** (older object payloads also carry a per-call `workdir`); resolve against it so a
-repo-root glob still matches a patch authored from a subdirectory, and keep the as-sent spelling too.
+repo-root glob and the file check both refer to the actual touched file. Do not include a cwd-relative
+alias in FILE_PATHS: after changing to the repo root, that alias can name a different file.
 The freeform spelling — `tool_input` being the bare patch string, as the rollouts record it — must
 keep working alongside the documented object form.
 
@@ -815,23 +816,25 @@ most.** A production `PreToolUse` hook on this machine blocks by printing
                           "permissionDecisionReason": "BLOCKED: …use bun, not npm. Run: bun install" } }
 ```
 
-and **exiting 0**. `permissionDecision` accepts `allow` / `deny` / `ask`. Other stdout fields:
-`continue`, `stopReason`, `systemMessage`, `additionalContext`, `decision`, `reason`,
-`suppressOutput`, and per-event `updatedInput` / `updatedPermissions` / `updatedMCPToolOutput`.
-`permissionDecisionReason` is the text the model acts on — **write it as an instruction, not a log
-line.**
+and **exiting 0**. Select the output shape by event; fields are not interchangeable.
 
-Exit codes: **0** = success, stdout parsed as JSON if it parses and otherwise as text (for
-`UserPromptSubmit`, plain-text stdout becomes `additionalContext`); **2** = blocking with stderr as
-the reason (**DOCUMENTED**, the same contract as Claude Code). **Emit the JSON form, not exit 2** —
-it is what production Codex hooks on this machine actually do, and it carries a structured reason.
+| Event | Output for a detected violation |
+|---|---|
+| `PreToolUse` | `hookSpecificOutput` with `hookEventName`, `permissionDecision: "deny"`, and an actionable `permissionDecisionReason` |
+| `PermissionRequest` | `hookSpecificOutput` with `hookEventName` and `decision: {"behavior": "deny", "message": "actionable reason"}` |
+| `PostToolUse` | Top-level `decision: "block"` and `reason`; feedback replaces the result, but cannot undo a completed tool |
+| `UserPromptSubmit`, `Stop`, `SubagentStop` | Top-level `decision: "block"` and `reason`; for stop events this requests continuation. Check `stop_hook_active` to avoid a loop |
+| Other lifecycle events | Notification/context only; use supported event-specific context or `systemMessage`, never a tool permission decision |
 
-> **UNVERIFIED — exit codes other than 0 and 2, and the `SessionEnd` matcher target.** The docs
-> specify only 0 and 2, and their matcher table omits `SessionEnd`. Claude Code treats other non-zero
-> codes as a non-blocking error; whether Codex does is unconfirmed. **What would confirm it:** a hook
-> that exits 1 and 3 in a live session, and a `SessionEnd` hook with a deliberately non-matching
-> matcher. Agentify's generated scripts therefore **only ever exit 0**, and express every decision in
-> JSON.
+`PreToolUse` supports `allow` and `deny`; `ask` is parsed but unsupported and lets the tool
+continue after a hook error. Do not emit `updatedPermissions`, `updatedMCPToolOutput`, or
+`suppressOutput`. Plain-text UserPromptSubmit stdout can add context, but is not a block.
+The template uses JSON and exit 0 for decisions. Tool filters apply only to the three tool events;
+lifecycle hooks without `tool_name` must not be filtered out. Remove the file-path filter from
+hooks without edit input. File checks run on every matched repo-relative path, resolved from the
+event's cwd. A check that fails to execute is inconclusive, never a successful fixture verdict.
+
+Protocol authority: [Codex hooks](https://learn.chatgpt.com/docs/hooks), checked 2026-09-16.
 
 #### A generated hook is INSTALLED, not ACTIVE — the trust gate
 
@@ -1459,9 +1462,9 @@ binary resolves** — say in the report which mode ran.
 | Hooks (config) | `python3 -c "import json;json.load(open('.codex/hooks.json'))"`; then confirm the top-level keys are a subset of `{"description","hooks"}`; then confirm every pre-existing event, group and handler survived the merge | valid JSON; **no unknown top-level key** (one silently disables the whole file, §4.3); nothing pre-existing lost |
 | Hooks (installed) | `test -x "<script>"`; the registration resolves to that script; `hooks.json` parses with a top-level key subset of `{"description","hooks"}`; every `eventName` is one of the 12 spelled events; every `matcher` is anchored and, for a tool-scoped event, contains the canonical name for its intent — `Bash` for shell, `apply_patch` for edits (§4.3) | **this is the pass condition, and it is always reachable.** All four hold ⇒ pass. A shell matcher with no `Bash` alternative is a **fail**, not a warning: it registers and never fires. This is what "the hook is installed" means and it is the strongest claim a first run may make — it says nothing about the hook being loaded or armed. |
 | Hooks (loaded) — **trust-gated** | drive `hooks/list` over the app-server (below), having already read the Project trust row | **Trusted project:** the hook appears with the expected `matcher` and `sourcePath`, `source` is `"project"`, and `warnings` is empty ⇒ pass. Compare `eventName` **case-insensitively** — a hook declared `"PreToolUse"` is reported `"preToolUse"` (measured). **Untrusted or no entry:** `hooks: []`, `warnings: []`, `errors: []` is the **expected** result ⇒ `not tested — project not trusted`, plus needs-you step 1. Never a fail. **`warnings` non-empty in a trusted project** ⇒ fail; it names the offending field, line and column. **In an untrusted project `warnings` is empty even for a file Codex would reject** (measured), so this row can neither confirm nor deny the file's validity there — the Hooks (config) row is the only authority on that. The reason surfaces on the app-server's **stderr**, not in the JSON: capture it and match `Project-local config, hooks, and exec policies are disabled … until the project is trusted`, so the report states which case it was instead of guessing. |
-| Hooks (script) | `test -x "<script>"` → `bash -n "<script>"` → the stdin fixtures below, **including the canonical one** (`"tool_name":"Bash"` for a shell hook, `"tool_name":"apply_patch"` with the patch on `tool_input.command` for a file-scoped one) | executable; syntax valid; benign fixture exits 0 and prints nothing; blocking fixture exits 0 and prints JSON whose `hookSpecificOutput.permissionDecision` is `deny` with an actionable `permissionDecisionReason`; **the canonical fixture produces the same verdict as the legacy spelling** — a hook that denies `exec_command` and allows `Bash` is inert on a current build and is a fail; a file-scoped hook's paths come out of the payload, so the `UNFILTERED` stderr line must not appear |
+| Hooks (script) | `test -x "<script>"` → `bash -n "<script>"` → the stdin fixtures below, **including the canonical one** (`"tool_name":"Bash"` for a shell hook, `"tool_name":"apply_patch"` with the patch on `tool_input.command` for a file-scoped one) | executable; syntax valid; benign fixture exits 0 and prints nothing; blocking fixture exits 0 and prints the event-specific blocking JSON defined in §4.3 with an actionable reason; **the canonical fixture produces the same verdict as the legacy spelling** — a hook that denies `exec_command` and allows `Bash` is inert on a current build and is a fail; a file-scoped hook's paths come out of the payload, so the `UNFILTERED` stderr line must not appear |
 | Skills | `test -f "$REPO/.agents/skills/<n>/SKILL.md"`; frontmatter `name` equals the directory name; `len(description) < 1024`; description contains a trigger phrase traceable to `signals.json`; then drive `skills/list` | static checks pass **and** the skill comes back from `skills/list` with `"scope": "repo"` and the expected `path`. **Not trust-gated either** — measured: an untrusted project's `<repo>/.agents/skills/**` still loads with `"scope":"repo"`, which is why this row asserts `loaded` where the hooks row cannot |
-| Subagents | `test -f "$REPO/.codex/agents/<n>.toml"`; the file parses as TOML if a parser is available, otherwise `name`, `description` and `developer_instructions` are each present at the start of a line; `name` matches the filename stem | static checks pass. **No runtime check exists** (§4.5) — the report must carry the live check as a manual item. |
+| Subagents | `test -f "$REPO/.codex/agents/<n>.toml"`; the file parses as TOML if a parser is available, otherwise `name`, `description` and `developer_instructions` are each present at the start of a line; `name` identifies the agent; matching the filename is a generation convention | static checks pass. **No runtime check exists** (§4.5) — the report must carry the live check as a manual item. |
 | MCP (draft) | `test -f "<plan-dir>/codex-mcp.toml"`; scan with `lib/scrub.py` patterns; every env-var name appears in the report's needs-you list | file exists; **zero scrub hits**; every variable documented. **Never connect, never authenticate.** |
 | MCP / any TOML agentify wrote — syntax | parse it with `python3 -c "import tomllib,sys;tomllib.load(open(sys.argv[1],'rb'))" <file>` | parses ⇒ pass. **Always reachable, and on a first run it is the only TOML check that is** — so it is the pass condition. A parse failure ⇒ restore the pre-write bytes from `pre_existing_sha256` and record a needs-you item. |
 | MCP / any TOML agentify wrote — field names — **trust-gated** | start `"$CODEX" --strict-config app-server` from the repo (the same process the probe below already starts) and send `initialize` | **VERIFIED** on a trusted project: with a valid config it stays alive and answers `initialize`; with an unknown field it exits 1 and prints `Error: <file>:<line>:<col>: unknown configuration field …` on stderr. It makes no model call and needs no auth. **But the repo-scoped `<repo>/.codex/config.toml` is behind the same trust gate as everything else** — measured: with no `[projects]` entry, an unknown field in it does **not** stop the server. So on an untrusted project a clean start proves nothing about the file agentify just wrote: record `not tested — project not trusted` and do **not** report it as validated. A failure in a trusted project ⇒ restore `pre_existing_sha256` and record a needs-you item. |

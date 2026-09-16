@@ -102,6 +102,9 @@ tmp/
 temp/
 .tmp/
 
+# --- Agent worktrees (live git worktrees, disposable, never source) ---
+.claude/worktrees/
+
 # ---------------------------------------------------------------------------
 # Explicitly tracked: agentify's own deliverables.
 # ---------------------------------------------------------------------------

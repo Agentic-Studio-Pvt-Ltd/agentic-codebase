@@ -644,7 +644,7 @@ def list_codex_session_files(roots, days=None, warnings=None):
     skipped_old = 0
     cutoff_epoch = None
     if days and days > 0:
-        cutoff_epoch = (_utc_now() - datetime.timedelta(days=int(days))).timestamp()
+        cutoff_epoch = (_utc_now().replace(tzinfo=datetime.timezone.utc) - datetime.timedelta(days=int(days))).timestamp()
 
     for root in roots or []:
         try:
@@ -992,6 +992,26 @@ def _utc_now():
 # rule 1.
 
 
+def _record_time(value):
+    """Parse a transcript timestamp as UTC; missing or malformed is unknown."""
+    if not isinstance(value, str) or "T" not in value:
+        return None
+    try:
+        moment = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=datetime.timezone.utc)
+        return moment.astimezone(datetime.timezone.utc)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _within_window(timestamp, cutoff):
+    if not cutoff:
+        return True
+    moment, boundary = _record_time(timestamp), _record_time(cutoff)
+    return moment is not None and boundary is not None and moment >= boundary
+
+
 def _iso_cutoff(days):
     """
     The window boundary as an ISO prefix, or None for unbounded consent.
@@ -1065,7 +1085,7 @@ def select_sessions(rows, days, max_sessions, max_bytes, warnings):
 
     cutoff_epoch = None
     if days and days > 0:
-        cutoff_epoch = (_utc_now() - datetime.timedelta(days=int(days))).timestamp()
+        cutoff_epoch = (_utc_now().replace(tzinfo=datetime.timezone.utc) - datetime.timedelta(days=int(days))).timestamp()
 
     used = 0
     for path, mtime, size in rows:
@@ -2097,7 +2117,7 @@ def read_claude_session(path, cutoff_iso, signals, stats):
             if not text:
                 continue
 
-            if cutoff_iso and timestamp and timestamp < cutoff_iso:
+            if not _within_window(timestamp, cutoff_iso):
                 stats["out_of_window"] += 1
                 continue
 
@@ -2342,7 +2362,7 @@ def _turn_key(text):
     return hashlib.sha1(normalized.encode("utf-8", "replace")).hexdigest()
 
 
-def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=None):
+def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=None, fork_time=None):
     """
     Stream one Codex rollout.
 
@@ -2365,11 +2385,9 @@ def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=Non
     this function removes are duplicate REPRESENTATIONS of a turn, so both are
     removed by matching representations pairwise and nothing else:
 
-      cross-stream  the Nth time a text appears in `event_msg` is the copy of
-                    the Nth time it appears in `response_item`.  A fourth
-                    `event_msg` record with only three `response_item` records
-                    behind it is a turn `response_item` did not record, and it
-                    is kept.
+      cross-stream  complete-text matches pair only at nearby timestamps;
+                    undated records additionally require adjacent positions.
+                    Gaps and later repeated requests remain separate turns.
       fork prefix   a fork COPIES its parent's leading turns, in order, so the
                     copies are the child's turns 0..k-1 matching the parent's
                     turns 0..k-1.  Matching is positional and stops at the
@@ -2408,7 +2426,7 @@ def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=Non
         return False
 
     with handle:
-        for raw in handle:
+        for position, raw in enumerate(handle):
             if len(raw) > MAX_LINE_BYTES:
                 # A single line here reached 25 MB on the measured corpus: a
                 # base64 image part, never a request.
@@ -2443,43 +2461,43 @@ def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=Non
                     if isinstance(value, str):
                         parts.append(value)
                 if parts:
-                    primary.append(("\n".join(parts), timestamp))
+                    primary.append(("\n".join(parts), timestamp, position))
             elif kind == "event_msg" and payload_type == "user_message":
                 value = payload.get("message")
                 if isinstance(value, str) and value.strip():
-                    secondary.append((value, timestamp))
+                    secondary.append((value, timestamp, position))
 
-    # Merge the two streams, dropping only the `event_msg` records that pair
-    # one-for-one with a `response_item` record of the same text.  `order` is
-    # the read position, kept as the sort tiebreak so two records written in
-    # the same second stay in the order the file recorded them.
+    # Pair only nearby representations of the same occurrence, never matching
+    # text from different days merely because its ordinal happens to agree.
     merged = []
-    primary_seen = {}
-    order = 0
-    for text, timestamp in primary:
+    candidates = {}
+    for text, timestamp, position in primary:
         key = _turn_key(text)
         if not key:
             continue
-        ordinal = primary_seen.get(key, 0)
-        primary_seen[key] = ordinal + 1
-        merged.append((timestamp or "", order, text, key, ordinal))
-        order += 1
-
-    secondary_seen = {}
-    for text, timestamp in secondary:
+        merged.append((timestamp or "", position, text, key))
+        candidates.setdefault(key, []).append((timestamp, position))
+    for text, timestamp, position in secondary:
         key = _turn_key(text)
         if not key:
             continue
-        ordinal = secondary_seen.get(key, 0)
-        secondary_seen[key] = ordinal + 1
-        if ordinal < primary_seen.get(key, 0):
-            # This occurrence is already present as a `response_item` record:
-            # one turn, its second representation.
+        paired = None
+        for candidate in candidates.get(key, []):
+            moment, other = _record_time(timestamp), _record_time(candidate[0])
+            nearby = abs(position - candidate[1]) <= 2
+            same_time = moment is not None and other is not None and abs((moment-other).total_seconds()) <= 2
+            if same_time or (nearby and not timestamp and not candidate[0]):
+                paired = candidate
+                break
+        if paired is not None:
+            candidates[key].remove(paired)
             continue
-        merged.append((timestamp or "", order, text, key, ordinal))
-        order += 1
-
-    merged.sort(key=lambda row: (row[0], row[1]))
+        merged.append((timestamp or "", position, text, key))
+    merged.sort(key=lambda row: row[1])
+    boundary = _record_time(fork_time)
+    if boundary is None and merged:
+        boundary = _record_time(merged[0][0])
+    occurrences = {}
 
     used = False
     # `diverged` turns the fork comparison off for good at the first turn that
@@ -2487,19 +2505,24 @@ def read_codex_session(path, cutoff_iso, signals, stats, inherited=None, own=Non
     # suppressed.  With no parent there is nothing to compare against.
     diverged = not inherited
     for index, row in enumerate(merged):
-        timestamp, _order, text, key, ordinal = row
+        timestamp, _order, text, key = row
+        ordinal = occurrences.get(key, 0)
+        occurrences[key] = ordinal + 1
         identity = (key, ordinal)
         # Recorded before any filter: a fork inherits its parent's whole turn
         # sequence, including turns this run's consent window excluded.
         if own is not None:
-            own.append(identity)
+            own.append((key, ordinal, timestamp))
         fork_copy = False
         if not diverged:
-            if index < len(inherited) and inherited[index] == identity:
+            parent_turn = inherited[index] if index < len(inherited) else None
+            parent_time = _record_time(parent_turn[2]) if parent_turn and len(parent_turn) > 2 else None
+            if (parent_turn and parent_turn[:2] == identity and boundary is not None
+                    and parent_time is not None and parent_time <= boundary):
                 fork_copy = True
             else:
                 diverged = True
-        if cutoff_iso and timestamp and timestamp[:19] < cutoff_iso:
+        if not _within_window(timestamp, cutoff_iso):
             stats["out_of_window"] += 1
             continue
         if fork_copy:
@@ -3274,7 +3297,7 @@ def main(argv=None):
             parent = meta.get("forked_from_id")
             inherited = keys_by_thread.get(str(parent)) if parent else None
             own = []
-            used = read_codex_session(path, cutoff_iso, signals, stats, inherited, own)
+            used = read_codex_session(path, cutoff_iso, signals, stats, inherited, own, meta.get("timestamp"))
             keys_by_thread[thread_id] = own
             size = sizes.get(path, 0)
             bytes_read += size
@@ -3303,7 +3326,7 @@ def main(argv=None):
     # shown to be inside the window, so under bounded consent it is not read.
     if cutoff_iso and fallback_prompts:
         in_window = [
-            row for row in fallback_prompts if row[2] and row[2][:19] >= cutoff_iso
+            row for row in fallback_prompts if _within_window(row[2], cutoff_iso)
         ]
         outside = len(fallback_prompts) - len(in_window)
         if outside:
@@ -3750,7 +3773,7 @@ def selftest():
         ]
         # A FORK: its history is a re-serialized copy of the main thread's, with
         # NEW timestamps (measured), so only the parent/child edge can spot it.
-        fork_session = [meta(repo, id="t-fork", forked_from_id="t-main")]
+        fork_session = [meta(repo, id="t-fork", forked_from_id="t-main", timestamp="2026-09-01T12:00:00.000Z")]
         for index, line in enumerate(planted[:3]):
             fork_session.append(uturn(line, "2026-09-01T12:0%d:00.000Z" % index))
         # Subagent + guardian-review rollouts: the Codex analogue of a sidechain.
@@ -4171,7 +4194,7 @@ def selftest():
         f10_parent = [meta(f10_repo, id="t-parent")]
         for index, line in enumerate(parent_turns):
             f10_parent.append(uturn(line, "2026-09-01T11:0%d:00.000Z" % index))
-        f10_child = [meta(f10_repo, id="t-child", forked_from_id="t-parent")]
+        f10_child = [meta(f10_repo, id="t-child", forked_from_id="t-parent", timestamp="2026-09-01T12:00:00.000Z")]
         for index, line in enumerate(parent_turns):
             f10_child.append(uturn(line, "2026-09-01T12:0%d:00.000Z" % index))
         f10_child.append(

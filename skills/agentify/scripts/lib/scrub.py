@@ -647,12 +647,10 @@ _RULES = [
             r"refresh[_-]?tokens?|private[_-]?keys?|session[_-]?tokens?|tokens?|credentials?)"
             r"[\"']?)"
             r"(\s*[:=]\s*)"
-            # `{` and `[` are excluded from the unquoted alternative: a value
-            # that opens a nested object or list is not a scalar secret, and
-            # consuming it would swallow the inner `"password":` key and leave
-            # the inner value exposed.  Failing here lets the engine find that
-            # inner assignment instead.
-            r"(" + _QUOTED_VALUE_SRC + r"|[^\s,;)\]}\[{\n]{1,512})",
+            # Scalar credential lists are redacted together, respecting quoted
+            # elements and escaped quotes. Objects fall through to their inner
+            # assignments instead of swallowing an inner credential key.
+            r"(" + _QUOTED_VALUE_SRC + r"|\[(?:" + _QUOTED_VALUE_SRC + r"|[^\[\]{}\"'])*\]|[^\s,;)\]}\[{\n]{1,512})",
             re.IGNORECASE,
         ),
         _assignment_factory,

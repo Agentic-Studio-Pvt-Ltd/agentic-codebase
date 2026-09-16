@@ -1925,7 +1925,7 @@ def heredoc_is_inert(raw: str, opener: Any) -> str:
     the body onward past that command -- `cat <<'EOF' | sh` hands the very same
     text to a shell, so the pipe makes it live again.
     """
-    if "|" in raw[opener.end():]:
+    if "|" in raw[opener.end():] or re.search(r"\b(?:sh|bash|zsh|dash|ksh|eval|exec|python[0-9.]*|node|ruby|perl)\b", raw[:opener.start()]):
         return ""
     consumer = heredoc_consumer(raw[: opener.start()])
     if consumer and consumer in _DATA_ONLY_CONSUMERS:
@@ -2343,41 +2343,54 @@ def hook_fixture_patch(event: str, path: str, cwd: str = "") -> str:
     return hook_fixture_payload(event, "apply_patch", patch, cwd)
 
 
-def fixture_verdict(result: Dict[str, Any]) -> str:
-    """
-    What the hook decided about one fixture: `allow`, `deny`, `ask`, or a
-    word naming why there was no decision.
-
-    Both protocols, read together, because the verdict has to be comparable
-    across the two spellings of the same tool.  Codex always exits 0 and
-    blocks by PRINTING `hookSpecificOutput.permissionDecision`; Claude Code
-    blocks with exit 2.  A run that reads only the exit code cannot tell an
-    allow from a deny on Codex at all.
-    """
+def fixture_verdict(result: Dict[str, Any], event: str = "") -> str:
+    """Interpret the selected event protocol; invalid output is not a verdict."""
     if result.get("error"):
         return "error"
     if result.get("timeout"):
         return "timeout"
-    text = str(result.get("stdout") or "")
-    decision = ""
-    if text.strip():
-        try:
-            parsed = json.loads(text)
-        except ValueError:
-            parsed = None
-        if isinstance(parsed, dict):
-            block = parsed.get("hookSpecificOutput")
-            if isinstance(block, dict):
-                decision = str(block.get("permissionDecision") or "").strip().lower()
-        if not decision:
-            found = _PERMISSION_DECISION.search(text)
-            decision = found.group(1).lower() if found else ""
-    if decision in ("deny", "ask"):
-        return decision
+    if re.search(r"check did not complete", str(result.get("stderr") or ""), re.IGNORECASE):
+        return "inconclusive"
     if result.get("code") == 2:
         return "deny"
     if result.get("code"):
         return "exit %s" % result.get("code")
+    text = str(result.get("stdout") or "").strip()
+    if not text:
+        return "allow"
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return "invalid output"
+    if not isinstance(parsed, dict):
+        return "invalid output"
+    block = parsed.get("hookSpecificOutput") or {}
+    if not isinstance(block, dict):
+        return "invalid output"
+    actual_event = block.get("hookEventName")
+    if event and actual_event and actual_event != event:
+        return "invalid output"
+    event = event or actual_event or "PreToolUse"
+    if event == "PreToolUse":
+        if any(key in parsed for key in ("continue", "stopReason", "suppressOutput", "decision")):
+            return "invalid output"
+        decision = block.get("permissionDecision")
+        if decision is not None:
+            return decision if decision in ("allow", "deny") else "invalid output"
+    elif event == "PermissionRequest":
+        if "permissionDecision" in block:
+            return "invalid output"
+        decision = block.get("decision")
+        if decision is not None:
+            if not isinstance(decision, dict) or any(key in decision for key in ("updatedInput", "updatedPermissions", "interrupt")):
+                return "invalid output"
+            behavior = decision.get("behavior")
+            return behavior if behavior in ("allow", "deny") else "invalid output"
+    elif event in ("PostToolUse", "UserPromptSubmit", "Stop", "SubagentStop"):
+        if "permissionDecision" in block:
+            return "invalid output"
+        if parsed.get("decision") == "block":
+            return "deny" if parsed.get("reason") else "invalid output"
     return "allow"
 
 
@@ -2438,9 +2451,9 @@ def run_fixture_set(
     if "shell" in intents and canonical_shell:
         for command in _FIXTURE_COMMANDS:
             canonical = runner(hook_fixture_payload(event, canonical_shell, command))
-            canonical_verdict = fixture_verdict(canonical)
+            canonical_verdict = fixture_verdict(canonical, event)
             observed.append("%s/`%s` -> %s" % (canonical_shell, command, canonical_verdict))
-            if canonical_verdict in ("error", "timeout"):
+            if canonical_verdict not in ("allow", "deny"):
                 problems.append(
                     "the canonical fixture (`tool_name: %s`, `%s`) produced no verdict (%s), so "
                     "nothing proves the hook reacts to the name a current build sends"
@@ -2450,9 +2463,9 @@ def run_fixture_set(
             if not legacy_shell:
                 continue
             legacy = runner(hook_fixture_payload(event, legacy_shell, command))
-            legacy_verdict = fixture_verdict(legacy)
+            legacy_verdict = fixture_verdict(legacy, event)
             observed.append("%s/`%s` -> %s" % (legacy_shell, command, legacy_verdict))
-            if legacy_verdict != canonical_verdict:
+            if legacy_verdict not in ("allow", "deny") or legacy_verdict != canonical_verdict:
                 problems.append(
                     "`%s` and `%s` get DIFFERENT verdicts on the same command `%s` (%s vs %s). "
                     "`%s` is the name a current build dispatches under, so a hook that reacts "
@@ -2464,7 +2477,9 @@ def run_fixture_set(
     if "file edit" in intents:
         for path in _FIXTURE_PATHS:
             result = runner(hook_fixture_patch(event, path))
-            observed.append("apply_patch/%s -> %s" % (path, fixture_verdict(result)))
+            observed.append("apply_patch/%s -> %s" % (path, fixture_verdict(result, event)))
+            if fixture_verdict(result, event) not in ("allow", "deny"):
+                problems.append("the apply_patch fixture for %s produced no valid verdict" % path)
             if fixture_filter_fell_open(result):
                 problems.append(
                     "on an `apply_patch` fixture for %s the hook printed its `no file path in "
@@ -2481,7 +2496,7 @@ def run_fixture_set(
             for channel in ("stdout", "stderr")
             if str(result.get(channel) or "").strip()
         ]
-        verdict = fixture_verdict(result)
+        verdict = fixture_verdict(result, event)
         observed.append("%s -> %s" % (unrelated_tool, verdict))
         if verdict != "allow" or noise:
             problems.append(
@@ -4798,7 +4813,7 @@ class Verifier(object):
         `name`, `description` and `developer_instructions` must each be a
         non-empty STRING, `model` / `model_reasoning_effort` / `sandbox_mode`
         are optional strings, there is no per-agent tool allowlist, and the
-        filename stem must equal `name`.  A parse error is a FAIL carrying the
+        filename matching `name` is a generation convention, not a load requirement.  A parse error is a FAIL carrying the
         parser's own message.  Without `tomllib` (3.9/3.10) the hand reader
         still names a missing field -- that stays a FAIL -- but a file it finds
         nothing wrong with comes back `unverified`, never `pass`: four invalid
@@ -4868,8 +4883,6 @@ class Verifier(object):
         description = str(values.get("description", ""))
         if description and len(description) >= 1024:
             problems.append("`description` is %d chars; the limit is 1024" % len(description))
-        if name.strip() and stem and name.strip() != stem:
-            problems.append("`name` is %r but the file is %s.toml; the stem must equal the name" % (name.strip(), stem))
 
         if problems:
             # A definite defect fails whether or not syntax was verified; the
@@ -4885,18 +4898,18 @@ class Verifier(object):
                 "subagent_frontmatter",
                 label,
                 UNVERIFIED,
-                "the three required keys are present on a partial scan and name=%s matches the "
-                "filename stem, but %s" % (name.strip(), note),
+                "the three required keys are present on a partial scan with name=%s, "
+                "but %s" % (name.strip(), note),
             )
-            return
-        self.add(
-            "subagent_frontmatter",
-            label,
-            PASS,
-            "TOML parses; name=%s matches the filename stem; description %d chars; "
-            "developer_instructions %d chars"
-            % (name.strip(), len(description), len(str(values.get("developer_instructions", "")))),
-        )
+        else:
+            self.add(
+                "subagent_frontmatter",
+                label,
+                PASS,
+                "TOML parses; agent identity name=%s; description %d chars; "
+                "developer_instructions %d chars"
+                % (name.strip(), len(description), len(str(values.get("developer_instructions", "")))),
+            )
 
         # Codex has no per-agent tool allowlist and pins no model.  Both are
         # WARNs about a real loss or a real hazard, never a FAIL: the file is
@@ -4922,7 +4935,7 @@ class Verifier(object):
         self.add(
             "subagent_tools",
             label,
-            PASS,
+            UNVERIFIED if outcome == TOML_UNVERIFIED else PASS,
             "no tool allowlist expected: Codex has none per agent%s"
             % (" (sandbox_mode = %s)" % sandbox if sandbox else ""),
         )

@@ -21,8 +21,9 @@
 #>     real number of items. Never leave an unfilled row behind.
 #>  5. Keep the five agentify-* lines verbatim. verify_artifacts.py parses them, and a rerun matches
 #>     on agentify-id to rewrite this file in place instead of writing a second copy.
-#>  6. Optional frontmatter key: add `allowed-tools: Read, Grep, Glob, Bash` only when the skill
-#>     genuinely needs a narrower tool set than the session default. Omit the key otherwise.
+#>  6. Claude Code only: add `allowed-tools` when the skill needs a narrower tool set.
+#>     Codex: omit this key; it is not an enforced Codex tool boundary. Use the session sandbox
+#>     and service-side read-only credentials when the workflow promises restricted access.
 #>  7. Target length after filling: 60-150 lines. Longer skills get skimmed, not followed. Push the
 #>     detail into reference files (rule 9) rather than growing this file.
 #>  8. No attribution anywhere in the body. The one comment line below is the only placement.

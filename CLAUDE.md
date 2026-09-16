@@ -17,7 +17,7 @@ adapters under `adapters/`, and the artifact templates under `templates/`.
 library — no `pip install`, no `package.json`, no `node_modules`. The Bun defaults in
 `/Users/ravisojitra/CLAUDE.md` do not apply here; there is nothing to run them against.
 
-The only commands are the analyzers' own selftests, which are developer tooling and must never be
+The analyzers' own selftests are developer tooling and must never be
 invoked during a real run:
 
 ```bash
@@ -28,6 +28,9 @@ python3 skills/agentify/scripts/verify_artifacts.py --selftest
 ```
 
 Each exits 0 and prints one JSON object. Run all four after touching any script.
+The developer-only integration suite runs with `python3 -m unittest discover -s tests -v`.
+It renders shipped Codex templates and uses synthetic histories in temporary repositories.
+Run it after changing templates, consent handling, redaction or verification; never during a real run.
 To exercise a script for real, point it at another repo:
 
 ```bash

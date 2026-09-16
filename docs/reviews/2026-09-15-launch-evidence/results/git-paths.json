@@ -1,0 +1,35 @@
+{
+  "explicit_days_1": {
+    "window": {
+      "days": 0,
+      "commits_analyzed": 1,
+      "first": "2020-01-01 00:00:00 +0000",
+      "last": "2020-01-01 00:00:00 +0000",
+      "mode": "explicit",
+      "min_commits": 0,
+      "steps": [],
+      "reason": "1d held no commits at all; fell back to all history"
+    },
+    "available": true,
+    "warnings": [
+      "no commits in the last 1 days; widened the window to full history",
+      "pr_patterns: skipped (--no-gh)",
+      "1 path-evidence row(s) name files that are no longer in the working tree (still_exists: false); they are history, not a target -- do not build on them"
+    ]
+  },
+  "non_ascii_filename": {
+    "git_numstat": "1\t0\t\"src/caf\\303\\251.py\"\n",
+    "hotspots": [
+      {
+        "path": "src/cafÃ©.py",
+        "commits": 1,
+        "authors": 1,
+        "churn": 1,
+        "first_seen": "2020-01-01",
+        "last_seen": "2020-01-01",
+        "still_exists": false
+      }
+    ],
+    "actual_file_exists": true
+  }
+}

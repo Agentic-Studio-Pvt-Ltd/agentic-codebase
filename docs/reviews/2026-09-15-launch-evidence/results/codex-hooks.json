@@ -1,0 +1,37 @@
+{
+  "shell_canonical_name": [
+    {
+      "tool_name": "exec_command",
+      "exit": 0,
+      "denied": true,
+      "stderr": ""
+    },
+    {
+      "tool_name": "Bash",
+      "exit": 0,
+      "denied": false,
+      "stderr": ""
+    }
+  ],
+  "documented_name_matches_emitted_regex": false,
+  "patch_payload_extraction": [
+    {
+      "input_kind": "raw_rollout",
+      "exit": 0,
+      "has_path": true,
+      "output": "SHAPE\tfreeform-patch\nCOMMAND\t\nPATH\tsrc/example.ts"
+    },
+    {
+      "input_kind": "documented_hook",
+      "exit": 0,
+      "has_path": false,
+      "output": "SHAPE\tcommand-string\nCOMMAND\t*** Begin Patch *** Update File: src/example.ts @@ -old +new *** End Patch"
+    }
+  ],
+  "distribution_symlink": {
+    "is_symlink": true,
+    "target": "/Users/ravisojitra/agentify/skills/agentify",
+    "target_exists": false
+  },
+  "orchestrator_description_characters": 1012
+}

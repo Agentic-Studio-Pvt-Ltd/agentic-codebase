@@ -1,0 +1,101 @@
+{
+  "binary": "/Applications/ChatGPT.app/Contents/Resources/codex",
+  "version": "codex-cli 0.154.0-alpha.6.2",
+  "hooks/list": [
+    {
+      "hooks": [],
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "hooks_response_shape": {
+    "data": "list"
+  },
+  "hook_entry_keys": [
+    [
+      "cwd",
+      "hooks",
+      "warnings",
+      "errors"
+    ]
+  ],
+  "hook_counts": [
+    2
+  ],
+  "hook_summaries": [],
+  "skills/list": [
+    {
+      "skills": [
+        {
+          "name": "contract-probe",
+          "description": "Validates the synthetic setup fixture when explicitly requested.",
+          "path": "/private/var/folders/pg/9h8qbnp90t35x6vy90gc2hqc0000gn/T/agentify-native-nsiyrmqy/.agents/skills/contract-probe/SKILL.md",
+          "scope": "repo",
+          "enabled": true,
+          "pluginId": null
+        }
+      ],
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "policies": [
+    {
+      "command": [
+        "npm",
+        "install",
+        "test"
+      ],
+      "exit": 0,
+      "output": {
+        "matchedRules": [
+          {
+            "prefixRuleMatch": {
+              "matchedPrefix": [
+                "npm",
+                "install"
+              ],
+              "decision": "prompt",
+              "justification": "Fixture approval"
+            }
+          }
+        ],
+        "decision": "prompt"
+      }
+    },
+    {
+      "command": [
+        "git",
+        "push",
+        "--force"
+      ],
+      "exit": 0,
+      "output": {
+        "matchedRules": [
+          {
+            "prefixRuleMatch": {
+              "matchedPrefix": [
+                "git",
+                "push",
+                "--force"
+              ],
+              "decision": "forbidden",
+              "justification": "Fixture denial"
+            }
+          }
+        ],
+        "decision": "forbidden"
+      }
+    },
+    {
+      "command": [
+        "git",
+        "status"
+      ],
+      "exit": 0,
+      "output": {
+        "matchedRules": []
+      }
+    }
+  ]
+}

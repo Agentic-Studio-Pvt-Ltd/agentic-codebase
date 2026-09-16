@@ -1,0 +1,178 @@
+{
+  "invalid_agent_toml": {
+    "duplicate_key": {
+      "verifier": [
+        {
+          "name": "subagent_frontmatter",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "TOML: name=reviewer matches the filename stem; description 19 chars; developer_instructions 15 chars"
+        },
+        {
+          "name": "subagent_tools",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "no tool allowlist expected: Codex has none per agent"
+        }
+      ],
+      "tomllib_error": "Cannot overwrite a value (at line 4, column 19)"
+    },
+    "invalid_escape": {
+      "verifier": [
+        {
+          "name": "subagent_frontmatter",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "TOML: name=reviewer matches the filename stem; description 22 chars; developer_instructions 15 chars"
+        },
+        {
+          "name": "subagent_tools",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "no tool allowlist expected: Codex has none per agent"
+        }
+      ],
+      "tomllib_error": "Unescaped '\\' in a string (at line 2, column 25)"
+    },
+    "unquoted_string": {
+      "verifier": [
+        {
+          "name": "subagent_frontmatter",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "TOML: name=reviewer matches the filename stem; description 19 chars; developer_instructions 15 chars"
+        },
+        {
+          "name": "subagent_tools",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "no tool allowlist expected: Codex has none per agent"
+        }
+      ],
+      "tomllib_error": "Invalid value (at line 3, column 26)"
+    },
+    "invalid_after_table": {
+      "verifier": [
+        {
+          "name": "subagent_frontmatter",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "TOML: name=reviewer matches the filename stem; description 19 chars; developer_instructions 15 chars"
+        },
+        {
+          "name": "subagent_tools",
+          "target": "reviewer.toml",
+          "status": "pass",
+          "detail": "no tool allowlist expected: Codex has none per agent"
+        }
+      ],
+      "tomllib_error": "Invalid value (at end of document)"
+    }
+  },
+  "invalid_mcp_toml": {
+    "verifier": [
+      {
+        "name": "mcp_json",
+        "target": "codex-mcp.toml",
+        "status": "pass",
+        "detail": "Codex TOML: 1 complete `[mcp_servers.*]` table block(s): linear"
+      },
+      {
+        "name": "mcp_secrets",
+        "target": "codex-mcp.toml",
+        "status": "pass",
+        "detail": "no literal credentials; values are placeholders or references the user fills in"
+      }
+    ],
+    "tomllib_error": "Invalid value (at end of document)"
+  },
+  "wrong_codex_matcher": {
+    "matcher": "^(exec|exec_command|shell_command|run)$",
+    "verifier": [
+      {
+        "name": "hook_wired",
+        "target": ".codex/hooks/guard.sh",
+        "status": "pass",
+        "detail": "registered in .codex/hooks.json; the command resolves to it"
+      }
+    ],
+    "matches_canonical_Bash": false
+  },
+  "quoted_shell_heredoc": {
+    "clear_to_execute": true,
+    "verifier": [
+      {
+        "name": "hook_static_scan",
+        "target": "/var/folders/pg/9h8qbnp90t35x6vy90gc2hqc0000gn/T/agentify-audit-verifier-5ak4bxyo/.codex/hooks/guard.sh",
+        "status": "warn",
+        "detail": "no network call, but curl -- text inside a quoted heredoc, not a call at script line 3: curl https://example.invalid"
+      }
+    ],
+    "local_stub_execution": {
+      "exit": 0,
+      "stdout": "STUB_CALLED:https://example.invalid\n"
+    }
+  },
+  "quoted_python_heredoc_scan": [
+    [],
+    [
+      {
+        "kind": "python http client -- text inside a quoted heredoc, not a call",
+        "line": 2,
+        "text": "import urllib.request"
+      },
+      {
+        "kind": "python http client -- text inside a quoted heredoc, not a call",
+        "line": 3,
+        "text": "urllib.request.urlopen('https://example.invalid')"
+      }
+    ]
+  ],
+  "timeout_execpolicy_mocked": {
+    "start_new_session": false,
+    "process_group_explicitly_set": false,
+    "killpg_requested": [
+      112233,
+      9
+    ],
+    "pid_looked_up": [
+      87654321
+    ],
+    "outcome": [
+      {
+        "name": "rule_policy_execpolicy",
+        "target": "agentify.rules",
+        "status": "warn",
+        "detail": "`codex execpolicy check` did not finish in 5s"
+      }
+    ]
+  },
+  "timeout_git_read_mocked": {
+    "start_new_session": false,
+    "process_group_explicitly_set": false,
+    "killpg_requested": [
+      112233,
+      9
+    ],
+    "pid_looked_up": [
+      87654321
+    ],
+    "outcome": [
+      false,
+      "",
+      "git timed out after 20s"
+    ]
+  },
+  "unmerge_same_basename": {
+    "recorded_generated_command": "/repo/.codex/hooks/block-npm.sh",
+    "pre_existing_user_command": "/repo/tools/block-npm.sh",
+    "pre_existing_sha256": "a72235acce28cbd37c025cb195d9e4e0c2705d519add719597317a53968605bb",
+    "result": [
+      "ok",
+      2,
+      "{}\n",
+      true,
+      ""
+    ]
+  }
+}

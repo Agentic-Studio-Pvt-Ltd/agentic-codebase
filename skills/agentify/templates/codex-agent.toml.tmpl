@@ -65,7 +65,7 @@
 #>     reads this file's `# agentify-*` header comments correctly and, for a non-markdown path,
 #>     reads its identity from the TOML instead of asking for YAML frontmatter:
 #>     `subagent_frontmatter` requires `name`, `description` and `developer_instructions`, and a
-#>     filename stem equal to `name`. `subagent_tools` checks what Codex actually has — no
+#>     non-empty agent `name` (filename matching is a generation convention). `subagent_tools` checks what Codex actually has — no
 #>     per-agent allowlist (a `tools` key WARNs, because the restriction is silently lost), a
 #>     pinned `model` WARNs, and `sandbox_mode = "danger-full-access"` FAILs.
 #>     **Expect zero FAILs on a correct file.** If `subagent_frontmatter` ever complains about
@@ -73,7 +73,7 @@
 #>     nothing (verification.md §9). Never add a `---` block to satisfy it — Codex does not read
 #>     one, and a TOML file that starts with `---` no longer parses.
 #> 10. Phase 8 validates this file STATICALLY only — that it parses as TOML, that the three
-#>     required keys are present, that the filename stem equals `name`. adapters/codex.md §4.5
+#>     required keys are present, that the `name` identifies the agent (matching the filename is a convention). adapters/codex.md §4.5
 #>     records that no read-only probe can prove a newly written agents file is loaded, so the
 #>     report's manual checklist must carry the live check: in a Codex session in this repo, ask
 #>     the model to spawn `{{SUBAGENT_NAME}}` by name, then check the child rollout's `session_meta`
@@ -95,7 +95,7 @@
 # {{SUBAGENT_TITLE}}
 # Remove: delete this file. Nothing else points at it.
 
-#> name — must equal this file's stem, kebab-case. It is how the main thread spawns the agent.
+#> name — use this file's stem by convention, kebab-case; Codex routes by this value. It is how the main thread spawns the agent.
 name = "{{SUBAGENT_NAME}}"
 
 #> description — the routing line, and the only thing the main agent reads when deciding whether

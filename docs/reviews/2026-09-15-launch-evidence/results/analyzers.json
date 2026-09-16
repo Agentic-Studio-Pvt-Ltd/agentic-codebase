@@ -1,0 +1,64 @@
+{
+  "quoted_credential_keys": [
+    {
+      "input": "{\"password\": \"SYNTHETIC-pw-123\", \"api_key\": \"SYNTHETIC-key-456\"}",
+      "output": "{\"password\": \"SYNTHETIC-pw-123\", \"api_key\": \"SYNTHETIC-key-456\"}",
+      "hits": []
+    },
+    {
+      "input": "{'password': 'SYNTHETIC-pw-123'}",
+      "output": "{'password': 'SYNTHETIC-pw-123'}",
+      "hits": []
+    },
+    {
+      "input": "password=SYNTHETIC-pw-123",
+      "output": "password=[REDACTED:assignment]",
+      "hits": [
+        "assignment"
+      ]
+    }
+  ],
+  "reader_outside_secret_symlink": {
+    "text": "{\"scripts\": {\"dev\": \"echo SYNTHETIC-outside-content\"}}",
+    "bytes_read": 54,
+    "refused": 0,
+    "resolved_is_secret": true
+  },
+  "discovery_symlink_end_to_end": {
+    "exit": 0,
+    "raw_scripts": {
+      "package.json": {
+        "dev": "echo SYNTHETIC-outside-content"
+      },
+      "#commands": {
+        "install": "package.json (package manager: package.json with no lockfile and no declaration (npm default)) -> npm install",
+        "dev": "package.json#scripts.dev (name match) -> npm run dev",
+        "build": "",
+        "test": "",
+        "lint": "",
+        "typecheck": "",
+        "format": ""
+      }
+    },
+    "skills": [
+      "workflow"
+    ],
+    "agents": [
+      "reviewer"
+    ],
+    "symlinked": {
+      "skills": [],
+      "agents": [],
+      "rules": [],
+      "hooks": []
+    },
+    "warnings": [
+      "no manifest entry defines commands.build, commands.test, commands.lint, commands.typecheck, commands.format; the slot is empty on purpose -- ask the user, never invent a command",
+      "commands were resolved from manifests, not executed; offer to run them only with the user's consent",
+      "Codex project trust for this repo is not declared in any config.toml this scan read.  [projects.\"<abs path>\"] trust_level gates AGENTS.md, .codex/config.toml, .codex/hooks.json and .codex/rules/ together -- every repo-scoped Codex artifact is inert without it.  Put trusting the project in the plan's capability notes and in the report's manual checklist; agentify never edits the user's config.toml to set it",
+      "not a git repository (or git unavailable): git evidence unavailable, mine_git.py will be a no-op",
+      "loc figures are ESTIMATES: newline counts, per-file read capped at 2 MB, code files only (markdown, json, yaml and toml excluded)",
+      "no .env files found; env var names come from CI references only"
+    ]
+  }
+}

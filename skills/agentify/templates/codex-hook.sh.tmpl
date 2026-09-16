@@ -20,11 +20,9 @@
 #
 # Contract (adapters/codex.md §4.3)
 #   stdin  one JSON event object: tool_name, tool_input, cwd, session_id, hook_event_name, …
-#   stdout the decision, as JSON. Blocking is
-#            {"hookSpecificOutput":{"hookEventName":"…","permissionDecision":"deny",
-#             "permissionDecisionReason":"…"}}
-#          and permissionDecisionReason is the text the MODEL acts on — write it as an
-#          instruction ("Run: bun install"), never as a log line.
+#   stdout event-specific JSON: PreToolUse permissionDecision; PermissionRequest
+#          decision.behavior; PostToolUse/prompt/stop events decision=block and reason.
+#          The reason tells the model what to do next. Other lifecycle events only notify.
 #   exit   ALWAYS 0. Codex documents 0 and 2 (2 blocks with stderr as the reason); the meaning of
 #          every other status is undocumented, so this script never returns one. Silence plus
 #          exit 0 is "allow".
@@ -62,7 +60,7 @@
 #>  3. bash, not POSIX sh — `#!/usr/bin/env bash` and `set -euo pipefail` are what adapters/codex.md
 #>     §4.3 specifies for this target. The ERR trap below is what keeps `set -e` compatible with
 #>     "always exit 0".
-#>  4. Delete whichever of the two filter blocks does not apply: the tool-name filter always stays,
+#>  4. Keep the event-aware tool filter. For events without tool input delete the file-path filter;
 #>     the file-path filter goes when the hook matches shell commands rather than edits. Deleting it
 #>     is not optional housekeeping — a command hook that keeps the path filter hits the FAIL LOUD
 #>     branch on every single call and prints a stderr line each time. If the hook matches edits,
@@ -80,10 +78,11 @@
 #>     Anything needing judgement is a rule or a skill, not a hook. If the check is "never run this
 #>     command", prefer `codex-rules.rules.tmpl` — an execution-policy rule fires before the
 #>     command runs, needs no script, and cannot be missed by a matcher that does not match.
-#>  7. Other events emit other shapes. `permissionDecision` is for PreToolUse and
-#>     PermissionRequest. On UserPromptSubmit, plain-text stdout becomes additionalContext. Stop
-#>     and the session events use `continue` / `stopReason` / `systemMessage`. Read
-#>     adapters/codex.md §4.3 before emitting anything other than the deny shape below.
+#>  7. The decision helper selects the event protocol: PreToolUse permissionDecision;
+#>     PermissionRequest decision.behavior; PostToolUse/UserPromptSubmit/Stop/SubagentStop
+#>     top-level decision=block and reason. Other lifecycle events only emit a systemMessage.
+#>     PostToolUse feedback cannot undo a tool that already ran. Never emit ask, updatedPermissions
+#>     or updatedMCPToolOutput; those are unsupported. See adapters/codex.md §4.3.
 #>  8. **Never interpolate generated prose into shell code.** {{BLOCK_MESSAGE}} and
 #>     {{REMEDIATION_HINT}} are read from a quoted heredoc and handed to python3 as arguments, so a
 #>     backtick or a `$(…)` in the message is literal text. Putting either inside a double-quoted
@@ -185,9 +184,8 @@ TOOL_NAME="$(json_get tool_name)"
 # session's working directory, and what patch paths are relative to. Older
 # object payloads also carry a per-call `workdir`/`cwd` inside `tool_input`;
 # both are read, `tool_input` first. When that directory is not the repo root,
-# each path is ALSO emitted rewritten repo-relative, so a {{PATH_GLOB}} written
-# against repo-root spellings still matches a patch authored from a subdirectory.
-# The as-sent spelling is emitted too, and never dropped.
+# each check path is normalized relative to the repo root. Filters and CHECK_COMMAND
+# use the same spelling, so subfolder calls cannot check an unrelated root file.
 #
 # What is NOT handled is handled LOUDLY: an unrecognised shape prints a
 # diagnostic to stderr and lets the check run UNFILTERED rather than skipping
@@ -196,7 +194,7 @@ TOOL_NAME="$(json_get tool_name)"
 # ---------------------------------------------------------------------------
 payload_fields() {
   printf '%s' "$INPUT" | python3 -c '
-import json, sys
+import json, os, sys
 
 HEADERS = ("*** Add File:", "*** Update File:", "*** Delete File:", "*** Move to:")
 PATCH_TOOLS = ("apply_patch", "applypatch", "ApplyPatch", "patch")
@@ -217,28 +215,16 @@ def is_patch(text):
     return text.lstrip().startswith("*** Begin Patch")
 
 def repo_relative(item, base, root):
-    """Rewrite a path given relative to `base` as relative to `root`. POSIX spellings;
-    returns "" when it cannot be placed inside the repo."""
-    if item.startswith("/"):
-        absolute = item
-    elif base.startswith("/"):
-        absolute = base.rstrip("/") + "/" + item
-    else:
-        return ""
-    parts = []
-    for part in absolute.split("/"):
-        if part in ("", "."):
-            continue
-        if part == "..":
-            if parts:
-                parts.pop()
-            continue
-        parts.append(part)
-    absolute = "/" + "/".join(parts)
-    root = root.rstrip("/")
-    if root and absolute.startswith(root + "/"):
-        return absolute[len(root) + 1:]
-    return ""
+    """Use the event cwd, including macOS directory aliases, for actual checks."""
+    base = os.path.realpath(base if os.path.isabs(base) else os.path.join(root, base))
+    absolute = os.path.normpath(item if os.path.isabs(item) else os.path.join(base, item))
+    root = os.path.realpath(root)
+    try:
+        if os.path.commonpath([absolute, root]) == root:
+            return os.path.relpath(absolute, root)
+    except ValueError:
+        pass
+    return absolute
 
 try:
     data = json.load(sys.stdin)
@@ -321,19 +307,10 @@ elif payload is None:
 else:
     shape = "unrecognised"
 
-# Emit each path as sent, and — when the tool ran from somewhere other than the
-# repo root — also rewritten relative to the repo root, so a repo-root glob
-# matches a patch authored from a subdirectory. Neither spelling replaces the
-# other; a filter matching EITHER is a match.
+# Check paths are relative to the repo root, where the script runs. Never mix
+# a cwd-relative alias with an actual check path: they can name different files.
 repo_root = sys.argv[1] if len(sys.argv) > 1 else ""
-resolved = []
-for item in paths:
-    resolved.append(item)
-    if not repo_root:
-        continue
-    relative = repo_relative(item, workdir or repo_root, repo_root)
-    if relative and relative != item:
-        resolved.append(relative)
+resolved = [repo_relative(item, workdir or repo_root, repo_root) for item in paths]
 
 out = ["SHAPE\t" + shape, "CWD\t" + workdir.replace("\t", " "),
        "COMMAND\t" + " ".join(command.split())]
@@ -362,8 +339,8 @@ done <<AGENTIFY_PAYLOAD_FIELDS
 $(payload_fields)
 AGENTIFY_PAYLOAD_FIELDS
 
-# The first touched path, for a {{CHECK_COMMAND}} that takes one file. Use
-# "$FILE_PATHS" (newline-separated) when the check can take several.
+# The current repo-relative path. A file-scoped CHECK_COMMAND runs once per
+# matching path; FILE_PATHS contains the complete matching set.
 FILE_PATH="$(printf '%s' "$FILE_PATHS" | head -n 1)"
 
 # deny <reason> [check output] — the only blocking primitive. Exits 0; the reason reaches the
@@ -381,11 +358,20 @@ parts.append(
     "This check comes from .codex/hooks/{{HOOK_FILE_NAME}} (agentify-id: {{AGENTIFY_ID}}). "
     "To remove it, delete that file and its handler in .codex/hooks.json."
 )
-print(json.dumps({"hookSpecificOutput": {
-    "hookEventName": "{{HOOK_EVENT}}",
-    "permissionDecision": "deny",
-    "permissionDecisionReason": "\n\n".join(parts),
-}}))
+event = "{{HOOK_EVENT}}"
+reason = "\n\n".join(parts)
+if event == "PreToolUse":
+    result = {"hookSpecificOutput": {"hookEventName": event,
+              "permissionDecision": "deny", "permissionDecisionReason": reason}}
+elif event == "PermissionRequest":
+    result = {"hookSpecificOutput": {"hookEventName": event,
+              "decision": {"behavior": "deny", "message": reason}}}
+elif event in ("PostToolUse", "UserPromptSubmit", "Stop", "SubagentStop"):
+    result = {"decision": "block", "reason": reason}
+else:
+    # Lifecycle notifications cannot prevent an operation with a tool decision.
+    result = {"systemMessage": reason}
+print(json.dumps(result))
 ' "$1" "${2:-}" 2>/dev/null || true
   exit 0
 }
@@ -394,23 +380,35 @@ print(json.dumps({"hookSpecificOutput": {
 # Filters. Every early exit here is a tool call this hook costs nothing on.
 # The wiring's regex matcher is permissive on purpose; this is the real filter.
 # ---------------------------------------------------------------------------
-case "$TOOL_NAME" in
-  {{TOOL_NAME_GLOB}}) ;;
-  *) exit 0 ;;
+case "{{HOOK_EVENT}}" in
+  PreToolUse|PermissionRequest|PostToolUse)
+    case "$TOOL_NAME" in
+      {{TOOL_NAME_GLOB}}) ;;
+      *) exit 0 ;;
+    esac ;;
+  Stop|SubagentStop)
+    # Do not keep blocking a continuation started by this hook.
+    case "$(json_get stop_hook_active)" in true|True) exit 0 ;; esac ;;
 esac
+FILE_SCOPED=0
 
-# A patch can touch several files, so this matches if ANY touched path matches.
+# A patch can touch several files; check every path matching the repo-root glob.
+FILE_SCOPED=1
+MATCHED_FILE_PATHS=""
 if [ -n "$FILE_PATHS" ]; then
   path_matched=0
   while IFS= read -r candidate; do
     [ -n "$candidate" ] || continue
     case "$candidate" in
-      {{PATH_GLOB}}) path_matched=1; break ;;
+      {{PATH_GLOB}}) path_matched=1; MATCHED_FILE_PATHS="${MATCHED_FILE_PATHS}${candidate}
+" ;;
     esac
   done <<AGENTIFY_PATH_FILTER
 $FILE_PATHS
 AGENTIFY_PATH_FILTER
   [ "$path_matched" = 1 ] || exit 0
+  FILE_PATHS="$MATCHED_FILE_PATHS"
+  FILE_PATH="$(printf '%s' "$FILE_PATHS" | head -n 1)"
 else
   # FAIL LOUD. This hook was built with a path filter, and no path came out of
   # the payload — so either Codex sent a shape not handled above, or this tool
@@ -456,8 +454,21 @@ run_guarded() {
   return "$rc"
 }
 
+run_scoped_check() {
+  if [ "$FILE_SCOPED" = 1 ] && [ -n "$FILE_PATHS" ]; then
+    while IFS= read -r FILE_PATH; do
+      [ -n "$FILE_PATH" ] || continue
+      run_check || return $?
+    done <<AGENTIFY_CHECK_PATHS
+$FILE_PATHS
+AGENTIFY_CHECK_PATHS
+  else
+    run_check
+  fi
+}
+
 status=0
-run_guarded run_check || status=$?
+run_guarded run_scoped_check || status=$?
 
 case "$status" in
   0)

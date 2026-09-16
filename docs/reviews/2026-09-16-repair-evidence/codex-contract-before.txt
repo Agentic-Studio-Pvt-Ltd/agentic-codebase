@@ -1,0 +1,91 @@
+test_all_matching_files_are_checked (test_codex_contract.CodexHookContract.test_all_matching_files_are_checked) ... FAIL
+test_broken_canonical_filter_is_detectable (test_codex_contract.CodexHookContract.test_broken_canonical_filter_is_detectable) ... ok
+test_missing_check_is_not_a_clean_pass (test_codex_contract.CodexHookContract.test_missing_check_is_not_a_clean_pass) ... ok
+test_outside_path_does_not_alias_guarded_repo_file (test_codex_contract.CodexHookContract.test_outside_path_does_not_alias_guarded_repo_file) ... ok
+test_patch_object_and_freeform (test_codex_contract.CodexHookContract.test_patch_object_and_freeform) ... ok
+test_permission_request_decision (test_codex_contract.CodexHookContract.test_permission_request_decision) ... ERROR
+test_post_tool_feedback (test_codex_contract.CodexHookContract.test_post_tool_feedback) ... ERROR
+test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) ... 
+  test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) (event='UserPromptSubmit') ... ERROR
+  test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) (event='Stop') ... ERROR
+  test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) (event='SubagentStop') ... ERROR
+test_shell_wiring_and_canonical_name (test_codex_contract.CodexHookContract.test_shell_wiring_and_canonical_name) ... ok
+test_subfolder_checks_the_actual_file (test_codex_contract.CodexHookContract.test_subfolder_checks_the_actual_file) ... FAIL
+test_unrelated_first_path_does_not_hide_guarded_path (test_codex_contract.CodexHookContract.test_unrelated_first_path_does_not_hide_guarded_path) ... FAIL
+
+======================================================================
+ERROR: test_permission_request_decision (test_codex_contract.CodexHookContract.test_permission_request_decision)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 93, in test_permission_request_decision
+    self.assertEqual(data["hookSpecificOutput"]["decision"]["behavior"], "deny")
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+KeyError: 'decision'
+
+======================================================================
+ERROR: test_post_tool_feedback (test_codex_contract.CodexHookContract.test_post_tool_feedback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 99, in test_post_tool_feedback
+    self.assertEqual(data["decision"], "block")
+                     ~~~~^^^^^^^^^^^^
+KeyError: 'decision'
+
+======================================================================
+ERROR: test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) (event='UserPromptSubmit')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 107, in test_prompt_and_stop_events_without_tool_name
+    self.assertEqual(data["decision"], "block")
+                     ~~~~^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) (event='Stop')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 107, in test_prompt_and_stop_events_without_tool_name
+    self.assertEqual(data["decision"], "block")
+                     ~~~~^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_prompt_and_stop_events_without_tool_name (test_codex_contract.CodexHookContract.test_prompt_and_stop_events_without_tool_name) (event='SubagentStop')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 107, in test_prompt_and_stop_events_without_tool_name
+    self.assertEqual(data["decision"], "block")
+                     ~~~~^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+FAIL: test_all_matching_files_are_checked (test_codex_contract.CodexHookContract.test_all_matching_files_are_checked)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 137, in test_all_matching_files_are_checked
+    self.assertIsNotNone(data, "a later matching file must not escape the check")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : a later matching file must not escape the check
+
+======================================================================
+FAIL: test_subfolder_checks_the_actual_file (test_codex_contract.CodexHookContract.test_subfolder_checks_the_actual_file)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 123, in test_subfolder_checks_the_actual_file
+    self.assertIsNotNone(data, "the actual touched file must be checked")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : the actual touched file must be checked
+
+======================================================================
+FAIL: test_unrelated_first_path_does_not_hide_guarded_path (test_codex_contract.CodexHookContract.test_unrelated_first_path_does_not_hide_guarded_path)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ravisojitra/Documents/projects/agentic-studio/agentify/tests/test_codex_contract.py", line 130, in test_unrelated_first_path_does_not_hide_guarded_path
+    self.assertIsNotNone(data)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^
+AssertionError: unexpectedly None
+
+----------------------------------------------------------------------
+Ran 11 tests in 1.283s
+
+FAILED (failures=3, errors=5)

@@ -154,3 +154,12 @@ repo-scoped config directory and `<plan-dir>/`, which a teammate gets by cloning
 4. Do **not** open an adapter to write this section. Phase 7 opens exactly one adapter, once. If a
    verdict you need is missing or tagless here, that is a bug to report — fixing it is an edit to
    this file, never a phase-6 read of a 1,280- or 1,534-line adapter.
+
+### Codex response contract (checked 2026-09-16)
+
+Native hook support is event-specific: PreToolUse uses `permissionDecision`; PermissionRequest
+uses `decision.behavior`; PostToolUse, UserPromptSubmit and stop events use top-level
+`decision: "block"` with a reason. PostToolUse cannot undo a completed tool. Other lifecycle
+events provide notifications/context. `ask` is not a supported PreToolUse decision.
+Codex skills omit `allowed-tools`; it is not an enforced tool boundary. A custom agent is
+identified by its TOML `name`; matching its filename is agentify’s generation convention.

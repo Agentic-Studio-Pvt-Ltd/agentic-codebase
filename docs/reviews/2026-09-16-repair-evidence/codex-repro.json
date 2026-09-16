@@ -1,0 +1,23 @@
+{
+  "PreToolUse": {
+    "code": 0,
+    "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Probe violation\\nFix: Use fixture\\n\\nThis check comes from .codex/hooks/probe.sh (agentify-id: probe). To remove it, delete that file and its handler in .codex/hooks.json.\"}}\n",
+    "stderr": ""
+  },
+  "PermissionRequest": {
+    "code": 0,
+    "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PermissionRequest\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Probe violation\\nFix: Use fixture\\n\\nThis check comes from .codex/hooks/probe.sh (agentify-id: probe). To remove it, delete that file and its handler in .codex/hooks.json.\"}}\n",
+    "stderr": ""
+  },
+  "PostToolUse": {
+    "code": 0,
+    "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"Probe violation\\nFix: Use fixture\\n\\nThis check comes from .codex/hooks/probe.sh (agentify-id: probe). To remove it, delete that file and its handler in .codex/hooks.json.\"}}\n",
+    "stderr": ""
+  },
+  "subfolder_existing_file": {
+    "expected": "deny because pkg/a.ts exists",
+    "code": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+}
