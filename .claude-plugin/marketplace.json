@@ -1,0 +1,35 @@
+{
+  "name": "agentic-codebase",
+  "owner": {
+    "name": "Agentic Studio",
+    "url": "https://github.com/Agentic-Studio-Pvt-Ltd"
+  },
+  "metadata": {
+    "description": "agentic-codebase: builds the Claude Code setup your repo and your own transcripts justify. Local only, plan approved before any file is written."
+  },
+  "plugins": [
+    {
+      "name": "agentic-codebase",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Derives a customized Claude Code setup from your repo and your own transcripts: rules, hooks, skills, subagents, and MCP drafts, each traced to evidence, behind a plan you approve first.",
+      "author": {
+        "name": "Agentic Studio",
+        "url": "https://github.com/Agentic-Studio-Pvt-Ltd"
+      },
+      "homepage": "https://github.com/Agentic-Studio-Pvt-Ltd/agentic-codebase",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": [
+        "claude-code",
+        "setup",
+        "skills",
+        "subagents",
+        "hooks",
+        "rules",
+        "mcp",
+        "codebase-analysis"
+      ]
+    }
+  ]
+}

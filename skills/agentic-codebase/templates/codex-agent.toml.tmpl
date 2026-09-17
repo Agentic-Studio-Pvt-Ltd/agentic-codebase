@@ -1,0 +1,199 @@
+#> ─── agentic-codebase template: codex-agent.toml.tmpl ─────────────────────────────────
+#> Emits: <repo>/.codex/agents/{{SUBAGENT_NAME}}.toml   (Codex — **Native**)
+#>        Authority on the bytes: adapters/codex.md §4.5. Verdict on support:
+#>        adapters/capabilities.md, row "Subagents".
+#>
+#> This is the Codex half of one artifact type. The Claude Code half is
+#> templates/subagent.md.tmpl — same candidate, same evidence string, same agentic-codebase-id, two
+#> formats: markdown-with-frontmatter there, TOML here. Codex does NOT read
+#> `.claude/agents/*.md`, and Claude Code does NOT read this file. With both targets selected,
+#> emit both files from the same candidate and say so in the plan.
+#>
+#> Filling rules
+#>  1. Replace every placeholder — an ALL_CAPS name in double braces. Delete every line starting
+#>     with "#>". Plain "#" comments stay: they are the emitted file's own documentation.
+#>  2. Keep the five agentic-codebase-* header lines verbatim. `verify_artifacts.py` reads
+#>     `# agentic-codebase-id:` style comment headers in any text file, and a rerun matches on
+#>     agentic-codebase-id to rewrite this file in place instead of writing a second copy.
+#>     adapters/codex.md §4.5 shows the same block at the END of the file; both are legal TOML
+#>     and the verifier reads them anywhere. Emit them at the top, where a human sees them —
+#>     and NEVER inside the ''' literal below, where they would become prompt text.
+#>  3. Whole-file artifact. agentic-codebase owns this file; it is never merged. If a file of this name
+#>     exists WITHOUT the agentic-codebase ID block, do not touch it: write
+#>     `{{SUBAGENT_NAME}}.toml.proposed` and record a needs-you item (adapters/codex.md §4.5).
+#>  4. TOML only. Bare keys, `=` not `:`, strings always quoted. Emit exactly the keys below —
+#>     `name`, `description`, `developer_instructions` are required; `model_reasoning_effort`
+#>     and `sandbox_mode` are optional and `model` is deliberately never emitted (a pinned model
+#>     goes stale and silently changes the user's session).
+#>  5. Build a subagent only for work that needs isolated context, a specialist persona, or
+#>     parallelism. Codex subagents ARE real separate threads (verified: 60% of the rollout
+#>     files on the research machine are subagent threads), so a candidate whose value is
+#>     context isolation passes the evidence test on this target — it is not a substitution.
+#>  6. **The one honest loss versus Claude Code: there is no per-agent tool allowlist.** If the
+#>     Claude Code candidate carried `tools:`, do not invent an equivalent here. Still emit
+#>     `sandbox_mode = "read-only"` for any review/analysis agent — it is the nearest thing Codex
+#>     has and it is worth emitting — but do not describe it as the restriction. State the loss in
+#>     the plan's capability notes. Never emit `danger-full-access`.
+#> 6a. **Never advertise this file as proof that anything is read-only.** Two separate gaps, both
+#>     real, and adapters/codex.md §4.5.1 is the authority on them:
+#>     (a) `sandbox_mode` governs the **local** filesystem and process sandbox — this checkout and
+#>     the commands run against it. It does not constrain a remote database, a remote API, or any
+#>     other network endpoint the agent reaches. That is exactly the `db-inspector` / `query-db` /
+#>     `ask-product` case, where the thing being read is not on disk: a "read-only" agent holding a
+#>     read-write `DATABASE_URL` can still issue writes to that database.
+#>     (b) `developer_instructions` are instructions to a custom agent, **not** an unrestricted
+#>     replacement for Codex's own higher-priority instructions. Current Codex documentation says
+#>     an active parent runtime override can be reapplied to a child, so the refusals below are a
+#>     strong default, not an enforced boundary.
+#>     **Where read-only access to a real service is promised, the enforcement has to be
+#>     service-side** — a read-only database role, a read-scoped API key, a replica connection
+#>     string — with `sandbox_mode` and the prose refusals as defense in depth rather than the
+#>     guarantee. agentic-codebase never provisions a credential, so when the candidate promises read-only
+#>     against a live service: say in the plan's capability notes what is enforced and by what,
+#>     name the credential this agent expects in `developer_instructions`, and put "create a
+#>     read-only role/credential for <service> and point <ENV_VAR_NAME> at it" on the report's
+#>     manual checklist. Verify the **effective** permissions of the credential the agent will
+#>     actually use; never infer them from what this file says.
+#>  7. Target length for developer_instructions after filling: 40-120 lines, the same budget as
+#>     the markdown body it is built from.
+#>  8. No attribution inside `developer_instructions`. The one comment line below is the only
+#>     placement — attribution must never reach a generated agent's runtime behaviour.
+#>  9. Trust gate: like every repo-scoped Codex artifact, this file is inert until the project
+#>     is trusted (`[projects."<abs path>"] trust_level = "trusted"`). agentic-codebase never edits
+#>     config.toml to set it; the report's manual checklist carries it.
+#> 9a. Manifest entry: `"type": "subagent"`, `"path": ".codex/agents/<name>.toml"`. The verifier
+#>     reads this file's `# agentic-codebase-*` header comments correctly and, for a non-markdown path,
+#>     reads its identity from the TOML instead of asking for YAML frontmatter:
+#>     `subagent_frontmatter` requires `name`, `description` and `developer_instructions`, and a
+#>     non-empty agent `name` (filename matching is a generation convention). `subagent_tools` checks what Codex actually has — no
+#>     per-agent allowlist (a `tools` key WARNs, because the restriction is silently lost), a
+#>     pinned `model` WARNs, and `sandbox_mode = "danger-full-access"` FAILs.
+#>     **Expect zero FAILs on a correct file.** If `subagent_frontmatter` ever complains about
+#>     missing frontmatter here, the verifier is wrong and this file is not: report it and change
+#>     nothing (verification.md §9). Never add a `---` block to satisfy it — Codex does not read
+#>     one, and a TOML file that starts with `---` no longer parses.
+#> 10. Phase 8 validates this file STATICALLY only — that it parses as TOML, that the three
+#>     required keys are present, that the `name` identifies the agent (matching the filename is a convention). adapters/codex.md §4.5
+#>     records that no read-only probe can prove a newly written agents file is loaded, so the
+#>     report's manual checklist must carry the live check: in a Codex session in this repo, ask
+#>     the model to spawn `{{SUBAGENT_NAME}}` by name, then check the child rollout's `session_meta`
+#>     for `source.subagent.thread_spawn.agent_path` pointing at this file.
+#>     This is the whole of phase 8 for a Codex subagent and verification.md §7 says the same thing
+#>     in the same words — there is no dry-run half on this target, so nothing is being skipped and
+#>     nothing may be reported as if it had run. The verified row reads **"written and statically
+#>     valid — loading not tested"**, and "working", "live" or "verified" are all false of an agent
+#>     that has never been spawned. On Claude Code the same artifact type does get an automatic
+#>     `Task` dry-run when the agent is visible to the session; that difference is a fact about the
+#>     two targets, not a gap in this file.
+
+# agentic-codebase-id: {{AGENTIC_CODEBASE_ID}}
+# agentic-codebase-version: 1
+# agentic-codebase-generated: {{GENERATED_DATE}}
+# agentic-codebase-evidence: {{EVIDENCE_LINE}}
+# Safe to delete or edit. This work was brought to you by Agentic Studio.
+#
+# {{SUBAGENT_TITLE}}
+# Remove: delete this file. Nothing else points at it.
+
+#> name — use this file's stem by convention, kebab-case; Codex routes by this value. It is how the main thread spawns the agent.
+name = "{{SUBAGENT_NAME}}"
+
+#> description — the routing line, and the only thing the main agent reads when deciding whether
+#> to delegate. Third person, under 1024 characters, and it must state WHAT THE SUBAGENT RETURNS,
+#> not its personality. Three parts in this order:
+#>   (a) what it produces (its output, not its process);
+#>   (b) when to delegate, in the words the main thread would be thinking;
+#>   (c) a "Does not ..." clause naming the nearest neighbour it must not steal work from.
+#> Use a """ basic multi-line string so ordinary quotes inside need no escaping; keep it to a few
+#> lines. Shape to copy: "Reviews a diff for correctness, missing tests, and violations of this
+#> repo's conventions. Returns a severity-ranked finding list with file:line anchors. Delegate
+#> when the user asks to review a branch, a PR, or 'the changes'. Does not edit code."
+description = """
+{{SUBAGENT_DESCRIPTION}}
+"""
+
+#> model_reasoning_effort — optional, one of the effort levels this build accepts ("high" is
+#> VERIFIED in real files). Emit ONLY if the interview asked for it; delete the line otherwise.
+model_reasoning_effort = "{{MODEL_REASONING_EFFORT}}"
+
+#> sandbox_mode — optional. VERIFIED values in the wild: "read-only", "workspace-write". The
+#> binary's enum also carries "danger-full-access" and "external-sandbox"; never emit the former.
+#> Emit "read-only" for any agent that only reads and reports. Delete the line if the agent must
+#> write and the interview approved that.
+#> What it restricts: the LOCAL filesystem and process sandbox. What it does NOT restrict: anything
+#> reached over the network — a remote database, an HTTP API, an MCP server. Emitting this line is
+#> still worth doing; describing it to the user as the reason a remote query is read-only is not
+#> (rule 6a). Note that network access is a separate knob (CODEX_SANDBOX_NETWORK_DISABLED), which
+#> agentic-codebase does not set.
+sandbox_mode = "{{SANDBOX_MODE}}"
+
+#> developer_instructions — the agent's whole system prompt, and the TOML counterpart of the
+#> markdown body in subagent.md.tmpl. Use a ''' literal string: nothing inside is escaped, so
+#> backslashes, ${VAR}, quotes and backticks are all safe. The one thing a ''' literal cannot
+#> contain is ''' itself — if the body needs it, switch that fenced block to ~~~ or use """ and
+#> escape. Keep the same section structure the markdown template uses, because it is what makes
+#> a subagent behave consistently in a context the caller cannot see.
+developer_instructions = '''
+# Role
+
+You are {{ROLE_STATEMENT}}.
+
+You work on {{REPO_NAME}}: {{REPO_ONE_LINER}}. The conventions that matter to you are
+{{KEY_CONVENTIONS}}.
+
+Your single job is {{SINGLE_JOB}}. You are done when {{DONE_CONDITION}}.
+
+# Scope boundaries
+
+You must refuse and hand back to the caller when:
+
+#> repeat/trim: 3-6 bullets. Each is a concrete refusal, not a value statement. These exist to
+#> stop scope creep in a context the main thread cannot see. On this target they carry extra
+#> weight: there is no `tools` allowlist to enforce the boundary mechanically. They are also only
+#> a default the model follows — not a boundary the runtime enforces — so a refusal that protects
+#> a real service (a database, a billing API) needs a service-side counterpart as well (rule 6a).
+- {{REFUSE_1}}
+- {{REFUSE_2}}
+- {{REFUSE_3}}
+
+You never:
+
+- {{NEVER_1}}
+- {{NEVER_2}}
+- Commit, push, rebase, force-push, or otherwise change git history.
+- Read `.env*` files, credential files, or any secret value.
+
+When a boundary is hit, stop immediately and return the output contract below with
+`status: blocked` and the reason. Do not work around it.
+
+# Method
+
+#> repeat/trim: 3-8 numbered imperatives. Name exact paths, exact commands, exact search terms.
+#> A subagent that has to improvise its own method returns inconsistent work.
+1. {{METHOD_1}}
+2. {{METHOD_2}}
+3. {{METHOD_3}}
+4. {{METHOD_4}}
+
+Budget: {{EFFORT_BUDGET}}. If you exceed it, return what you have with `status: partial` rather
+than continuing.
+
+# Output contract
+
+Return exactly this structure and nothing else — no preamble, no restatement of the task:
+
+status: done | partial | blocked
+summary: <{{SUMMARY_LENGTH}}>
+{{OUTPUT_FIELD_1}}: <{{OUTPUT_FIELD_1_SHAPE}}>
+{{OUTPUT_FIELD_2}}: <{{OUTPUT_FIELD_2_SHAPE}}>
+evidence:
+  - <file:line or command output that supports each claim>
+open_questions:
+  - <anything the caller must decide; empty list if none>
+
+Rules for the output:
+
+- Every claim carries a `file:line` or a command you actually ran. No claim without evidence.
+- Report uncertainty as uncertainty. Never present an inference as an observation.
+- Keep it under {{OUTPUT_SIZE_CAP}} — the caller pays for this text in its own context window.
+'''

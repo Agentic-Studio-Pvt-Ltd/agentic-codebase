@@ -1,0 +1,60 @@
+{
+  "_agentic-codebase_template": {
+    "template": "plugin.json.tmpl",
+    "STATUS": "NOT AN ARTIFACT TYPE IN v1. NO RUN EMITS THIS FILE, UNDER ANY ANSWER THE INTERVIEW CAN PRODUCE. Read the retained_because key before doing anything with this template.",
+    "v1_status": "A plugin manifest is a v1 non-goal (adapters/capabilities.md row 'Plugin manifest' reads **Not emitted** on both targets; adapters/claude-code.md §4.8 and adapters/codex.md §4.7 say the same). The setup a run builds is derived from one repo's evidence and personalized to it, so a portable copy would be wrong wherever it landed. There is no build-order step for it (references/build-and-verify.md), the interview question that used to offer it is banned outright (references/interview.md §2, §4.1), and phase 7 never opens this file.",
+    "do_not_conflate": "Two different things share the word 'plugin'. (1) Packaging THE CUSTOMER'S generated setup as a plugin — that is what this template describes, and it is the non-goal above. (2) Distributing AGENTIC_CODEBASE ITSELF as a Claude Code plugin — that is this repo's own .claude-plugin/plugin.json and README install route 1, it is real, it is supported, and nothing here affects it. A user asking 'can I install this as a plugin?' is almost always asking (2).",
+    "retained_because": "The schema below was established by reading a real manifest out of the local plugin cache, and setup-manager must be able to answer a user who asks about packaging without that research having to be redone. references/verification.md §2.0 also cites this file's _agentic-codebase key as the shape a manifest's own identity block takes. Deleting the template would cost both and buy nothing, since nothing reads it at build time. If v1.x ever adds the artifact type back, the filling rules below are the starting point — not a licence to use them now.",
+    "emits": "NOTHING IN v1. Were it ever emitted, it would be {{PLUGIN_DIR}}/.claude-plugin/plugin.json — the manifest that packages THIS repo's generated setup so it can be installed elsewhere (Claude Code). It is not agentic-codebase's own manifest. The Codex counterpart is a separate file with a separate template: codex-plugin.json.tmpl. Cross-tool plugins DUAL-SHIP both manifests side by side over the same source tree and keep name and version identical between them.",
+    "delete_this_key_when_emitting": true,
+    "note": "This whole _agentic-codebase_template key is filling guidance. Remove it from the emitted file. JSON carries no comments, so guidance and metadata live in keys; only the _agentic-codebase key survives.",
+    "filling_rules": [
+      "DORMANT. None of these rules runs in v1; they document the schema, they do not authorize a build. A run that reaches this array has taken a wrong turn in phase 4 — a `plugin manifest` candidate is a phase-4 defect, not a phase-7 problem.",
+      "Replace every placeholder — an ALL_CAPS name in double braces. Every one sits inside a JSON string, so the template parses before and after substitution.",
+      "Escape every substituted value for JSON: a raw double quote, backslash, or newline in a value breaks the file. Substitute, then re-parse before writing.",
+      "name: lowercase, hyphenated, no spaces. It is the install handle, so make it repo-specific, e.g. acme-api-agentic-setup.",
+      "version: start at 0.1.0 and bump on every rerun that changes a component. Semver, no leading v.",
+      "author: take name and email from `git config user.name` / `git config user.email`, or from the top contributor in mine_git.py output. This is the setup's owner, not agentic-codebase.",
+      "Component paths are relative to the plugin root and must exist. Delete the key for any component type this setup did not build — a manifest pointing at a missing directory fails to load.",
+      "The hooks key points at a JSON file, not a directory: it holds the same hooks object shape as the settings-hooks fragment.",
+      "Do not add keys Claude Code does not read. Unknown keys are ignored at best and rejected at worst; the underscore-prefixed metadata below is the one exception.",
+      "A packaged hook script that must work under both manifests should resolve its root as ${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}: Codex exports both spellings, Claude Code only the first."
+    ],
+    "packaging_steps": [
+      "DORMANT in v1, exactly like filling_rules. Kept as the record of what packaging would involve, so setup-manager can describe it to a user who asks.",
+      "Copy the generated artifacts into {{PLUGIN_DIR}} keeping the directory names below.",
+      "Write this manifest to {{PLUGIN_DIR}}/.claude-plugin/plugin.json.",
+      "Validate: `python3 -c \"import json,sys;json.load(open(sys.argv[1]))\" {{PLUGIN_DIR}}/.claude-plugin/plugin.json`.",
+      "Install locally to test: `/plugin install {{PLUGIN_DIR}}` from inside the agent, then confirm the skills and agents list.",
+      "Publishing to a marketplace is the user's call and is out of scope for this run: say so in report.md rather than doing it."
+    ]
+  },
+  "_agentic-codebase": {
+    "agentic-codebase-id": "{{AGENTIC_CODEBASE_ID}}",
+    "agentic-codebase-version": 1,
+    "agentic-codebase-generated": "{{GENERATED_DATE}}",
+    "agentic-codebase-evidence": "{{EVIDENCE_LINE}}",
+    "note": "Inert metadata. Claude Code does not read this key; it exists so a rerun can match on id and rewrite this file in place. Safe to delete or edit. This work was brought to you by Agentic Studio.",
+    "remove": "Delete {{PLUGIN_DIR}}. Removing the package leaves the artifacts in the repo untouched."
+  },
+  "name": "{{PLUGIN_NAME}}",
+  "version": "{{PLUGIN_VERSION}}",
+  "description": "{{PLUGIN_DESCRIPTION}}",
+  "author": {
+    "name": "{{AUTHOR_NAME}}",
+    "email": "{{AUTHOR_EMAIL}}",
+    "url": "{{AUTHOR_URL}}"
+  },
+  "homepage": "{{PLUGIN_HOMEPAGE}}",
+  "repository": "{{PLUGIN_REPOSITORY}}",
+  "license": "{{PLUGIN_LICENSE}}",
+  "keywords": [
+    "{{KEYWORD_1}}",
+    "{{KEYWORD_2}}"
+  ],
+  "skills": "./skills",
+  "agents": "./agents",
+  "commands": "./commands",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
+}

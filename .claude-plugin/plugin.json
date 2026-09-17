@@ -1,0 +1,28 @@
+{
+  "name": "agentic-codebase",
+  "version": "0.1.0",
+  "description": "Analyzes your repo and your local Claude Code transcripts, finds the work you repeat and the guardrails you are missing, and builds a customized agentic setup (CLAUDE.md, rules, hooks, skills, subagents, MCP drafts) from that evidence. Writes a plan you approve before it creates a single file. Use it to set up Claude Code for a repo, audit an existing .claude/ setup, or turn repeated prompts into skills.",
+  "author": {
+    "name": "Agentic Studio",
+    "url": "https://github.com/Agentic-Studio-Pvt-Ltd"
+  },
+  "homepage": "https://github.com/Agentic-Studio-Pvt-Ltd/agentic-codebase",
+  "repository": "https://github.com/Agentic-Studio-Pvt-Ltd/agentic-codebase",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "setup",
+    "onboarding",
+    "skills",
+    "subagents",
+    "hooks",
+    "rules",
+    "claude-md",
+    "agents-md",
+    "mcp",
+    "codebase-analysis",
+    "transcript-analysis",
+    "developer-experience"
+  ],
+  "skills": "./skills/"
+}

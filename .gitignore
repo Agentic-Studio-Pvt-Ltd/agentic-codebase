@@ -1,0 +1,114 @@
+# ---------------------------------------------------------------------------
+# agentic-codebase — repository ignores
+#
+# Note: docs/agentic-setup/ is NOT ignored. plan.md and report.md are the
+# deliverables a user is meant to review and commit. See the negations at the
+# bottom of this file.
+# ---------------------------------------------------------------------------
+
+# --- agentic-codebase run output (local, disposable, may contain repo-specific text) ---
+.agentic-codebase-cache/
+.agentic-codebase-scratch/
+*.local.json
+discovery.json
+signals.json
+transcripts.json
+git-signals.json
+build-manifest.json
+agentic-codebase-run-*.json
+scratch/
+scratchpad/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+env/
+ENV/
+.tox/
+.nox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.cover
+
+# --- Node / Bun ---
+node_modules/
+.npm/
+.yarn/
+.pnp.*
+bun.lockb
+.next/
+.nuxt/
+.turbo/
+.cache/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Secrets and local environment (never committed, never read by agentic-codebase) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+*credentials*
+
+# --- Editor / OS ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# --- Logs and temp ---
+*.log
+logs/
+tmp/
+temp/
+.tmp/
+
+# --- Agent worktrees (live git worktrees, disposable, never source) ---
+.claude/worktrees/
+
+# ---------------------------------------------------------------------------
+# Explicitly tracked: agentic-codebase's own deliverables.
+# ---------------------------------------------------------------------------
+!docs/agentic-setup/
+!docs/agentic-setup/**
+!docs/agentic-setup/plan.md
+!docs/agentic-setup/report.md

@@ -1,0 +1,108 @@
+agentic-codebase template: settings-hooks.json.tmpl
+===========================================
+
+This file is NOT written to the repo. It is a fragment to MERGE into `.claude/settings.json`,
+which is the user's file and may already contain permissions, env, statusline, and hooks that have
+nothing to do with agentic-codebase. The JSON body below is the only part that is data; everything above
+the BEGIN marker is instructions for the merge and must never be written anywhere.
+
+**Claude Code only.** For the Codex target use `codex-hooks.json.tmpl`, which merges into
+`<repo>/.codex/hooks.json`. Codex has a full, first-class hook system — 12 events, regex matchers,
+a JSON decision protocol — so nothing is substituted there and nothing is lost. Do not paste this
+fragment into a Codex config: the shapes differ (Codex's top level accepts only `description` and
+`hooks`, and an `_agentic-codebase` key there silently disables every hook in the repo), and
+`$CLAUDE_PROJECT_DIR` does not exist on that target.
+
+Merge procedure — read, append, write. Never replace.
+----------------------------------------------------
+
+1. Read `.claude/settings.json`. If it does not exist, create it as `{}`. If it exists but does not
+   parse as JSON, stop: report the parse error to the user, write nothing, and record the hook as
+   skipped in the report. Never overwrite a file you could not read.
+2. Take a copy of the file's contents before touching it. Every hook merge is one entry; if a later
+   step fails, restore the copy.
+3. Ensure a top-level `"hooks"` object exists. Ensure `hooks["{{HOOK_EVENT}}"]` exists as an array.
+   Create only what is missing; leave every sibling key exactly as it was.
+4. Look for the **command object** agentic-codebase already owns: any object in
+   `hooks["{{HOOK_EVENT}}"][].hooks[]` whose `command` ends with `/.claude/hooks/{{HOOK_FILE_NAME}}`.
+   That whole command path, under that event, is the idempotency key.
+   - Found: replace **that one command object** in place — `{"type": "command", "command": …,
+     "timeout": 5}` — and stop. **Never replace the matcher group that holds it.** The group is
+     routinely shared with hooks the user wrote, so swapping the group for the fragment's entry
+     deletes every sibling in it. Do not append a second copy.
+   - Not found: append the fragment's **command object** to the `hooks` array of the group whose
+     `matcher` equals the fragment's `matcher`. Only when there is no such group, append the
+     fragment's whole entry — matcher group and all — to the end of the event array.
+5. Do not drop, reorder, or edit any object you did not match in step 4, including the siblings in
+   the group you appended to, entries under other events, and hooks the user wrote by hand.
+6. Do NOT copy the fragment's `_agentic-codebase` key into `.claude/settings.json`. It is inert metadata
+   describing this fragment, not settings. Provenance in the merged file lives in the command path
+   and in the header of the hook script itself.
+7. Escape every substituted value for JSON before merging: a raw double quote, backslash, or
+   newline in a value breaks the file.
+8. Write the result with 2-space indentation and a trailing newline, then re-read and parse it to
+   confirm it is still valid JSON. `verify_artifacts.py` re-checks this and also confirms the
+   referenced script exists and is executable — so `chmod 0755` the hook script before verifying.
+
+Event shapes
+------------
+
+`PreToolUse` and `PostToolUse` entries take a `"matcher"` (a regex over tool names, e.g.
+`Edit|Write|MultiEdit`, or `Bash`). `UserPromptSubmit`, `Stop`, `SubagentStop`, `SessionStart`, and
+`SessionEnd` do not match on tools: for those, delete the `"matcher"` key from the fragment entirely
+rather than leaving it empty.
+
+`timeout` is in seconds and is the harness's outer limit. Keep it at 5: the hook script enforces its
+own 2-second budget internally and fails open, so the harness timeout should only ever fire if the
+script itself is wedged.
+
+`${CLAUDE_PROJECT_DIR}` is expanded by the harness to the project root. Keep it — an absolute
+path from the generating machine breaks the moment a teammate checks the repo out. **Emit the
+braced form.** Both spellings are recognised by the expander and the bare one is commoner in the
+wild, but PowerShell reads `$CLAUDE_PROJECT_DIR` as an undefined variable and substitutes nothing
+(adapters/claude-code.md §4.3). The change is safe on a rerun: the idempotency key matches on the
+**suffix** `/.claude/hooks/<name>.sh`, and the un-merge script normalises both spellings of the
+project-root variable to the same `<repo>/.claude/hooks/<name>.sh` before comparing the **whole**
+path, so the two spellings are the same handler to both — and a basename alone is an identity to
+neither.
+
+Removal
+-------
+
+**The undo is generated from `build-manifest.json`, not from this paragraph.** The script that runs
+is `references/report-template.md` §3.1 block C, and this file is not one of its inputs. What that
+script does — and the only removal that is correct here — is: delete the **command object** whose
+`command` matches, under the event it was registered in, leaving its matcher group and every sibling
+hook exactly where they are; prune the group, the event array and the `hooks` key only when this
+removal is what emptied them; then delete `.claude/hooks/{{HOOK_FILE_NAME}}`. A hook of the user's
+that merely shares a basename at another path is not this hook and is never touched.
+
+<<<AGENTIC_CODEBASE-FRAGMENT-BEGIN>>>
+```json
+{
+  "_agentic-codebase": {
+    "agentic-codebase-id": "{{AGENTIC_CODEBASE_ID}}",
+    "agentic-codebase-version": 1,
+    "agentic-codebase-generated": "{{GENERATED_DATE}}",
+    "agentic-codebase-evidence": "{{EVIDENCE_LINE}}",
+    "note": "Inert metadata describing this fragment. Do not merge this key into settings.json. Safe to delete or edit. No attribution line here, deliberately: this key is the one _agentic-codebase block that is never merged into a generated file, so a placement here would reach nothing. settings.json gets no attribution at all.",
+    "merge_into": ".claude/settings.json",
+    "idempotency_key": "hooks.{{HOOK_EVENT}}[].hooks[].command ends with /.claude/hooks/{{HOOK_FILE_NAME}}"
+  },
+  "hooks": {
+    "{{HOOK_EVENT}}": [
+      {
+        "matcher": "{{HOOK_MATCHER}}",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/{{HOOK_FILE_NAME}}",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+<<<AGENTIC_CODEBASE-FRAGMENT-END>>>

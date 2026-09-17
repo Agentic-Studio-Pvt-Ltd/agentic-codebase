@@ -1,0 +1,205 @@
+{{!--
+agentic-codebase template: index-doc-section.md.tmpl
+Emits: one delimited block inside the repo's index doc — CLAUDE.md (Claude Code) or AGENTS.md
+(Codex). This is the only generated artifact that goes into a file the user already owns, so it is
+the only one with a merge procedure instead of a write.
+
+**This is the stitch, and it is built LAST.** Every other artifact is inert until this block points
+at it. Its tables enumerate what was actually written, which is why it cannot be written first —
+an earlier build order produced rows linking to files that did not exist yet. See blueprint.md §9.
+
+THE ADDITIVE LAW — the rule this file exists to protect
+ The user's index doc is theirs. Never delete, reword, reorder, summarize, reflow, or "clean up"
+ a single line of it, however stale or wrong it looks. Everything agentic-codebase writes lives inside the
+ agentic-codebase:begin / agentic-codebase:end span and nowhere else. If their existing text contradicts a rule
+ this run generated, say so in report.md and let them decide — do not fix their prose, and do not
+ quietly write the correction into this block as though it were new.
+
+Filling rules
+ 1. Replace every placeholder — an ALL_CAPS name in double braces.
+ 2. Delete every guidance block: this one, and the short "repeat:" notes under the table headers.
+    They use the same brace-and-bang markers as this block, and they do not nest — each one ends at
+    its own closing marker. Leftovers render as nothing, but the agent still reads them, so none
+    may survive.
+ 3. Emit ONLY the span from the begin marker to the end marker. Nothing above or below it.
+    The spelling is `agentic-codebase:begin` / `agentic-codebase:end`, exactly — this file is where that
+    convention is defined, and the adapters quote it. `verify_artifacts.py` also accepts
+    `agentic-codebase:start` so a rerun can still find a block written by an older agentic-codebase; that is
+    backward compatibility, not a second legal spelling. Never emit `start`.
+ 4. Merge procedure — never overwrite the user's index doc:
+    a. Read the existing file. If it already contains `<!-- agentic-codebase:begin id={{AGENTIC_CODEBASE_ID}} -->`,
+       replace exactly the span from that marker through its matching
+       `<!-- agentic-codebase:end id={{AGENTIC_CODEBASE_ID}} -->`, inclusive. Nothing outside that span changes.
+       **Match markers only at the start of a line** (`^[ \t]*<!--[ \t]*agentic-codebase:(begin|end) ...`),
+       and take the FIRST begin and the LAST end. This is not optional: the "Removing this"
+       section below quotes both marker strings inside backticks, so a plain substring search
+       finds the quoted `end` on that line instead of the real one and silently truncates the
+       block, leaving an orphaned end marker behind. `verify_artifacts.py`'s `_MARKER` regex is
+       line-anchored for exactly this reason — match what it matches.
+    b. If the markers are absent, append: one blank line, then this block, at the end of the file.
+       **Exactly one blank line, outside the span — this is load-bearing.** The undo in
+       `report-template.md` §3.1 removes the marker span and reclaims that one separator line,
+       and only when the recorded `pre_existing_sha256` proves the result matches the pre-run
+       bytes. Two blank lines, or a separator moved inside the span, breaks the byte-exact
+       restore: the removal degrades to a warning and leaves a stray blank line in the user's
+       file. If this separator ever changes, change §3.1's reclaim in the same edit.
+    c. If the file does not exist at all, create it with the repo's name as an H1 and a one-line
+       description, then this block.
+    d. Never reflow, reorder, or reword the user's own prose. See THE ADDITIVE LAW above.
+ 5. Heading levels: this block uses `##` as its top level, which is right for a doc whose title is
+    an `#` H1. Shift every heading down one level if the existing doc starts its sections at `##`
+    under no H1, so the block nests instead of competing.
+ 5a. **Codex only — two things that can make a correct merge do nothing.**
+    * `project_doc_max_bytes` defaults to **32768 bytes shared by the whole `AGENTS.md` chain**
+      (global, repo root, and every directory down to the cwd), and discovery **stops** at the cap.
+      Appending to an already-large `AGENTS.md` can therefore silently drop the deeper files that
+      used to load. Check the chain's total size before appending; if the block would cross the
+      cap, say so in the plan and move the prose into `<plan-dir>/` files that this section only
+      points at.
+    * `AGENTS.override.md` in the same directory **outranks** `AGENTS.md`. If one exists, a block
+      appended to `AGENTS.md` is shadowed — merge into the override, or record it as a needs-you
+      item. There is no `@import` on this target, and deeper files win on conflict.
+    A repo that has only `CLAUDE.md` gives Codex nothing: write `AGENTS.md` too, or symlink one to
+    the other (the only zero-config way one file serves both), and say in the plan which was done.
+ 6. Every row below must point at a file that was actually built. A row for a skipped candidate is
+    a broken link and a lie about the setup — list skipped items in report.md, not here.
+ 7. **Drop any section whose artifact type produced nothing.** An empty table with a "none yet"
+    row is noise. Sections are dropped, never emptied.
+ 8. **Every table cell is written from the artifact itself, not from the plan.** The rule sentence
+    is the rule file's own imperative sentence, verbatim; the skill trigger is lifted from that
+    skill's `description`; the subagent's "returns" is its output contract's first line. This is
+    what stops the tables drifting from the files within a week.
+ 9. This block and report.md are the only two generated files that carry the attribution footer.
+--}}
+<!-- agentic-codebase:begin id={{AGENTIC_CODEBASE_ID}} -->
+<!--
+agentic-codebase-id: {{AGENTIC_CODEBASE_ID}}
+agentic-codebase-version: 1
+agentic-codebase-generated: {{GENERATED_DATE}}
+agentic-codebase-evidence: {{EVIDENCE_LINE}}
+Safe to delete or edit.
+-->
+
+## Agentic setup
+
+Generated by agentic-codebase on {{GENERATED_DATE}} from this repo and {{EVIDENCE_SUMMARY}}. Every item
+below traces to a counted signal in this codebase; the reasoning is in
+[{{PLAN_PATH}}]({{PLAN_PATH}}) and the run record is in [{{REPORT_PATH}}]({{REPORT_PATH}}).
+
+{{SETUP_SUMMARY_SENTENCE}}
+
+{{!-- SETUP_SUMMARY_SENTENCE: two or three sentences naming what this repo is and what the setup
+     is shaped around — the stack, the zones, the services, the workflow. It is the paragraph a
+     new contributor reads first, so it must be about THIS repo. "A Next.js app with a Drizzle
+     schema under db/ and server actions under actions/, deployed on Vercel, instrumented with
+     PostHog." Not "an agentic setup for this repository." --}}
+
+### How work moves here
+
+{{!-- Drop this whole section when interview Q14 answered `none` AND signals.git had no branch or
+     commit convention to state. Otherwise: the engineering workflow, in this order —
+       1. The named engineering system, if Q14 named one that is installed, and how the artifacts
+          below plug into it. Written from what the user said it does, never from assumption.
+       2. Branch naming, from signals.git.branch_naming, with a real example branch from this repo.
+       3. Commit convention, from signals.git.commit_conventions, with a real example subject.
+       4. What happens before work lands: review, tests, the tracker.
+     Keep it to what the evidence supports. This section states how the repo already works — it
+     never proposes a new process. --}}
+{{WORKFLOW_PROSE}}
+
+### Subagents
+
+Specialists that run in their own context window and report back. Delegate rather than doing the
+work inline when the trigger matches.
+
+| Subagent | What it is | Delegate when | Returns |
+|---|---|---|---|
+{{!-- repeat: one row per built subagent. "What it is" is one or two lines from its own
+     description. "Returns" is the first line of its output contract. --}}
+| [{{SUBAGENT_1_NAME}}]({{SUBAGENT_1_PATH}}) | {{SUBAGENT_1_DESC}} | {{SUBAGENT_1_TRIGGER}} | {{SUBAGENT_1_OUTPUT}} |
+
+### Skills
+
+Procedures to invoke by name, or to let the agent select on the trigger phrases in each one's
+description.
+
+| Skill | What it does | How to invoke |
+|---|---|---|
+{{!-- repeat: one row per built skill. `setup-manager` is always one of them and goes LAST in the
+     table, because it is the one that maintains the others. --}}
+| [{{SKILL_1_NAME}}]({{SKILL_1_PATH}}) | {{SKILL_1_DESC}} | {{SKILL_1_TRIGGER}} |
+| [setup-manager]({{SETUP_MANAGER_PATH}}) | Creates, extends, modifies, audits and removes any part of this setup — rules, skills, hooks, subagents, permissions, MCP servers. | Ask for a change to the setup: "add a rule for …", "loosen the … hook", "what is in my setup?" |
+
+### Rules
+
+Path-scoped guardrails. Read the one whose scope matches the files you are about to change.
+
+| Rule | File | Scope | What it governs |
+|---|---|---|---|
+{{!-- repeat: one row per built rule. "What it governs" is the rule's own imperative sentence,
+     verbatim, so this table never drifts from the rule file.
+     This table is not a claim that rules load themselves: on Claude Code a `paths:` frontmatter
+     auto-loads one lazily and an unscoped rule loads at session start; on Codex nothing walks a
+     prose rules directory at all, and on both targets THIS TABLE is what makes the rule
+     reachable. Do not promise automatic application in the emitted text. --}}
+| {{RULE_1_NAME}} | [{{RULE_1_PATH}}]({{RULE_1_PATH}}) | `{{RULE_1_SCOPE}}` | {{RULE_1_SENTENCE}} |
+| {{RULE_2_NAME}} | [{{RULE_2_PATH}}]({{RULE_2_PATH}}) | `{{RULE_2_SCOPE}}` | {{RULE_2_SENTENCE}} |
+
+### Guardrails
+
+{{!-- Drop any line whose artifact type was not built. --}}
+
+| Guardrail | Fires on | Behaviour | Wired in |
+|---|---|---|---|
+{{!-- repeat: one row per built hook. "Behaviour" is `warns` or `blocks`, from hook_strictness. --}}
+| {{HOOK_1_NAME}} | {{HOOK_1_EVENT}} — {{HOOK_1_MATCHER}} | {{HOOK_1_BEHAVIOUR}} | `{{SETTINGS_PATH}}` |
+
+Permissions are set in `{{PERMISSIONS_PATH}}`: {{PERMISSIONS_SUMMARY}}.
+
+{{!-- PERMISSIONS_SUMMARY: one sentence naming what is pre-approved and what is blocked, e.g.
+     "this repo's own test, lint and typecheck commands are pre-approved; reads of .env.local and
+     installs through npm or pnpm are blocked." --}}
+
+### Connected services
+
+| Service | Used for | Status |
+|---|---|---|
+{{!-- repeat: one row per MCP draft written. Status is "configured" or "needs authentication —
+     see report.md". Never claim a server is connected when only a draft was written. --}}
+| {{MCP_1_NAME}} | {{MCP_1_PURPOSE}} | {{MCP_1_STATUS}} |
+
+Config: `{{MCP_PATH}}`.
+
+### Working with this repo
+
+{{!-- repeat/trim: 2-6 bullets, each derived from signals.transcripts.corrections[] — the things
+     this developer has had to say more than once. Generalize the correction into a directive and
+     keep their own vocabulary. Drop this section entirely when corrections[] is empty; never fill
+     it with generic advice about how to be a good assistant. --}}
+- {{INTERACTION_RULE_1}}
+- {{INTERACTION_RULE_2}}
+
+### Removing this
+
+Everything here is additive and safe to delete, in whole or one piece at a time.
+
+- One artifact: delete its file, and its row above.
+- One hook: delete its script, then its entry in `{{SETTINGS_PATH}}` — the entry whose `command`
+  ends with that script's name.
+- The permission entries: delete exactly the strings listed in
+  [{{REPORT_PATH}}]({{REPORT_PATH}}) from `{{PERMISSIONS_PATH}}`, leaving your own alone.
+- This section: delete everything from `<!-- agentic-codebase:begin id={{AGENTIC_CODEBASE_ID}} -->` through
+  `<!-- agentic-codebase:end id={{AGENTIC_CODEBASE_ID}} -->`. Nothing else in this file came from agentic-codebase.
+- All of it: `{{REMOVE_ALL_COMMAND}}`.
+
+Rerunning agentic-codebase updates these files in place by matching on `agentic-codebase-id`. It never writes a
+second copy, and it never edits text it did not generate.
+
+---
+
+This work was brought to you by Agentic Studio.
+
+Bigger codebase or a team? Agentic Studio makes your team AI-native in 4 weeks: agents, reviews, guardrails, CI.
+https://theagentic.studio/?utm_source=agentic-codebase&utm_campaign=oss&utm_medium=index-doc
+
+<!-- agentic-codebase:end id={{AGENTIC_CODEBASE_ID}} -->
